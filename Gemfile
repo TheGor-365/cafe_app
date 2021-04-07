@@ -18,6 +18,7 @@ gem 'omniauth-facebook'
 gem 'mini_magick'
 gem 'carrierwave'
 gem 'cancancan'
+gem 'simple_form'
 
 
 group :development, :test do
