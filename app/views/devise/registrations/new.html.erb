@@ -1,0 +1,56 @@
+<div class="container mt-5 mb-5">
+  <div class="row">
+    <div class="col-6">
+      <div class="card p-5">
+        <h5>Sign up</h5>
+
+        <%= form_for(resource, as: resource_name, url: registration_path(resource_name)) do |f| %>
+          <%= render "devise/shared/error_messages", resource: resource %>
+
+          <div class="form-group">
+            <%= f.label :email %>
+            <%= f.email_field :email, autofocus: true, autocomplete: "email", class: 'form-control' %>
+          </div>
+
+          <div class="form-group">
+            <%= f.label :username %>
+            <%= f.text_field :username, class: 'form-control' %>
+          </div>
+
+          <!-- <div class="form-group">
+            <div class="custom-file"> -->
+              <%# <%= f.label :avatar, class: 'custom-file-label' %>
+              <%#= f.file_field :avatar, type: 'file', class: 'custom-file-input' %>
+              <%#= f.hidden_field :avatar_cache %> %>
+            <!-- </div>
+          </div> -->
+
+          <div class="form-group">
+            <%= f.label :password %>
+            <% if @minimum_password_length %>
+            <small class="text-muted">(<%= @minimum_password_length %> characters minimum)</small>
+            <% end %>
+            <%= f.password_field :password, autocomplete: "new-password", class: 'form-control' %>
+          </div>
+
+          <div class="form-group">
+            <%= f.label :password_confirmation %>
+            <%= f.password_field :password_confirmation, autocomplete: "new-password", class: 'form-control' %>
+          </div>
+
+          <div class="form-group">
+            <%= f.submit "Sign up", class: 'btn btn-success btn-sm' %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-5">
+    <div class="col-6">
+      <div class="card p-5">
+        <small><%= render "devise/shared/links" %></small>
+      </div>
+    </div>
+  </div>
+</div>
