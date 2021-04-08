@@ -23,19 +23,19 @@
   <tbody>
     <% @products.each do |product| %>
       <tr>
-        <td><%= product.id %></td>
-        <td><%= product.name %></td>
-        <td><%= product.price %></td>
+        <td><small><%= product.id %></small></td>
+        <td><small><%= product.name %></small></td>
+        <td><small><%= product.price %></small></td>
         <td><small><%= product.image.identifier %></small></td>
-        <td><%= product.dairy_free %></td>
-        <td><%= product.gluten_free %></td>
-        <td><%= product.kosher %></td>
-        <td><%= product.peanut_free %></td>
-        <td><%= product.vegan %></td>
-        <td><%= product.vegetarian %></td>
-        <td><%= product.available %></td>
-        <td><%= product.catering %></td>
-        <td><%= product.featured %></td>
+        <td><small><%= product.dairy_free %></small></td>
+        <td><small><%= product.gluten_free %></small></td>
+        <td><small><%= product.kosher %></small></td>
+        <td><small><%= product.peanut_free %></small></td>
+        <td><small><%= product.vegan %></small></td>
+        <td><small><%= product.vegetarian %></small></td>
+        <td><small><%= product.available %></small></td>
+        <td><small><%= product.catering %></small></td>
+        <td><small><%= product.featured %></small></td>
         <td><%= link_to 'Show', product %></td>
         <td><%= link_to 'Edit', edit_product_path(product) %></td>
         <td><%= link_to 'Destroy', product, method: :delete, data: { confirm: 'Are you sure?' } %></td>

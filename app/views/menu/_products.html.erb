@@ -1,5 +1,6 @@
-<div>
+<div class="row">
   <% @cats.each do |cat| %>
+
     <% if cat.products.first.present? %>
       <%= product_image cat.products.first %>
     <% end %>
@@ -10,19 +11,22 @@
     </div>
 
     <% @products.each do |product| %>
+
       <% if product.category == cat %>
         <div class="col-4 mb-5">
-          <h5>
-            <%= product.name %>
-          </h5>
 
-          <p>
-            <%= product.description %>
-          </p>
-
+          <h5><%= product.name %></h5>
+          <p><%= product.description %></p>
           <span>
             <%= product.price %> <%= '| Available for catering' if product.catering? %>
           </span>
+
+          <%= form_with model: @order_item do |f| %>
+            <%= f.hidden_field :product_id, value: product.id %>
+            <%= f.number_field :quantity, value: 1, nin: 1 %>
+            <%= f.submit 'Add To Cart', class: 'btn btn-success btn-sm'  %>
+          <% end %>
+
         </div>
       <% end %>
     <% end %>

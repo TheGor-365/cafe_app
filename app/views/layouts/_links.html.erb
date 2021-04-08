@@ -18,4 +18,27 @@
   <h5 class="link-container">
     <%= link_to 'Castomer Reviews', '', class: "link #{@page == 'reviews' ? 'active' : ''}" %>
   </h5>
+
+  <% if current_user.present? && current_user.admin? %>
+    <h4 class="link-container">
+      <%= link_to 'Product List', products_path %>
+    </h4>
+
+    <h4 class="link-container">
+      <%= link_to 'Categories List', categories_path %>
+    </h4>
+  <% end %>
+
+</div>
+
+<div class="col-9"></div>
+
+<div class="col-1 p-2">
+  <% if user_signed_in? %>
+    <h6 class="text-white"><%= current_user.username %></h6>
+    <h6><%= link_to 'Sign out', destroy_user_session_path, method: :delete %></h6>
+  <% else %>
+    <h6><%= link_to 'Sign in', new_user_session_path %></h6>
+    <h6><%= link_to 'Sign up', new_user_registration_path %></h6>
+  <% end %>
 </div>

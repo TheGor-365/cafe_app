@@ -68,6 +68,7 @@ class ProductsController < ApplicationController
       :catering,
       :featured,
       :image,
+      :image_cache,
       :category_id
     )
   end
