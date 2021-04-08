@@ -1,64 +1,88 @@
-<p id="notice"><%= notice %></p>
+<div class="container">
 
-<p>
-  <strong>Name:</strong>
-  <%= @product.name %>
-</p>
+  <h3 class="mt-5 mb-5 display-3">
+    <%= @product.category.heading %>
+  </h3>
 
-<p>
-  <strong>Description:</strong>
-  <%= @product.description %>
-</p>
+  <h4 class="mb-3">
+    <%= @product.name %>
+  </h4>
 
-<p>
-  <strong>Price:</strong>
-  <%= @product.price %>
-</p>
+  <div>
+    <div class="card p-3 mt-3 mb-3">
+      <small class="mb-3">Description:</small>
+      <%= @product.description %>
+    </div>
+  </div>
+  <hr>
 
-<p>
-  <strong>Dairy free:</strong>
-  <%= @product.dairy_free %>
-</p>
+  <p>
+    <small>Product Image:</small>
+    <%= @product.image.identifier %>
+  </p>
+  <hr>
 
-<p>
-  <strong>Gluten free:</strong>
-  <%= @product.gluten_free %>
-</p>
+  <p>
+    <small>Price:</small>
+    <%= @product.price %>
+  </p>
+  <hr>
 
-<p>
-  <strong>Kosher:</strong>
-  <%= @product.kosher %>
-</p>
+  <p>
+    <small>Dairy free:</small>
+    <%= @product.dairy_free %>
+  </p>
+  <hr>
 
-<p>
-  <strong>Peanut free:</strong>
-  <%= @product.peanut_free %>
-</p>
+  <p>
+    <small>Gluten free:</small>
+    <%= @product.gluten_free %>
+  </p>
+  <hr>
 
-<p>
-  <strong>Vegan:</strong>
-  <%= @product.vegan %>
-</p>
+  <p>
+    <small>Kosher:</small>
+    <%= @product.kosher %>
+  </p>
+  <hr>
 
-<p>
-  <strong>Vegetarian:</strong>
-  <%= @product.vegetarian %>
-</p>
+  <p>
+    <small>Peanut free:</small>
+    <%= @product.peanut_free %>
+  </p>
+  <hr>
 
-<p>
-  <strong>Available:</strong>
-  <%= @product.available %>
-</p>
+  <p>
+    <small>Vegan:</small>
+    <%= @product.vegan %>
+  </p>
+  <hr>
 
-<p>
-  <strong>Catering:</strong>
-  <%= @product.catering %>
-</p>
+  <p>
+    <small>Vegetarian:</small>
+    <%= @product.vegetarian %>
+  </p>
+  <hr>
 
-<p>
-  <strong>Featured:</strong>
-  <%= @product.featured %>
-</p>
+  <p>
+    <small>Available:</small>
+    <%= @product.available %>
+  </p>
+  <hr>
 
-<%= link_to 'Edit', edit_product_path(@product) %> |
-<%= link_to 'Back', products_path %>
+  <p>
+    <small>Catering:</small>
+    <%= @product.catering %>
+  </p>
+  <hr>
+
+  <p>
+    <small>Featured:</small>
+    <%= @product.featured %>
+  </p>
+  <hr>
+
+  <%= link_to 'Edit', edit_product_path(@product) %> |
+  <%= link_to 'Back', products_path %>
+  <hr>
+</div>

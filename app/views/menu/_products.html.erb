@@ -1,0 +1,31 @@
+<div>
+  <% @cats.each do |cat| %>
+    <% if cat.products.first.present? %>
+      <%= product_image cat.products.first %>
+    <% end %>
+
+    <div class="col-12">
+      <h1 style="text-align:center;"><%= cat.heading %></h1>
+      <hr>
+    </div>
+
+    <% @products.each do |product| %>
+      <% if product.category == cat %>
+        <div class="col-4 mb-5">
+          <h5>
+            <%= product.name %>
+          </h5>
+
+          <p>
+            <%= product.description %>
+          </p>
+
+          <span>
+            <%= product.price %> <%= '| Available for catering' if product.catering? %>
+          </span>
+        </div>
+      <% end %>
+    <% end %>
+
+  <% end %>
+</div>

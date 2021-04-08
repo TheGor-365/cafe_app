@@ -8,28 +8,33 @@
     <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track': 'reload' %>
     <%= stylesheet_pack_tag 'application', media: 'all', 'data-turbolinks-track': 'reload' %>
     <%= javascript_pack_tag 'application', 'data-turbolinks-track': 'reload' %>
+
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300&display=swap" rel="stylesheet">
   </head>
 
   <body>
 
-    <div class="<%= @page %>-page">
-      <div class="row page-container">
-        <%= toastr_flash %>
+    <% cache do %>
+      <div class="<%= @page %>-page">
+        <div class="row page-container">
+          <%= toastr_flash %>
 
-        <%= render 'layouts/links' %>
+          <%= render 'layouts/links' %>
 
-        <div class="col-8">
-          <% unless @page == 'home' %>
-            <%= render 'layouts/title' %>
-          <% end %>
+          <div class="col-8">
+            <% unless @page == 'home' %>
+              <%= render 'layouts/title' %>
+            <% end %>
 
-          <%= yield %>
-        </div>
-        <div class="col-2">
+            <%= yield %>
+          </div>
+          <div class="col-2">
 
+          </div>
         </div>
       </div>
-    </div>
+    <% end %>
 
   </body>
 </html>

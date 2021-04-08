@@ -1,13 +1,12 @@
-<p id="notice"><%= notice %></p>
+<h5 class="mt-5 mb-5">Products list</h5>
 
-<h1>Products</h1>
-
-<table>
+<table class="table table-striped table-bordered">
   <thead>
     <tr>
+      <th>id</th>
       <th>Name</th>
-      <th>Description</th>
       <th>Price</th>
+      <th>Image</th>
       <th>Dairy free</th>
       <th>Gluten free</th>
       <th>Kosher</th>
@@ -24,9 +23,10 @@
   <tbody>
     <% @products.each do |product| %>
       <tr>
+        <td><%= product.id %></td>
         <td><%= product.name %></td>
-        <td><%= product.description %></td>
         <td><%= product.price %></td>
+        <td><small><%= product.image.identifier %></small></td>
         <td><%= product.dairy_free %></td>
         <td><%= product.gluten_free %></td>
         <td><%= product.kosher %></td>
