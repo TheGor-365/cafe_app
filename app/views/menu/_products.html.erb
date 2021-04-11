@@ -5,8 +5,8 @@
       <%= product_image cat.products.first %>
     <% end %>
 
-    <div class="col-12">
-      <h1 style="text-align:center;"><%= cat.heading %></h1>
+    <div class="col-12 mt-3">
+      <h1 class="text-muted" style="text-align:center;"><%= cat.heading %></h1>
       <hr>
     </div>
 
@@ -16,15 +16,62 @@
         <div class="col-4 mb-5">
 
           <h5><%= product.name %></h5>
-          <p><%= product.description %></p>
-          <span>
-            <%= product.price %> <%= '| Available for catering' if product.catering? %>
-          </span>
+
+          <div class="card-text">
+            <div class="mt-3">
+
+              <small class="float-left text-muted">Price</small>
+
+              <p class="float-right text-muted mb-0">
+                <strong>
+                  $<%= product.price %> <%= '| Available for catering' if product.catering? %>
+                </strong>
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <div class="accordion" id="accordionExample">
+
+              <button
+                class="btn btn-link btn-block text-left text-muted text-decoration-none text-dark pl-0 pt-0 pb-2"
+                type="button"
+                data-toggle="collapse"
+                data-target="#<%= product.name %>-description"
+                aria-expanded="true"
+                aria-controls="collapseOne">
+                <small>
+                  View  Description
+                </small>
+              </button>
+
+              <div
+                id="<%= product.name %>-description"
+                class="collapse mb-2"
+                aria-labelledby="headingOne"
+                data-parent="#accordionExample">
+                <div class="card-body bg-light mt-2">
+                  <small class="text-muted">
+                    <%= product.description %>
+                  </small>
+                </div>
+              </div>
+
+            </div>
+          </div>
 
           <%= form_with model: @order_item do |f| %>
+
             <%= f.hidden_field :product_id, value: product.id %>
-            <%= f.number_field :quantity, value: 1, nin: 1 %>
-            <%= f.submit 'Add To Cart', class: 'btn btn-success btn-sm'  %>
+            <div class="input-group input-group-sm mt-4">
+              <small class="mt-2">Count</small>
+              <%= f.number_field :quantity, value: 1, min: 1, class: 'form-control', id: 'product-count-field' %>
+              <div class="input-group-append">
+                <%= f.submit "Add To Cart", class: "btn btn-sm btn-outline-primary" %>
+                <%= button_to "Buy now", product, class: "btn btn-sm btn-outline-success" %>
+                <%= button_to "Details", product, method: :get, class: "btn btn-sm btn-outline-secondary" %>
+              </div>
+            </div>
           <% end %>
 
         </div>

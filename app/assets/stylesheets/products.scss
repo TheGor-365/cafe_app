@@ -1,1 +1,48 @@
+.btn:focus, .btn:active {
+  outline: none !important;
+  box-shadow: none !important;
+}
 
+#product-count-field {
+  border: 0;
+}
+
+input[type=text] {
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+input[type=email] {
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+input[type=password] {
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+input[type=password-confirmation] {
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+select {
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}

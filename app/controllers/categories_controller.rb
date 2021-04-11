@@ -7,12 +7,11 @@ class CategoriesController < ApplicationController
   end
 
   def show; end
+  def edit; end
 
   def new
     @category = Category.new
   end
-
-  def edit; end
 
   def create
     @category = Category.new(category_params)

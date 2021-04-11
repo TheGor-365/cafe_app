@@ -6,6 +6,7 @@
       <th>id</th>
       <th>Name</th>
       <th>Price</th>
+      <th>Cat</th>
       <th>Image</th>
       <th>Dairy free</th>
       <th>Gluten free</th>
@@ -16,7 +17,7 @@
       <th>Available</th>
       <th>Catering</th>
       <th>Featured</th>
-      <th colspan="3"></th>
+      <th colspan="3">Controlls</th>
     </tr>
   </thead>
 
@@ -26,6 +27,7 @@
         <td><small><%= product.id %></small></td>
         <td><small><%= product.name %></small></td>
         <td><small><%= product.price %></small></td>
+        <td><small><%= product.category.heading %></small></td>
         <td><small><%= product.image.identifier %></small></td>
         <td><small><%= product.dairy_free %></small></td>
         <td><small><%= product.gluten_free %></small></td>

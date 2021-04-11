@@ -13,3 +13,10 @@
  *= require_tree .
  *= require_self
  */
+
+.-page {
+  width: 100%;
+  height: 100%;
+  background-image: url('./extereor.jpg');
+  background-size: 100% 100%;
+}

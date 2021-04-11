@@ -5,5 +5,4 @@ module ProductsHelper
     image_tag(image_path, class: 'img-fluid')
   end
 
-
 end

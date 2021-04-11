@@ -23,14 +23,26 @@
           <%= render 'layouts/links' %>
 
           <div class="col-8">
-            <% unless @page == 'home' %>
-              <%= render 'layouts/title' %>
-            <% end %>
+            <%= render 'layouts/title' %>
 
             <%= yield %>
           </div>
-          
-          <div class="col-2"></div>
+
+          <div class="col-1"></div>
+
+          <div class="col-1 p-2">
+            <% if user_signed_in? %>
+              <h6><%= link_to 'Sign out', destroy_user_session_path, method: :delete %></h6>
+              <%= link_to edit_user_registration_path do %>
+                <h6 class="text-white text-decoration-none">
+                  <%= current_user.username %>
+                </h6>
+              <% end %>
+            <% else %>
+              <h6><%= link_to 'Sign in', new_user_session_path %></h6>
+              <h6><%= link_to 'Sign up', new_user_registration_path %></h6>
+            <% end %>
+          </div>
         </div>
       </div>
     <% end %>

@@ -6,16 +6,16 @@
       <th>Heading</th>
       <th>Body</th>
       <th>Display</th>
-      <th colspan="3"></th>
+      <th colspan="3">Controlls</th>
     </tr>
   </thead>
 
   <tbody>
     <% @categories.each do |category| %>
       <tr>
-        <td><%= category.heading %></td>
-        <td><%= category.body %></td>
-        <td><%= category.display %></td>
+        <td><small><%= category.heading %></small></td>
+        <td><small><%= category.body %></small></td>
+        <td><small><%= category.display %></small></td>
         <td><%= link_to 'Show', category %></td>
         <td><%= link_to 'Edit', edit_category_path(category) %></td>
         <td><%= link_to 'Destroy', category, method: :delete, data: { confirm: 'Are you sure?' } %></td>

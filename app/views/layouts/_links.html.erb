@@ -30,15 +30,3 @@
   <% end %>
 
 </div>
-
-<div class="col-9"></div>
-
-<div class="col-1 p-2">
-  <% if user_signed_in? %>
-    <h6 class="text-white"><%= current_user.username %></h6>
-    <h6><%= link_to 'Sign out', destroy_user_session_path, method: :delete %></h6>
-  <% else %>
-    <h6><%= link_to 'Sign in', new_user_session_path %></h6>
-    <h6><%= link_to 'Sign up', new_user_registration_path %></h6>
-  <% end %>
-</div>

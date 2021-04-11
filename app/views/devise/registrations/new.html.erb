@@ -17,13 +17,13 @@
             <%= f.text_field :username, class: 'form-control' %>
           </div>
 
-          <!-- <div class="form-group">
-            <div class="custom-file"> -->
-              <%# <%= f.label :avatar, class: 'custom-file-label' %>
-              <%#= f.file_field :avatar, type: 'file', class: 'custom-file-input' %>
-              <%#= f.hidden_field :avatar_cache %> %>
-            <!-- </div>
-          </div> -->
+          <div class="form-group">
+            <div class="custom-file">
+              <%= f.label :avatar, class: 'custom-file-label' %>
+              <%= f.file_field :avatar, type: 'file', class: 'custom-file-input' %>
+              <%#= f.hidden_field :avatar_cache %>
+            </div>
+          </div>
 
           <div class="form-group">
             <%= f.label :password %>
