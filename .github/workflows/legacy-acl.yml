@@ -44,5 +44,5 @@ jobs:
         run: bundle _2.2.13_ install --jobs 2 --retry 2
       - name: Prepare disposable test schema
         run: bundle _2.2.13_ exec rails db:schema:load
-      - name: Run guest and regular-user ACL regression tests
-        run: bundle _2.2.13_ exec rails test test/controllers/admin_access_test.rb
+      - name: Run ACL negative and admin CRUD positive tests
+        run: bundle _2.2.13_ exec rails test test/controllers/admin_access_test.rb test/controllers/products_controller_test.rb test/controllers/categories_controller_test.rb
