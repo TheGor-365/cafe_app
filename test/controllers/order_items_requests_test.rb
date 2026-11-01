@@ -3,6 +3,7 @@ require 'test_helper'
 class OrderItemsRequestsTest < ActionDispatch::IntegrationTest
   setup do
     @product = products(:one)
+    @product.update!(available: true)
   end
 
   test "adds a cart line using the server-side product price" do

@@ -1,5 +1,7 @@
-<div class="title-card sticky-top">
-  <h1 class="title-text">
-    Gor's Foods
-  </h1>
+<div class="title-card cafe-brandbar">
+  <%= link_to root_path, class: 'cafe-brandbar__brand', 'aria-label': "Gor's Coffee — home" do %>
+    <span class="cafe-brandbar__mark" aria-hidden="true">GC</span>
+    <span class="cafe-brandbar__name">Gor's Coffee</span>
+  <% end %>
+  <span class="cafe-brandbar__descriptor">Coffee &amp; good moments · Demo</span>
 </div>

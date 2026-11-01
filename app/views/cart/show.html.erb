@@ -1,5 +1,8 @@
-<div id="cart-item">
-  <%= render 'cart_items' %>
-</div>
-
-<hr>
+<main class="cafe-cart" aria-labelledby="cafe-cart-title">
+  <header class="cafe-cart__header">
+    <p class="cafe-cart__eyebrow">Gor's Coffee · demo</p>
+    <h1 id="cafe-cart-title">Your coffee cart</h1>
+    <p>Review your picks before continuing. No payments or live orders are processed.</p>
+  </header>
+  <%= render 'cart/cart_items' %>
+</main>

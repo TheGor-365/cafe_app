@@ -41,7 +41,7 @@
                 <%= link_to 'Details', product_path(product), class: 'coffee-product-card__details' %>
               </div>
               <%= form_with url: order_items_path, scope: :order_item, method: :post,
-                    local: false, class: 'coffee-product-card__cart-form' do |form| %>
+                    local: true, class: 'coffee-product-card__cart-form' do |form| %>
                 <%= form.hidden_field :product_id, value: product.id, id: nil %>
                 <%= form.label :quantity, 'Qty', for: "coffee-qty-#{product.id}" %>
                 <%= form.number_field :quantity, value: 1, min: 1, max: 20, required: true,

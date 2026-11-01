@@ -1,17 +1,37 @@
-<% @order_items.each do |item| %>
-
-  <h3><%= item.product.name %></h3>
-  <h3><%= item.product.price %></h3>
-
-  <%= form_with model: item do |f| %>
-    <%= f.hidden_field :product_id, value: item.product.id %>
-    <%= f.number_field :quantity, value: item.quantity.to_i %>
-    <%= f.submit 'Update Cart', class: 'btn btn-sm btn-primary' %>
-    <%= link_to 'Remove Items', item, method: :delete, remote: true, class: 'btn btn-sm btn-danger' %>
-  <% end %>
-
-  <h2>Subtotal: <%= item.total %></h2>
-
+<% if @order_items.empty? %>
+  <section class="cafe-cart__empty" role="status">
+    <div aria-hidden="true" class="cafe-cart__empty-icon">☕</div>
+    <h2>Your cart is empty</h2>
+    <p>Explore the menu and find something worth a coffee break.</p>
+    <%= link_to 'Browse menu', menu_path, class: 'cafe-cart__primary-action' %>
+  </section>
+<% else %>
+  <div class="cafe-cart__items">
+    <% @order_items.each do |item| %>
+      <article class="cafe-cart__item">
+        <div>
+          <p class="cafe-cart__item-category"><%= item.product.category.heading %></p>
+          <h2><%= item.product.name %></h2>
+          <p class="cafe-cart__item-price">Unit price: <%= number_to_currency(item.unit_price) %></p>
+          <strong class="cafe-cart__item-total"><%= number_to_currency(item.total) %></strong>
+        </div>
+        <div class="cafe-cart__item-actions">
+          <%= form_with model: item, local: true, class: 'cafe-cart__update-form' do |form| %>
+            <%= form.label :quantity, "Quantity for #{item.product.name}" %>
+            <%= form.number_field :quantity, min: 1, max: 20, required: true,
+                  class: 'cafe-cart__quantity' %>
+            <%= form.submit 'Update', class: 'cafe-cart__update-button' %>
+          <% end %>
+          <%= button_to 'Remove', order_item_path(item), method: :delete,
+                class: 'cafe-cart__remove-button', form_class: 'cafe-cart__remove-form' %>
+        </div>
+      </article>
+    <% end %>
+  </div>
+  <aside class="cafe-cart__summary" aria-label="Cart summary">
+    <span>Subtotal · <%= pluralize(@order_items.sum { |item| item.quantity.to_i }, 'item') %></span>
+    <strong><%= number_to_currency(@order_items.sum { |item| item.total || 0 }) %></strong>
+  </aside>
+  <p class="cafe-cart__disclaimer">Demo checkout is under development. No real orders or payments are available.</p>
+  <%= link_to 'Continue shopping', menu_path, class: 'cafe-cart__secondary-action' %>
 <% end %>
-
-<h3>Your current order has a total of: <%= current_order.subtotal %></h3>
