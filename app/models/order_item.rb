@@ -3,6 +3,8 @@ class OrderItem < ApplicationRecord
   belongs_to :product
   belongs_to :order
 
+  validates :quantity, numericality: { only_integer: true, greater_than: 0 }
+
   before_save :set_unit_price
   before_save :set_total
 
@@ -11,12 +13,14 @@ class OrderItem < ApplicationRecord
     if persisted?
       self[:unit_price]
     else
-      product.price
+      product&.price
     end
   end
 
   def total
-    return unit_price * quantity
+    return nil unless unit_price && quantity
+
+    unit_price * quantity
   end
 
   private
@@ -26,7 +30,7 @@ class OrderItem < ApplicationRecord
   end
 
   def set_total
-    self[:total] = total * quantity
+    self[:total] = total
   end
 
 end
