@@ -48,3 +48,40 @@ jobs:
         run: |
           test -s public/packs/manifest.json
           node -e 'const m=require("./public/packs/manifest.json"); if(!m["application.js"]) process.exit(1); console.log("application.js:", m["application.js"]);'
+
+  webpacker5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: ruby:2.5.8
+    env:
+      RAILS_ENV: development
+      NODE_ENV: development
+      RUBYOPT: -rlogger
+      BUNDLE_PATH: /tmp/cafe-bundle
+      DISABLE_BOOTSNAP: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install legacy Bundler
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Align Ruby gem to Webpacker 5.4.3 inside disposable CI checkout
+        run: |
+          ruby -e 'p="Gemfile"; s=File.read(p); before="gem '\''webpacker'\'', '\''~> 4.0'\''"; after="gem '\''webpacker'\'', '\''= 5.4.3'\''"; abort "Gemfile differs" unless s.include?(before); File.write(p, s.sub(before, after))'
+          bundle _2.2.13_ lock --add-platform x86_64-linux
+          bundle _2.2.13_ update webpacker
+      - name: Install Ruby dependencies
+        run: bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Node 14 for legacy Webpack compatibility
+        uses: actions/setup-node@v4
+        with:
+          node-version: '14.21.3'
+      - name: Install Yarn
+        run: npm install -g yarn@1.22.22
+      - name: Align JavaScript dependency to Webpacker 5.4.3 inside CI
+        run: yarn add --exact @rails/webpacker@5.4.3 --non-interactive
+      - name: Compile real Webpacker 5 assets
+        run: bundle _2.2.13_ exec rails webpacker:compile
+      - name: Verify generated application JavaScript
+        run: |
+          test -s public/packs/manifest.json
+          node -e 'const m=require("./public/packs/manifest.json"); if(!m["application.js"]) process.exit(1); console.log("application.js:", m["application.js"]);'
