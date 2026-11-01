@@ -62,3 +62,45 @@ demo_items.each_with_index do |(category_name, name, description, price, vegan, 
 end
 
 puts "Demo café catalog ready: #{demo_items.size} curated products; no accounts created."
+
+# Optional size and extras for selected demo beverages. Intentionally do not
+# change existing photos, clients, carts or historic order-item snapshots.
+configurable_drinks = %w[Cappuccino Mocha].concat([
+  'Flat White', 'Caffè Latte', 'Matcha Latte', 'Iced Latte'
+])
+configurable_drinks.each do |name|
+  product = Product.find_by!(name: name)
+  base_cents = (product.price * 100).round.to_i
+
+  [['S', 'Small · 240 ml', 0],
+   ['M', 'Medium · 350 ml', 75],
+   ['L', 'Large · 470 ml', 150]].each do |code, label, difference|
+    variant = ProductVariant.find_or_initialize_by(product: product, code: code)
+    variant.assign_attributes(label: label, price_cents: base_cents + difference, available: true)
+    variant.save!
+  end
+
+  {
+    'milk' => [
+      ['oat', 'Oat milk', 60],
+      ['almond', 'Almond milk', 60]
+    ],
+    'syrup' => [
+      ['vanilla', 'Vanilla syrup', 55],
+      ['caramel', 'Caramel syrup', 55]
+    ],
+    'shot' => [
+      ['espresso', 'Extra espresso shot', 90]
+    ]
+  }.each do |group, selections|
+    selections.each do |code, label, price_cents|
+      option = ProductModifierOption.find_or_initialize_by(
+        product: product, group_code: group, code: code
+      )
+      option.assign_attributes(label: label, price_cents: price_cents, available: true)
+      option.save!
+    end
+  end
+end
+
+puts "Demo drinks configurable: #{configurable_drinks.size}; 3 sizes and optional milk, syrup, shot."
