@@ -43,6 +43,30 @@
               <%= form_with url: order_items_path, scope: :order_item, method: :post,
                     local: true, class: 'coffee-product-card__cart-form' do |form| %>
                 <%= form.hidden_field :product_id, value: product.id, id: nil %>
+                <% variants = product.product_variants.select(&:available?) %>
+                <% if variants.any? %>
+                  <div class="coffee-product-card__config">
+                    <%= form.label :product_variant_id, 'Drink size', for: "coffee-size-#{product.id}" %>
+                    <%= form.select :product_variant_id,
+                        options_for_select(variants.sort_by(&:price_cents).map { |v|
+                          ["#{v.label} — #{number_to_currency(BigDecimal(v.price_cents.to_s) / 100)}", v.id]
+                        }),
+                        {}, id: "coffee-size-#{product.id}", class: 'coffee-product-card__select' %>
+                  </div>
+                <% end %>
+                <% [['milk', 'Milk choice'], ['syrup', 'Syrup'], ['shot', 'Extra espresso']].each do |group_code, label| %>
+                  <% options = product.product_modifier_options.select { |o| o.available? && o.group_code == group_code } %>
+                  <% next if options.empty? %>
+                  <div class="coffee-product-card__config">
+                    <% field_id = "coffee-#{group_code}-#{product.id}" %>
+                    <%= label_tag field_id, label %>
+                    <%= select_tag 'order_item[modifier_option_ids][]',
+                          options_for_select([['No extra (+$0.00)', '']] +
+                            options.sort_by(&:price_cents).map { |o|
+                              ["#{o.label} (+#{number_to_currency(BigDecimal(o.price_cents.to_s) / 100)})", o.id]
+                            }), id: field_id, class: 'coffee-product-card__select' %>
+                  </div>
+                <% end %>
                 <%= form.label :quantity, 'Qty', for: "coffee-qty-#{product.id}" %>
                 <%= form.number_field :quantity, value: 1, min: 1, max: 20, required: true,
                       id: "coffee-qty-#{product.id}", class: 'coffee-product-card__quantity' %>

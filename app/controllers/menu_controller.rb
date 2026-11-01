@@ -33,7 +33,7 @@ class MenuController < ApplicationController
     @page = 'menu'
     @order_item = current_order.order_items.new
 
-    @products = Product.includes(:category).where(available: true)
+    @products = Product.includes(:category, :product_variants, :product_modifier_options).where(available: true)
                        .where(category_id: @cats.map(&:id))
 
     @selected_category = @cats.find { |cat| cat.id.to_s == params[:category_id].to_s } if params[:category_id].present?

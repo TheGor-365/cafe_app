@@ -1,0 +1,36 @@
+/* Cafe drink configurator — progressive enhancement without JavaScript. */
+.coffee-product-card__config {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+  width: 100%;
+  margin: .55rem 0;
+}
+.coffee-product-card__config label {
+  font-size: .8rem;
+  font-weight: 700;
+  color: #4d3425;
+  margin: 0;
+}
+.coffee-product-card__select {
+  width: 100%;
+  max-width: 100%;
+  padding: .55rem .6rem;
+  color: #29201b;
+  border: 1px solid #d8c7b6;
+  border-radius: .5rem;
+  background: #fff;
+  font: inherit;
+  font-size: .85rem;
+}
+.coffee-product-card__select:focus-visible {
+  outline: 3px solid #b27c40;
+  outline-offset: 2px;
+}
+.cafe-cart__selected-options {
+  margin: .5rem 0;
+  padding-left: 1.1rem;
+  font-size: .84rem;
+  color: #5f4838;
+}
+.cafe-cart__selected-options li { margin: .17rem 0; }
