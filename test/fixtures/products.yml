@@ -4,6 +4,7 @@ one:
   name: MyString
   description: MyText
   price: 9.99
+  category: one
   dairy_free: false
   gluten_free: false
   kosher: false
@@ -18,6 +19,7 @@ two:
   name: MyString
   description: MyText
   price: 9.99
+  category: one
   dairy_free: false
   gluten_free: false
   kosher: false

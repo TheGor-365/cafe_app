@@ -9,13 +9,13 @@
             <%= text_field_tag :search, '', class: 'form-control', placeholder: 'Search', onkeydown: 'clickSubmit();' %>
           </div>
 
-          <div class="col-4" style="padding:0"">
+          <div class="col-4" style="padding:0">
             <%= select_tag 'filter', options_for_select([
               'Select Filter',
               'Dairy Free',
               'Gluten Free',
               'Kosher',
-              'Penaut Free',
+              'Peanut Free',
               'Vegan',
               'Vegetarian'
             ]), class: 'custom-select', onchange: 'clickSubmit();' %>
