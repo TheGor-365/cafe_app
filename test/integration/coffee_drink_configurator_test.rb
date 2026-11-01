@@ -105,6 +105,35 @@ class CoffeeDrinkConfiguratorTest < ActionDispatch::IntegrationTest
     assert_redirected_to menu_path
   end
 
+  test 'existing cart snapshots remain editable after add-on is disabled' do
+    post order_items_path, params: { order_item: {
+      product_id: @drink.id, quantity: 1,
+      product_variant_id: @medium.id,
+      modifier_option_ids: [@milk.id.to_s]
+    } }
+    assert_redirected_to cart_path
+    line = OrderItem.order(:id).last
+    assert_equal BigDecimal('5.60'), line[:unit_price]
+
+    @milk.update!(available: false, price_cents: 999, label: 'Unavailable oat')
+    @medium.update!(available: false, price_cents: 9999)
+
+    patch order_item_path(line), params: { order_item: { quantity: 2 } }
+    assert_redirected_to cart_path
+    assert_equal BigDecimal('11.20'), line.reload[:total]
+    assert_equal 'Oat milk', line.order_item_modifiers.first.label_snapshot
+    assert_equal 60, line.order_item_modifiers.first.price_cents_snapshot
+
+    assert_no_difference('OrderItem.count') do
+      post order_items_path, params: { order_item: {
+        product_id: @drink.id, quantity: 1,
+        product_variant_id: @small.id,
+        modifier_option_ids: [@milk.id.to_s]
+      } }
+    end
+    assert_redirected_to menu_path
+  end
+
   test 'rejects unavailable add-on and unrecognized variant' do
     @milk.update!(available: false)
     assert_no_difference('OrderItem.count') do
