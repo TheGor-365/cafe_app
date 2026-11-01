@@ -78,7 +78,16 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn@1.22.22
       - name: Align JavaScript dependency to Webpacker 5.4.3 inside CI
-        run: yarn add --exact @rails/webpacker@5.4.3 sass@1.69.7 --non-interactive
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          p.dependencies['@rails/webpacker'] = '5.4.3';
+          p.devDependencies = {...(p.devDependencies || {}), sass: '1.69.7'};
+          p.resolutions = {...(p.resolutions || {}), sass: '1.69.7'};
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          NODE
+          yarn install --non-interactive
       - name: Compile real Webpacker 5 assets
         run: bundle _2.2.13_ exec rails webpacker:compile
       - name: Verify generated application JavaScript
