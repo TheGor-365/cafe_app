@@ -1,0 +1,272 @@
+/*
+ * Cafe visual QA: responsive shell and unobtrusive notices.
+ * Only CSS: preserves the owner's modified application layout and avatar.
+ * Named zz_* so the legacy Sprockets require_tree compiles this after pages.scss.
+ */
+
+/* Bootstrap's .row was wrapping when a Rails flash became an extra flex item.
+ * Make the four actual layout columns explicit, not dependent on float widths. */
+html, body {
+  max-width: 100%;
+}
+html body {
+  margin: 0;
+  overflow-x: hidden;
+  background-color: #201913;
+}
+html body .home-page,
+html body .menu-page,
+html body .cart-page,
+html body .info-page,
+html body .catering-page,
+html body .review-page {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 100vh;
+  background-size: cover;
+  background-position: center top;
+}
+html body .cart-page {
+  background-image: linear-gradient(125deg, #211b16 0%, #4c3629 58%, #2b241c 100%);
+}
+html body .menu-page {
+  background-color: #291f19;
+  background-size: cover;
+}
+html body .page-container.row {
+  display: grid;
+  grid-template-columns: 192px minmax(0, 1fr) 52px 112px;
+  grid-template-areas: "nav main avatar account";
+  gap: 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  align-items: start;
+}
+html body .page-container.row > .col-2,
+html body .page-container.row > .col-8,
+html body .page-container.row > .col-1 {
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  flex: none;
+}
+html body .page-container.row > .col-2 {
+  grid-area: nav;
+  padding: 1rem .7rem;
+  min-height: 100vh;
+  background: linear-gradient(180deg, rgba(31, 24, 19, .97), rgba(44, 30, 23, .94));
+  box-shadow: inset -1px 0 rgba(249, 221, 184, .12);
+}
+html body .page-container.row > .col-2 .link-container {
+  padding-top: 0;
+  padding-left: .6rem;
+  margin: .15rem 0 .55rem;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+html body .page-container.row > .col-2 .link-container > .link {
+  color: #f6e9d9;
+  text-decoration: none;
+}
+html body .page-container.row > .col-2 .link-container > .link:hover,
+html body .page-container.row > .col-2 .link-container > .link.active {
+  color: #ffe2b9;
+}
+html body .page-container.row > .col-8 {
+  grid-area: main;
+  padding: .85rem;
+  min-width: 0;
+  overflow: visible;
+}
+html body .page-container.row > .col-8 > * {
+  max-width: 100%;
+  min-width: 0;
+}
+html body .page-container.row > .col-1:not(.p-2) {
+  grid-area: avatar;
+  padding: .75rem .15rem 0;
+  min-width: 0;
+}
+html body .page-container.row > .col-1:not(.p-2) img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 50%;
+}
+html body .page-container.row > .col-1.p-2 {
+  grid-area: account;
+  align-self: start;
+  min-width: 0;
+  padding: .9rem .45rem;
+  background: rgba(31, 24, 19, .88);
+  border-bottom-left-radius: .8rem;
+}
+html body .page-container.row > .col-1.p-2 h6 {
+  margin: .1rem 0 .7rem;
+  font-size: .83rem;
+  line-height: 1.35;
+}
+html body .page-container.row > .col-1.p-2 a {
+  color: #f5e3ce;
+}
+html body .page-container.row > .col-1.p-2 a:hover {
+  color: #ffe0b2;
+}
+html body .page-container.row > .col-1.p-2 form button {
+  color: #f5e3ce;
+}
+
+/* Rails helper renders escaped .alert directly inside .page-container.
+ * Fixed positioning removes it from the grid flow without any ERB changes. */
+html body .page-container.row > .alert {
+  position: fixed;
+  z-index: 1040;
+  top: 5.75rem;
+  right: 1rem;
+  left: auto;
+  width: 320px;
+  max-width: calc(100vw - 2rem);
+  min-height: 0;
+  margin: 0;
+  padding: .8rem 1rem;
+  border-radius: .75rem;
+  border: 1px solid #d1b18b;
+  box-shadow: 0 8px 24px rgba(26, 18, 12, .2);
+  background: #fff8ed;
+  color: #3c2b1d;
+  font-size: .9rem;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+}
+html body .page-container.row > .alert-success {
+  background: #f4f8ef;
+  color: #2c4b35;
+  border-color: #b6d0b7;
+}
+html body .page-container.row > .alert-danger {
+  background: #fff1eb;
+  color: #7e342a;
+  border-color: #dbad99;
+}
+html body .page-container.row > .alert-info {
+  background: #f9f2e5;
+  color: #574128;
+  border-color: #d8c4a6;
+}
+
+/* Keep all major storefront surfaces inside their layout column. */
+html body .cafe-home,
+html body .coffee-menu,
+html body .cafe-cart {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
+html body .cafe-home__hero,
+html body .cafe-home__featured-grid,
+html body .cafe-home__category-grid,
+html body .coffee-menu__grid,
+html body .cafe-cart__items {
+  min-width: 0;
+}
+html body .cafe-cart__item > * {
+  min-width: 0;
+}
+html body .cafe-cart__item-actions {
+  max-width: 100%;
+}
+html body .cafe-cart__update-form {
+  max-width: 100%;
+}
+
+/* On tablets reduce the side rail but preserve the avatar/profile areas. */
+@media (max-width: 1100px) {
+  html body .page-container.row {
+    grid-template-columns: 152px minmax(0, 1fr) 44px 100px;
+  }
+  html body .page-container.row > .col-2 {
+    padding: .9rem .4rem;
+  }
+  html body .page-container.row > .col-2 .link-container {
+    padding-left: .35rem;
+    font-size: .9rem;
+  }
+}
+
+/* Mobile: navigation becomes an accessible, wrapping horizontal bar.
+ * The page remains one column, with the account/avatar row above content. */
+@media (max-width: 760px) {
+  html body .page-container.row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "nav nav"
+      "account avatar"
+      "main main";
+  }
+  html body .page-container.row > .col-2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .15rem .3rem;
+    min-height: 0;
+    padding: .55rem .7rem;
+  }
+  html body .page-container.row > .col-2 .link-container {
+    padding: 0;
+    margin: 0;
+    font-size: .85rem;
+  }
+  html body .page-container.row > .col-2 .link-container > a {
+    margin: 0;
+    padding: .5rem .65rem;
+  }
+  html body .page-container.row > .col-1.p-2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .65rem;
+    min-height: 2.7rem;
+    padding: .45rem .85rem;
+    border-radius: 0;
+  }
+  html body .page-container.row > .col-1.p-2 h6 {
+    margin: 0;
+  }
+  html body .page-container.row > .col-1:not(.p-2) {
+    min-height: 2.7rem;
+    padding: .35rem .65rem;
+    background: rgba(31, 24, 19, .88);
+  }
+  html body .page-container.row > .col-1:not(.p-2) img {
+    max-height: 2.1rem;
+    width: auto;
+  }
+  html body .page-container.row > .col-8 {
+    padding: .6rem;
+  }
+  html body .page-container.row > .alert {
+    top: .6rem;
+    right: .6rem;
+    width: 280px;
+    max-width: calc(100vw - 1.2rem);
+  }
+  html body .cafe-home__category-grid,
+  html body .cafe-home__featured-grid {
+    grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  }
+}
+
+@media (max-width: 400px) {
+  html body .cafe-home__category-grid,
+  html body .cafe-home__featured-grid,
+  html body .coffee-menu__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html body .cafe-cart__item-actions,
+  html body .cafe-cart__update-form {
+    align-items: flex-start;
+  }
+}
