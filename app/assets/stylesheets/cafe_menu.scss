@@ -12,7 +12,7 @@
 }
 
 .coffee-menu__hero {
-  padding: clamp(1.4rem, 4vw, 3rem);
+  padding: 2rem;
   border-radius: 1rem;
   color: #fff9ef;
   background: linear-gradient(120deg, #382619, #765039);
@@ -25,7 +25,7 @@
 }
 .coffee-menu__hero h1 {
   max-width: 23ch;
-  font-size: clamp(1.7rem, 4vw, 3rem);
+  font-size: 2.5rem;
   line-height: 1.12;
   font-weight: 700;
 }
@@ -78,11 +78,11 @@
 }
 .coffee-menu__result-count { color: var(--coffee-muted); font-size: .9rem; }
 .coffee-menu__section { margin: 2rem 0 2.5rem; }
-.coffee-menu__section-header h2 { font-size: clamp(1.4rem, 2vw, 1.9rem); font-weight: 700; }
+.coffee-menu__section-header h2 { font-size: 1.8rem; font-weight: 700; }
 .coffee-menu__section-header p { color: var(--coffee-muted); }
 .coffee-menu__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 215px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
   gap: 1rem;
 }
 .coffee-product-card {
