@@ -1,0 +1,118 @@
+/*
+ * Cafe interactions: understated, accessible hover states.
+ * Scoped to the legacy sidebar/account area and coffee storefront.
+ * Sprockets application.scss uses require_tree . to include this file.
+ */
+
+/* Sidebar navigation — warm highlight instead of an underlined hyperlink. */
+.page-container > .col-2 .link-container > a {
+  display: inline-block;
+  max-width: 100%;
+  margin-left: -.65rem;
+  padding: .32rem .65rem;
+  border-left: 2px solid transparent;
+  border-radius: .55rem;
+  color: #f9f3e9;
+  text-decoration: none;
+  transition: color .18s ease, background-color .18s ease,
+              border-color .18s ease, transform .18s ease;
+}
+.page-container > .col-2 .link-container > a:hover {
+  color: #ffe6bd;
+  background-color: rgba(255, 248, 234, .12);
+  border-left-color: #e7b879;
+  text-decoration: none;
+  transform: translateX(3px);
+}
+.page-container > .col-2 .link-container > a.active {
+  color: #ffe6bd;
+  border-left-color: #e7b879;
+  background-color: rgba(255, 248, 234, .07);
+}
+.page-container > .col-2 .link-container > a.active:hover {
+  background-color: rgba(255, 248, 234, .16);
+}
+
+/* Devise sign-in / sign-up and profile links in the right-side rail. */
+.page-container > .col-1.p-2 a {
+  display: inline-block;
+  border-radius: .45rem;
+  padding: .15rem .35rem;
+  margin-left: -.35rem;
+  color: #f8e0bf;
+  text-decoration: none;
+  transition: color .18s ease, background-color .18s ease,
+              transform .18s ease;
+}
+.page-container > .col-1.p-2 a:hover {
+  color: #fff8e9;
+  background-color: rgba(255, 248, 234, .14);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+/* Coffee menu category chips and product links. */
+.coffee-menu .coffee-menu__categories a.coffee-menu__category {
+  text-decoration: none;
+  transition: background-color .18s ease, color .18s ease,
+              border-color .18s ease, box-shadow .18s ease,
+              transform .18s ease;
+}
+.coffee-menu .coffee-menu__categories a.coffee-menu__category:hover {
+  color: #513421;
+  background-color: #f1e6d7;
+  border-color: #d0ac87;
+  box-shadow: 0 3px 10px rgba(60, 37, 17, .10);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+.coffee-menu .coffee-menu__categories a.coffee-menu__category.is-active,
+.coffee-menu .coffee-menu__categories a.coffee-menu__category.is-active:hover {
+  color: #fffaf2;
+  background-color: #29201b;
+  border-color: #29201b;
+  text-decoration: none;
+}
+.coffee-menu .coffee-product-card__details,
+.coffee-menu .coffee-menu__reset-link {
+  display: inline-block;
+  border-radius: .4rem;
+  padding: .2rem .35rem;
+  margin: -.2rem -.35rem;
+  color: #694329;
+  text-decoration: none;
+  transition: color .18s ease, background-color .18s ease;
+}
+.coffee-menu .coffee-product-card__details:hover,
+.coffee-menu .coffee-menu__reset-link:hover {
+  color: #472912;
+  background-color: #f1e6d7;
+  text-decoration: none;
+}
+
+/* Keyboard users retain a clearly visible focus indicator. */
+.page-container > .col-2 .link-container > a:focus-visible,
+.page-container > .col-1.p-2 a:focus-visible,
+.coffee-menu .coffee-menu__categories a.coffee-menu__category:focus-visible,
+.coffee-menu .coffee-product-card__details:focus-visible,
+.coffee-menu .coffee-menu__reset-link:focus-visible {
+  outline: 3px solid #e7b879;
+  outline-offset: 2px;
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-container > .col-2 .link-container > a,
+  .page-container > .col-1.p-2 a,
+  .coffee-menu .coffee-menu__categories a.coffee-menu__category,
+  .coffee-menu .coffee-product-card__details,
+  .coffee-menu .coffee-menu__reset-link {
+    transition: none;
+    transform: none;
+  }
+  .page-container > .col-2 .link-container > a:hover,
+  .page-container > .col-1.p-2 a:hover,
+  .coffee-menu .coffee-menu__categories a.coffee-menu__category:hover {
+    transform: none;
+  }
+}
