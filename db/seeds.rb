@@ -1,11 +1,18 @@
-User.create([
-  { username: 'sarah',    email: 'sarah@example.com',    password: 'Password', password_confirmation: 'password', admin: true },
-  { username: 'emily',    email: 'emily@example.com',    password: 'Password' },
-  { username: 'melanie',  email: 'melanie@example.com',  password: 'Password' },
-  { username: 'caroline', email: 'caroline@example.com', password: 'Password' },
-  { username: 'bridget',  email: 'bridget@example.com',  password: 'Password' }
-])
+# Deterministic, idempotent catalog-only sample data for local development.
+# Never create a login or administrator from checked-in credentials.
+unless Rails.env.development? || Rails.env.test?
+  raise 'Cafe demo seeds are intentionally disabled outside development/test'
+end
 
-Category.create!(heading: 'Pizza', body: "It's so good, daugh!", display: true)
-Category.create!(heading: 'Pasta', body: "We cannoli do so much in each vide", display: true)
-Category.create!(heading: 'Desserts', body: "Rock rails icecream", display: true)
+[
+  ['Pizza', "It's so good, daugh!"],
+  ['Pasta', 'We cannoli do so much in each vide'],
+  ['Desserts', 'Rock rails icecream']
+].each do |heading, body|
+  category = Category.find_or_initialize_by(heading: heading)
+  category.body = body
+  category.display = true
+  category.save!
+end
+
+puts 'Cafe local sample categories are ready. No accounts were created.'
