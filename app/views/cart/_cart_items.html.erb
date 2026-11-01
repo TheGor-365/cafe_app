@@ -12,6 +12,16 @@
         <div>
           <p class="cafe-cart__item-category"><%= item.product.category.heading %></p>
           <h2><%= item.product.name %></h2>
+          <% if item.variant_label_snapshot.present? || item.order_item_modifiers.any? %>
+            <ul class="cafe-cart__selected-options" aria-label="Drink configuration">
+              <% if item.variant_label_snapshot.present? %>
+                <li>Size: <%= item.variant_label_snapshot %></li>
+              <% end %>
+              <% item.order_item_modifiers.each do |extra| %>
+                <li><%= extra.label_snapshot %> (+<%= number_to_currency(BigDecimal(extra.price_cents_snapshot.to_s) / 100) %>)</li>
+              <% end %>
+            </ul>
+          <% end %>
           <p class="cafe-cart__item-price">Unit price: <%= number_to_currency(item.unit_price) %></p>
           <strong class="cafe-cart__item-total"><%= number_to_currency(item.total) %></strong>
         </div>
