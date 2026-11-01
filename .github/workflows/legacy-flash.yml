@@ -1,0 +1,45 @@
+name: Cafe legacy flash safety
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  flash:
+    if: github.head_ref == 'feature/cafe-safe-flash-20261101'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: ruby:2.5.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Bundler
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Resolve runner Linux platform
+        run: bundle _2.2.13_ lock --add-platform x86_64-linux
+      - name: Install dependencies
+        run: bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Load disposable test schema
+        run: bundle _2.2.13_ exec rails db:schema:load
+      - name: Test flash escaping and markup
+        run: bundle _2.2.13_ exec rails test test/helpers/application_helper_test.rb
