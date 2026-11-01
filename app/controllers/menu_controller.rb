@@ -1,4 +1,12 @@
 class MenuController < ApplicationController
+  DIETARY_FILTERS = {
+    'dairy free' => :dairy_free,
+    'gluten free' => :gluten_free,
+    'kosher' => :kosher,
+    'peanut free' => :peanut_free,
+    'vegan' => :vegan,
+    'vegetarian' => :vegetarian
+  }.freeze
 
   before_action :set_cats
 
@@ -9,23 +17,23 @@ class MenuController < ApplicationController
   end
 
   def search
-    query = params[:search]
+    @page = 'menu'
+    @order_item = current_order.order_items.new
+    @products = Product.all
 
-    results = Product.where('name LIKE ?', "%#{query}%")
-
-    if params[:filter] == 'Select Filter'
-      @products == results
-    else
-      symbol = params[:filter].gsub(/ /, '_').downcase!.to_sym
-
-      @products = results.where(symbol => true)
+    query = params[:search].to_s.strip
+    if query.present?
+      escaped = ActiveRecord::Base.sanitize_sql_like(query)
+      @products = @products.where('name ILIKE ?', "%#{escaped}%")
     end
+
+    filter = DIETARY_FILTERS[params[:filter].to_s.strip.downcase]
+    @products = @products.where(filter => true) if filter
   end
 
   private
 
   def set_cats
-    @cats = Category.all.where(display: true)
+    @cats = Category.where(display: true)
   end
-
 end
