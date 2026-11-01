@@ -1,32 +1,27 @@
-<div class="col-2">
+<nav class="col-2 cafe-sidebar" aria-label="Main navigation">
   <h5 class="link-container">
     <%= link_to 'Home', root_path, class: "link #{@page == 'home' ? 'active' : ''}" %>
   </h5>
-
   <h5 class="link-container">
     <%= link_to 'Menu', menu_path, class: "link #{@page == 'menu' ? 'active' : ''}" %>
   </h5>
-
+  <h5 class="link-container">
+    <%= link_to "Cart (#{current_order.order_items.to_a.sum { |item| item.quantity.to_i }})",
+          cart_path, class: "link #{@page == 'cart' ? 'active' : ''}" %>
+  </h5>
   <h5 class="link-container">
     <%= link_to 'Catering', catering_path, class: "link #{@page == 'catering' ? 'active' : ''}" %>
   </h5>
-
   <h5 class="link-container">
     <%= link_to 'More Info', info_path, class: "link #{@page == 'info' ? 'active' : ''}" %>
   </h5>
 
-  <h5 class="link-container">
-    <%= link_to 'Castomer Reviews', '', class: "link #{@page == 'reviews' ? 'active' : ''}" %>
-  </h5>
-
-  <% if current_user.present? && current_user.admin? %>
-    <h4 class="link-container">
-      <%= link_to 'Product List', products_path %>
-    </h4>
-
-    <h4 class="link-container">
-      <%= link_to 'Categories List', categories_path %>
-    </h4>
+  <% if current_user&.admin? %>
+    <h5 class="link-container">
+      <%= link_to 'Manage products', products_path, class: 'link' %>
+    </h5>
+    <h5 class="link-container">
+      <%= link_to 'Manage categories', categories_path, class: 'link' %>
+    </h5>
   <% end %>
-
-</div>
+</nav>
