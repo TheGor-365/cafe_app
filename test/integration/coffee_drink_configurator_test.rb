@@ -93,6 +93,18 @@ class CoffeeDrinkConfiguratorTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test 'does not bypass a configured drink when all sizes are unavailable' do
+    @small.update!(available: false)
+    @medium.update!(available: false)
+
+    assert_no_difference('OrderItem.count') do
+      post order_items_path, params: { order_item: {
+        product_id: @drink.id, quantity: 1
+      } }
+    end
+    assert_redirected_to menu_path
+  end
+
   test 'rejects unavailable add-on and unrecognized variant' do
     @milk.update!(available: false)
     assert_no_difference('OrderItem.count') do

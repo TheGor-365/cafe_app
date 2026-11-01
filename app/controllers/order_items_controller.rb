@@ -53,13 +53,10 @@ class OrderItemsController < ApplicationController
   def apply_drink_configuration(item, payload)
     product = item.product
     selected_variant_id = payload[:product_variant_id].to_s.strip
-    variants = product.product_variants.where(available: true)
-
-    variant = if variants.exists?
-                variants.find_by(id: selected_variant_id)
-              end
-    return false if variants.exists? && variant.nil?
-    return false if !variants.exists? && selected_variant_id.present?
+    has_configurable_sizes = product.product_variants.exists?
+    variant = product.product_variants.where(available: true).find_by(id: selected_variant_id)
+    return false if has_configurable_sizes && variant.nil?
+    return false if !has_configurable_sizes && selected_variant_id.present?
 
     raw_ids = payload[:modifier_option_ids]
     return false unless raw_ids.nil? || raw_ids.is_a?(Array)
