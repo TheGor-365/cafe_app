@@ -1,8 +1,17 @@
 require 'test_helper'
 
 class ProductsControllerTest < ActionDispatch::IntegrationTest
+  include Devise::Test::IntegrationHelpers
+
   setup do
     @product = products(:one)
+    @admin = User.create!(
+      username: "products_admin_test",
+      email: "products_admin_test@example.test",
+      password: SecureRandom.hex(24),
+      admin: true
+    )
+    sign_in @admin
   end
 
   test "should get index" do
@@ -17,7 +26,7 @@ class ProductsControllerTest < ActionDispatch::IntegrationTest
 
   test "should create product" do
     assert_difference('Product.count') do
-      post products_url, params: { product: { available: @product.available, catering: @product.catering, dairy_free: @product.dairy_free, description: @product.description, featured: @product.featured, gluten_free: @product.gluten_free, kosher: @product.kosher, name: @product.name, peanut_free: @product.peanut_free, price: @product.price, vegan: @product.vegan, vegetarian: @product.vegetarian } }
+      post products_url, params: { product: { available: @product.available, catering: @product.catering, dairy_free: @product.dairy_free, description: @product.description, featured: @product.featured, gluten_free: @product.gluten_free, kosher: @product.kosher, name: @product.name, peanut_free: @product.peanut_free, price: @product.price, category_id: categories(:one).id, vegan: @product.vegan, vegetarian: @product.vegetarian } }
     end
 
     assert_redirected_to product_url(Product.last)
@@ -34,7 +43,7 @@ class ProductsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should update product" do
-    patch product_url(@product), params: { product: { available: @product.available, catering: @product.catering, dairy_free: @product.dairy_free, description: @product.description, featured: @product.featured, gluten_free: @product.gluten_free, kosher: @product.kosher, name: @product.name, peanut_free: @product.peanut_free, price: @product.price, vegan: @product.vegan, vegetarian: @product.vegetarian } }
+    patch product_url(@product), params: { product: { available: @product.available, catering: @product.catering, dairy_free: @product.dairy_free, description: @product.description, featured: @product.featured, gluten_free: @product.gluten_free, kosher: @product.kosher, name: @product.name, peanut_free: @product.peanut_free, price: @product.price, category_id: categories(:one).id, vegan: @product.vegan, vegetarian: @product.vegetarian } }
     assert_redirected_to product_url(@product)
   end
 
