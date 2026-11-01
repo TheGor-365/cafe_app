@@ -41,5 +41,11 @@ jobs:
         run: bundle _2.2.13_ install --jobs 2 --retry 2
       - name: Prepare test schema
         run: bundle _2.2.13_ exec rails db:schema:load
+      # Only server request/render behavior is tested here; real JS compilation
+      # remains a separate acceptance gate on the legacy Webpacker stack.
+      - name: Provide test-only pack manifest
+        run: |
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
       - name: Test menu requests
         run: bundle _2.2.13_ exec rails test test/controllers/menu_controller_test.rb
