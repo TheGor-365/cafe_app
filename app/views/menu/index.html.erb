@@ -1,41 +1,47 @@
-<div class="menu-container">
-  <div class="row">
-    <div class="col-12">
+<section class="coffee-menu" aria-labelledby="coffee-menu-title">
+  <header class="coffee-menu__hero">
+    <p class="coffee-menu__eyebrow">Gor's Coffee · Demo café</p>
+    <h1 id="coffee-menu-title">Your next coffee moment starts here.</h1>
+    <p>Discover espresso classics, refreshing drinks, fresh bakery and cozy breakfasts.</p>
+    <p class="coffee-menu__demo-note">Demo menu and prices. Orders are not sent to a real café.</p>
+  </header>
 
-      <%= form_tag(search_path, method: 'get', remote: true) do %>
-        <div class="input-group mb-5">
-
-          <div class="col-8" style="padding:0">
-            <%= text_field_tag :search, '', class: 'form-control', placeholder: 'Search', onkeydown: 'clickSubmit();' %>
-          </div>
-
-          <div class="col-4" style="padding:0">
-            <%= select_tag 'filter', options_for_select([
-              'Select Filter',
-              'Dairy Free',
-              'Gluten Free',
-              'Kosher',
-              'Peanut Free',
-              'Vegan',
-              'Vegetarian'
-            ]), class: 'custom-select', onchange: 'clickSubmit();' %>
-
-            <%= submit_tag 'Search', class: 'btn btn-dark', id: 'search_submit', style: 'display:none' %>
-          </div>
-
-        </div>
-      <% end %>
-
+  <%= form_tag menu_path, method: :get, role: 'search', class: 'coffee-menu__search' do %>
+    <div class="coffee-menu__field coffee-menu__field--wide">
+      <%= label_tag :search, 'Find a drink or treat' %>
+      <%= search_field_tag :search, params[:search].to_s, id: 'search', class: 'form-control',
+            placeholder: 'Try cappuccino, matcha, croissant…' %>
     </div>
-  </div>
+    <div class="coffee-menu__field">
+      <%= label_tag :filter, 'Dietary preference' %>
+      <%= select_tag :filter,
+            options_for_select([
+              ['All preferences', 'Select Filter'], ['Dairy free', 'Dairy Free'],
+              ['Gluten free', 'Gluten Free'], ['Kosher', 'Kosher'],
+              ['Peanut free', 'Peanut Free'], ['Vegan', 'Vegan'],
+              ['Vegetarian', 'Vegetarian']
+            ], params[:filter]), class: 'form-control' %>
+    </div>
+    <% if @selected_category %>
+      <%= hidden_field_tag :category_id, @selected_category.id %>
+    <% end %>
+    <%= button_tag 'Show results', type: 'submit', class: 'coffee-menu__search-button' %>
+  <% end %>
 
-  <div id="menu-products-container">
+  <nav class="coffee-menu__categories" aria-label="Menu categories">
+    <%= link_to 'All items',
+          menu_path(search: params[:search], filter: params[:filter]),
+          class: "coffee-menu__category #{'is-active' unless @selected_category}",
+          'aria-current': (@selected_category ? nil : 'page') %>
+    <% @cats.each do |category| %>
+      <%= link_to category.heading,
+            menu_path(category_id: category.id, search: params[:search], filter: params[:filter]),
+            class: "coffee-menu__category #{'is-active' if @selected_category == category}",
+            'aria-current': (@selected_category == category ? 'page' : nil) %>
+    <% end %>
+  </nav>
+
+  <div id="menu-products-container" aria-live="polite">
     <%= render 'menu/products' %>
   </div>
-</div>
-
-<script type="text/javascript">
-  function clickSubmit() {
-    $('#search_submit').trigger('click');
-  }
-</script>
+</section>
