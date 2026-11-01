@@ -4,7 +4,8 @@ class ProductsControllerTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
 
   setup do
-    @product = products(:one)
+    # A separate record avoids the order-item foreign key in legacy fixtures.
+    @product = Product.create!(name: "QA Product", price: 9.99, category: categories(:one))
     @admin = User.create!(
       username: "products_admin_test",
       email: "products_admin_test@example.test",
