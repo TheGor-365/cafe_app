@@ -44,5 +44,11 @@ jobs:
         run: bundle _2.2.13_ install --jobs 2 --retry 2
       - name: Prepare disposable test schema
         run: bundle _2.2.13_ exec rails db:schema:load
+      # Controller rendering tests do not exercise Webpack bundles. A temporary
+      # test-only manifest isolates Rails HTML/auth behavior from old JS tooling.
+      - name: Provide test-only Webpacker manifest (not a JS build)
+        run: |
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
       - name: Run ACL negative and admin CRUD positive tests
         run: bundle _2.2.13_ exec rails test test/controllers/admin_access_test.rb test/controllers/products_controller_test.rb test/controllers/categories_controller_test.rb
