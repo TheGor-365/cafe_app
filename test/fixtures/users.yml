@@ -1,11 +1,13 @@
-# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+# Non-authenticating fixtures for legacy integration tests.
+# Devise-authenticated test users are created in the relevant tests.
+one:
+  username: fixture_user_one
+  email: fixture-one@example.test
+  encrypted_password: invalid-test-only-hash
+  admin: false
 
-# This model initially had no columns defined. If you add columns to the
-# model remove the '{}' from the fixture names and add the columns immediately
-# below each fixture, per the syntax in the comments below
-#
-one: {}
-# column: value
-#
-two: {}
-# column: value
+two:
+  username: fixture_user_two
+  email: fixture-two@example.test
+  encrypted_password: invalid-test-only-hash
+  admin: false
