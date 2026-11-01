@@ -84,7 +84,7 @@ class CoffeeHomeCartFlowTest < ActionDispatch::IntegrationTest
     buyer.get cart_path
     assert_includes buyer.response.body, @product.name
     other_guest.get cart_path
-    assert_select '.cafe-cart__empty', other_guest.response.body, count: 1
+    assert_includes other_guest.response.body, 'Your cart is empty'
     assert_not_includes other_guest.response.body, @product.name
   end
 end
