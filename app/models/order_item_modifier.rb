@@ -14,7 +14,7 @@ class OrderItemModifier < ApplicationRecord
 
     if order_item.product_id != product_modifier_option.product_id ||
        product_modifier_option.group_code != group_code_snapshot ||
-       !product_modifier_option.available?
+       (new_record? && !product_modifier_option.available?)
       errors.add(:product_modifier_option, 'must be available for this product')
     end
   end
