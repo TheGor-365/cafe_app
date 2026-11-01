@@ -1,12 +1,13 @@
 name: Cafe legacy ACL request tests
 
 on:
-  push:
-    branches:
-      - feature/cafe-server-acl-20261101
   pull_request:
     branches:
       - master
+
+concurrency:
+  group: cafe-acl-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
