@@ -44,5 +44,5 @@ jobs:
         run: bundle _2.2.13_ install --jobs 2 --retry 2
       - name: Prepare disposable test schema
         run: bundle _2.2.13_ exec rails db:schema:load
-      - name: Run cart arithmetic regression tests
-        run: bundle _2.2.13_ exec rails test test/models/order_item_test.rb
+      - name: Run cart model and request regression tests
+        run: bundle _2.2.13_ exec rails test test/models/order_item_test.rb test/controllers/order_items_requests_test.rb
