@@ -1,0 +1,50 @@
+name: Cafe real legacy Webpacker build smoke
+
+on:
+  pull_request:
+    branches: [feature/cafe-coffee-menu-v1-20261101]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cafe-real-webpack-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  webpacker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: ruby:2.5.8
+    env:
+      RAILS_ENV: development
+      NODE_ENV: development
+      RUBYOPT: -rlogger
+      BUNDLE_PATH: /tmp/cafe-bundle
+      DISABLE_BOOTSNAP: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compatible legacy Bundler
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Resolve Linux lockfile platform inside CI only
+        run: bundle _2.2.13_ lock --add-platform x86_64-linux
+      - name: Install Ruby gems
+        run: bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Use isolated Node 14 for legacy Webpack 4 diagnosis
+        uses: actions/setup-node@v4
+        with:
+          node-version: '14.21.3'
+      - name: Install Yarn 1
+        run: |
+          npm install -g yarn@1.22.22
+          node --version
+          yarn --version
+      - name: Install locked JavaScript dependencies
+        run: yarn install --frozen-lockfile --non-interactive
+      - name: Compile actual Webpacker pack assets
+        run: bundle _2.2.13_ exec rails webpacker:compile
+      - name: Assert real application.js is in manifest
+        run: |
+          test -s public/packs/manifest.json
+          node -e 'const m=require("./public/packs/manifest.json"); if(!m["application.js"]) process.exit(1); console.log("application.js:", m["application.js"]);'
