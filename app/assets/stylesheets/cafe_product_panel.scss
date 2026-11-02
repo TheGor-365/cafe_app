@@ -57,7 +57,8 @@
 }
 .coffee-config.is-modal > .coffee-config__trigger { display: none; }
 .coffee-config.is-modal .coffee-config__sheet {
-  width: min(100%, 600px);
+  width: 100%;
+  max-width: 600px;
   max-height: calc(100vh - 2.5rem);
   overflow-y: auto;
   box-shadow: 0 26px 80px rgba(11, 6, 3, .5);
