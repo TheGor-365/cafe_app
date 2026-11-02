@@ -1,25 +1,26 @@
-<h2>Change your password</h2>
-
-<%= form_for(resource, as: resource_name, url: password_path(resource_name), html: { method: :put }) do |f| %>
-  <%= render "devise/shared/error_messages", resource: resource %>
-  <%= f.hidden_field :reset_password_token %>
-
-  <div class="field">
-    <%= f.label :password, "New password" %><br />
-    <% if @minimum_password_length %>
-      <em>(<%= @minimum_password_length %> characters minimum)</em><br />
+<% content_for :title, "Change Password · Gor's Coffee" %>
+<main class="cafe-auth" aria-labelledby="cafe-auth-title">
+  <header class="cafe-auth__intro">
+    <p class="cafe-auth__eyebrow">Account recovery</p>
+    <h1 id="cafe-auth-title">Choose a new password</h1>
+  </header>
+  <section class="cafe-auth__card">
+    <%= form_for(resource, as: resource_name, url: password_path(resource_name), html: { method: :put }) do |f| %>
+      <%= render 'devise/shared/error_messages', resource: resource %>
+      <%= f.hidden_field :reset_password_token %>
+      <div class="cafe-auth__field">
+        <%= f.label :password, 'New password' %>
+        <% if @minimum_password_length %><small class="cafe-auth__hint">At least <%= @minimum_password_length %> characters</small><% end %>
+        <%= f.password_field :password, autofocus: true, autocomplete: 'new-password', required: true, class: 'form-control' %>
+      </div>
+      <div class="cafe-auth__field">
+        <%= f.label :password_confirmation, 'Confirm new password' %>
+        <%= f.password_field :password_confirmation, autocomplete: 'new-password', required: true, class: 'form-control' %>
+      </div>
+      <%= f.submit 'Change password', class: 'cafe-auth__submit' %>
     <% end %>
-    <%= f.password_field :password, autofocus: true, autocomplete: "new-password" %>
-  </div>
-
-  <div class="field">
-    <%= f.label :password_confirmation, "Confirm new password" %><br />
-    <%= f.password_field :password_confirmation, autocomplete: "new-password" %>
-  </div>
-
-  <div class="actions">
-    <%= f.submit "Change my password" %>
-  </div>
-<% end %>
-
-<%= render "devise/shared/links" %>
+    <nav class="cafe-auth__links" aria-label="Account access links">
+      <%= render 'devise/shared/links' %>
+    </nav>
+  </section>
+</main>
