@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Gor's Coffee">
+  <rect width="64" height="64" rx="14" fill="#2c1c14"/>
+  <path d="M13 21h34v18c0 9-7 14-17 14S13 48 13 39Z" fill="#fff2dc"/>
+  <path d="M47 24h4c12 0 10 17-4 17" fill="none" stroke="#fff2dc" stroke-width="5" stroke-linecap="round"/>
+  <path d="M20 14c-3-4 3-5 1-9M31 14c-3-4 3-5 1-9M42 14c-3-4 3-5 1-9" stroke="#ddb987" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <path d="M22 28h16" stroke="#7f502f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M23 36h13" stroke="#7f502f" stroke-width="3" stroke-linecap="round"/>
+</svg>
