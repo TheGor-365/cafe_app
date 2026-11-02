@@ -3,14 +3,14 @@
   box-sizing: border-box;
   min-width: 0;
   width: 100%;
-  padding: clamp(1rem, 2.5vw, 1.7rem);
+  padding: 1.5rem;
   border-radius: 1.1rem;
   background: #fffaf2;
   color: #312319;
 }
 .cafe-content-page *, .coffee-product-detail *, .cafe-site-footer * { box-sizing: border-box; }
 .cafe-content-page__hero {
-  padding: clamp(1.4rem, 3.5vw, 3rem);
+  padding: 2.25rem;
   border-radius: .9rem;
   background: linear-gradient(125deg, #342318, #765039);
   color: #fff9ef;
@@ -23,7 +23,7 @@
 }
 .cafe-content-page__hero .cafe-content-page__eyebrow { color: #f6d7aa; }
 .cafe-content-page__hero h1 {
-  font-size: clamp(2rem, 4vw, 3.1rem);
+  font-size: 2.7rem;
   line-height: 1.13;
   font-weight: 800;
   max-width: 23ch;
@@ -54,7 +54,7 @@
 .cafe-content-page__section { padding: 1.6rem .25rem; }
 .cafe-content-page__section + .cafe-content-page__section { border-top: 1px solid #e6d9c9; }
 .cafe-content-page__section h2 {
-  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+  font-size: 1.65rem;
   font-weight: 800;
   margin: .25rem 0 1.1rem;
 }
@@ -139,7 +139,7 @@
   display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
   gap: 1.5rem; border-bottom: 1px solid #e8d7c5; padding-bottom: 1.35rem;
 }
-.coffee-product-detail__heading h1 { margin: .35rem 0 .6rem; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.1; font-weight: 800; }
+.coffee-product-detail__heading h1 { margin: .35rem 0 .6rem; font-size: 2.7rem; line-height: 1.1; font-weight: 800; }
 .coffee-product-detail__heading p { max-width: 58ch; }
 .coffee-product-detail__eyebrow { color: #815a3d; }
 .coffee-product-detail__badges { display: flex; flex-wrap: wrap; gap: .4rem; }
@@ -175,7 +175,7 @@
 .cafe-site-footer {
   min-width: 0;
   margin-top: 1.3rem;
-  padding: clamp(1.3rem, 3vw, 2rem);
+  padding: 1.6rem;
   background: #261c17;
   border: 1px solid rgba(243,219,192,.15);
   border-radius: .95rem;
