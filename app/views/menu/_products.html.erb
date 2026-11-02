@@ -98,9 +98,15 @@
                   </div>
                 <% end %>
                 <%= form.label :quantity, 'Qty', for: "coffee-qty-#{product.id}" %>
-                <%= form.number_field :quantity, value: 1, min: 1, max: 20, required: true,
-                      id: "coffee-qty-#{product.id}", class: 'coffee-product-card__quantity',
-                      data: { coffee_quantity: true } %>
+                <div class="coffee-quantity" data-coffee-quantity-control>
+                  <button type="button" class="coffee-quantity__step" data-coffee-quantity-step="-1"
+                          aria-label="Decrease quantity for <%= product.name %>">−</button>
+                  <%= form.number_field :quantity, value: 1, min: 1, max: 20, required: true,
+                        id: "coffee-qty-#{product.id}", class: 'coffee-product-card__quantity',
+                        data: { coffee_quantity: true, coffee_quantity_input: true } %>
+                  <button type="button" class="coffee-quantity__step" data-coffee-quantity-step="1"
+                          aria-label="Increase quantity for <%= product.name %>">+</button>
+                </div>
                 <% if variants.any? %>
                   <output class="coffee-product-card__live-price"
                           data-coffee-price-output aria-live="polite" aria-atomic="true"
