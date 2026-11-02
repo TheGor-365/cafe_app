@@ -2,7 +2,7 @@ name: Coffee price preview JS and Rails validation
 
 on:
   pull_request:
-    branches: [feature/cafe-drink-configurator-20261102]
+    branches: [feature/cafe-drink-configurator-20261102, feature/cafe-live-price-preview-20261102]
 
 permissions:
   contents: read
@@ -66,7 +66,8 @@ jobs:
             test/integration/coffee_layout_reflow_test.rb \
             test/integration/coffee_drink_configurator_test.rb \
             test/models/coffee_drink_seed_test.rb \
-            test/integration/coffee_live_price_preview_test.rb
+            test/integration/coffee_live_price_preview_test.rb \
+            test/integration/coffee_cart_consolidation_test.rb
 
   javascript:
     runs-on: ubuntu-latest
