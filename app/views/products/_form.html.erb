@@ -1,91 +1,41 @@
-<%= form_with(model: product, local: true) do |form| %>
+<%= form_with(model: product, local: true, html: { class: 'cafe-admin__form' }) do |form| %>
   <% if product.errors.any? %>
-    <div id="error_explanation">
-      <h2><%= pluralize(product.errors.count, "error") %> prohibited this product from being saved:</h2>
-
-      <ul>
-        <% product.errors.full_messages.each do |message| %>
-          <li><%= message %></li>
-        <% end %>
-      </ul>
+    <div class="cafe-admin__alert" role="alert">
+      <h2><%= pluralize(product.errors.count, 'error') %> prevented this product from being saved</h2>
+      <ul><% product.errors.full_messages.each do |message| %><li><%= message %></li><% end %></ul>
     </div>
   <% end %>
-
-  <div class="form-group">
+  <div class="cafe-admin__field">
     <%= form.label :name %>
-    <%= form.text_field :name, class: 'form-control' %>
+    <%= form.text_field :name, required: true, class: 'form-control' %>
   </div>
-
-  <div class="form-group">
+  <div class="cafe-admin__field">
     <%= form.label :description %>
-    <%= form.text_area :description, class: 'form-control' %>
+    <%= form.text_area :description, rows: 4, class: 'form-control' %>
   </div>
-
-  <div class="form-group">
-    <%= form.label :price %>
-    <%= form.text_field :price, class: 'form-control' %>
-  </div>
-
-  <div class="form-group">
-    <%= form.label 'Product Image' %>
-    <div class="custom-file">
-      <%= form.label 'Choose file', class: 'custom-file-label' %>
-      <%= form.file_field :image, type: 'file', class: 'custom-file-input' %>
-      <%= form.hidden_field :image_cache %>
+  <div class="cafe-admin__two-col">
+    <div class="cafe-admin__field">
+      <%= form.label :price, 'Demo base price (USD)' %>
+      <%= form.number_field :price, min: 0, step: 0.01, required: true, class: 'form-control' %>
+    </div>
+    <div class="cafe-admin__field">
+      <%= form.label :category_id, 'Category' %>
+      <%= form.collection_select :category_id, Category.order(:heading), :id, :heading, { prompt: 'Select category' }, { class: 'form-control', required: true } %>
     </div>
   </div>
-
-  <div class="form-group">
-    <%= form.label :category %>
-    <%= form.select(:category_id, options_from_collection_for_select(Category.all, :id, :heading, (@product.category.id if @product.category.present?)), {}, {class: 'form-control'}) %>
-  </div>
-
-  <div class="form-group">
-    <%= form.label :dairy_free %>
-    <%= form.check_box :dairy_free %>
-  </div>
-
-  <div class="form-group">
-    <%= form.label :gluten_free %>
-    <%= form.check_box :gluten_free %>
-  </div>
-
-  <div class="form-group">
-    <%= form.label :kosher %>
-    <%= form.check_box :kosher %>
-  </div>
-
-  <div class="form-group">
-    <%= form.label :peanut_free %>
-    <%= form.check_box :peanut_free %>
-  </div>
-
-  <div class="form-group">
-    <%= form.label :vegan %>
-    <%= form.check_box :vegan %>
-  </div>
-
-  <div class="form-group">
-    <%= form.label :vegetarian %>
-    <%= form.check_box :vegetarian %>
-  </div>
-
-  <div class="form-group">
-    <%= form.label :available %>
-    <%= form.check_box :available %>
-  </div>
-
-  <div class="form-group">
-    <%= form.label :catering %>
-    <%= form.check_box :catering %>
-  </div>
-
-  <div class="form-group">
-    <%= form.label :featured %>
-    <%= form.check_box :featured %>
-  </div>
-
-  <div class="form-group">
-    <%= form.submit class: 'btn btn-sm btn-primary' %>
-  </div>
+  <p class="cafe-admin__hint">Image uploads are temporarily disabled because the current Docker code mount is read-only. Existing product images remain unchanged.</p>
+  <fieldset class="cafe-admin__checkbox-group">
+    <legend>Catalogue availability</legend>
+    <% %i[available featured catering].each do |flag| %>
+      <label><%= form.check_box flag %> <%= flag.to_s.humanize %></label>
+    <% end %>
+  </fieldset>
+  <fieldset class="cafe-admin__checkbox-group">
+    <legend>Demo dietary attributes</legend>
+    <p>These labels are unverified sample data; they must not be treated as actual food-safety guarantees.</p>
+    <% %i[vegan vegetarian dairy_free gluten_free peanut_free kosher].each do |flag| %>
+      <label><%= form.check_box flag %> <%= flag.to_s.humanize %></label>
+    <% end %>
+  </fieldset>
+  <%= form.submit class: 'cafe-admin__button' %>
 <% end %>
