@@ -7,6 +7,7 @@
 'use strict'
 
 const { initializeCoffeePricePreviews } = require('./coffee_price_preview')
+const { initializeCoffeeQuantitySteppers } = require('./coffee_quantity_stepper')
 
 let activePanel = null
 let handlersInstalled = false
@@ -64,6 +65,7 @@ function openCoffeeConfig(details) {
   activePanel = { details, sheet, trigger, anchor, bodyOverflow, inerted }
   // AJAX menu search can inject fresh forms after the initial page load.
   initializeCoffeePricePreviews()
+  initializeCoffeeQuantitySteppers()
   const focusables = focusableElements(sheet)
   if (focusables.length) focusables[0].focus()
   else { sheet.setAttribute('tabindex', '-1'); sheet.focus() }
