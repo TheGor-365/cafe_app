@@ -53,10 +53,12 @@ class ProductsController < ApplicationController
   end
 
   def destroy
-    if @product.destroy
+    if @product.order_items.exists? || @product.product_variants.exists? || @product.product_modifier_options.exists?
+      redirect_to products_url, alert: 'This product has basket references or configuration options. Keep it unavailable instead of deleting it.'
+    elsif @product.destroy
       redirect_to products_url, notice: 'Demo product removed.'
     else
-      redirect_to products_url, alert: 'This product is referenced by existing items or options and cannot be removed safely.'
+      redirect_to products_url, alert: 'Product could not be removed safely.'
     end
   end
 
