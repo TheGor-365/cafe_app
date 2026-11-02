@@ -1,88 +1,47 @@
-<div class="container">
+<% content_for :title do %><%= @product.name %> · Gor's Coffee<% end %>
+<main class="coffee-product-detail" aria-labelledby="coffee-detail-title">
+  <nav class="coffee-product-detail__breadcrumbs" aria-label="Breadcrumb">
+    <%= link_to 'Menu', menu_path %>
+    <span aria-hidden="true">/</span>
+    <%= link_to @product.category.heading, menu_path(category_id: @product.category_id) %>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page"><%= @product.name %></span>
+  </nav>
 
-  <h3 class="mt-5 mb-5 display-3">
-    <%= @product.category.heading %>
-  </h3>
-
-  <h4 class="mb-3">
-    <%= @product.name %>
-  </h4>
-
-  <div>
-    <div class="card p-3 mt-3 mb-3">
-      <small class="mb-3">Description:</small>
-      <%= @product.description %>
+  <header class="coffee-product-detail__heading">
+    <div>
+      <p class="coffee-product-detail__eyebrow"><%= @product.category.heading %> · Demo menu</p>
+      <h1 id="coffee-detail-title"><%= @product.name %></h1>
+      <p><%= @product.description.presence || 'A sample item from our demo menu.' %></p>
+      <div class="coffee-product-detail__badges" aria-label="Demo catalogue attributes">
+        <% if @product.vegan? %><span>Vegan</span><% end %>
+        <% if @product.dairy_free? %><span>Dairy free</span><% end %>
+        <% if @product.gluten_free? %><span>Gluten free</span><% end %>
+      </div>
     </div>
-  </div>
-  <hr>
+    <%= link_to 'Back to menu', menu_path(category_id: @product.category_id), class: 'coffee-product-detail__back' %>
+  </header>
 
-  <p>
-    <small>Product Image:</small>
-    <%= @product.image.identifier %>
-  </p>
-  <hr>
+  <% if @product.available? %>
+    <section class="coffee-product-detail__purchase" aria-label="Configure and add <%= @product.name %> to demo cart">
+      <div class="coffee-product-detail__intro">
+        <h2>Make it yours</h2>
+        <p>Choose available options, review the price and add this sample item to your demo basket.</p>
+      </div>
+      <%# Reuse the exact server-backed menu form, including its no-JavaScript fallback. %>
+      <div class="coffee-product-detail__catalog-form">
+        <%= render 'menu/products' %>
+      </div>
+    </section>
+  <% else %>
+    <section class="coffee-product-detail__unavailable" role="status">
+      <h2>Temporarily unavailable</h2>
+      <p>This sample product cannot be added to the demo basket right now.</p>
+      <%= link_to 'See available items', menu_path, class: 'coffee-product-detail__back' %>
+    </section>
+  <% end %>
 
-  <p>
-    <small>Price:</small>
-    <%= @product.price %>
-  </p>
-  <hr>
-
-  <p>
-    <small>Dairy free:</small>
-    <%= @product.dairy_free %>
-  </p>
-  <hr>
-
-  <p>
-    <small>Gluten free:</small>
-    <%= @product.gluten_free %>
-  </p>
-  <hr>
-
-  <p>
-    <small>Kosher:</small>
-    <%= @product.kosher %>
-  </p>
-  <hr>
-
-  <p>
-    <small>Peanut free:</small>
-    <%= @product.peanut_free %>
-  </p>
-  <hr>
-
-  <p>
-    <small>Vegan:</small>
-    <%= @product.vegan %>
-  </p>
-  <hr>
-
-  <p>
-    <small>Vegetarian:</small>
-    <%= @product.vegetarian %>
-  </p>
-  <hr>
-
-  <p>
-    <small>Available:</small>
-    <%= @product.available %>
-  </p>
-  <hr>
-
-  <p>
-    <small>Catering:</small>
-    <%= @product.catering %>
-  </p>
-  <hr>
-
-  <p>
-    <small>Featured:</small>
-    <%= @product.featured %>
-  </p>
-  <hr>
-
-  <%= link_to 'Edit', edit_product_path(@product) %> |
-  <%= link_to 'Back', products_path %>
-  <hr>
-</div>
+  <aside class="coffee-product-detail__disclaimer">
+    <strong>Demo only.</strong> Sample pricing and catalogue information; no real order or payment is placed. Product dietary flags are demonstration attributes, not food-safety guarantees.
+  </aside>
+</main>
