@@ -1,8 +1,16 @@
-<div class="container mt-5 mb-5">
-  <h5 class="mb-5">Editing Product</h5>
-
-  <%= render 'form', product: @product %>
-
-  <%= link_to 'Show', @product %> |
-  <%= link_to 'Back', products_path %>
-</div>
+<% content_for :title, "Edit product · Gor's Coffee" %>
+<main class="cafe-admin cafe-admin--form" aria-labelledby="cafe-admin-title">
+  <header class="cafe-admin__hero">
+    <div>
+      <p class="cafe-admin__eyebrow">Restricted · Catalogue administration</p>
+      <h1 id="cafe-admin-title">Edit product</h1>
+      <p>Manage fictional catalogue data; changes affect the local sample menu.</p>
+    </div>
+  </header>
+  <div class="cafe-admin__panel cafe-admin__form-panel">
+    <%= render 'form', product: @product %>
+    <nav class="cafe-admin__form-nav" aria-label="Return to management">
+      <%= link_to 'Back to products', products_path %>
+    </nav>
+  </div>
+</main>

@@ -1,15 +1,20 @@
-
-<%= simple_form_for(@category) do |f| %>
-  <%= f.error_notification %>
-  <%= f.error_notification message: f.object.errors[:base].to_sentence if f.object.errors[:base].present? %>
-
-  <div class="form-inputs">
-    <%= f.input :heading %>
-    <%= f.input :body %>
-    <%= f.input :display %>
+<%= form_with(model: @category, local: true, html: { class: 'cafe-admin__form' }) do |form| %>
+  <% if @category.errors.any? %>
+    <div class="cafe-admin__alert" role="alert">
+      <h2><%= pluralize(@category.errors.count, 'error') %> prevented this category from being saved</h2>
+      <ul><% @category.errors.full_messages.each do |message| %><li><%= message %></li><% end %></ul>
+    </div>
+  <% end %>
+  <div class="cafe-admin__field">
+    <%= form.label :heading %>
+    <%= form.text_field :heading, required: true, class: 'form-control' %>
   </div>
-
-  <div class="form-group">
-    <%= f.button :submit, class: 'btn btn-sm btn-primary' %>
+  <div class="cafe-admin__field">
+    <%= form.label :body, 'Category description' %>
+    <%= form.text_area :body, rows: 4, class: 'form-control' %>
   </div>
+  <div class="cafe-admin__checkbox-group">
+    <label><%= form.check_box :display %> Display in demo catalogue</label>
+  </div>
+  <%= form.submit class: 'cafe-admin__button' %>
 <% end %>

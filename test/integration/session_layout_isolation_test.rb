@@ -29,17 +29,17 @@ class SessionLayoutIsolationTest < ActionDispatch::IntegrationTest
       params: { user: { email: @member.email, password: @password } }
     assert_equal 302, member_browser.response.status
 
-    member_browser.get categories_path
+    member_browser.get menu_path
     assert_equal 200, member_browser.response.status
     assert_includes member_browser.response.body, @member.username
 
-    guest_browser.get categories_path
+    guest_browser.get menu_path
     assert_equal 200, guest_browser.response.status
     assert_not_includes guest_browser.response.body, @member.username
     assert_includes guest_browser.response.body, 'Sign in'
 
     member_browser.delete destroy_user_session_path
-    member_browser.get categories_path
+    member_browser.get menu_path
     assert_equal 200, member_browser.response.status
     assert_not_includes member_browser.response.body, @member.username
   end
