@@ -1,67 +1,46 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <title>The change you wanted was rejected (422)</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>
-  .rails-default-error-page {
-    background-color: #EFEFEF;
-    color: #2E2F30;
-    text-align: center;
-    font-family: arial, sans-serif;
-    margin: 0;
-  }
-
-  .rails-default-error-page div.dialog {
-    width: 95%;
-    max-width: 33em;
-    margin: 4em auto 0;
-  }
-
-  .rails-default-error-page div.dialog > div {
-    border: 1px solid #CCC;
-    border-right-color: #999;
-    border-left-color: #999;
-    border-bottom-color: #BBB;
-    border-top: #B00100 solid 4px;
-    border-top-left-radius: 9px;
-    border-top-right-radius: 9px;
-    background-color: white;
-    padding: 7px 12% 0;
-    box-shadow: 0 3px 8px rgba(50, 50, 50, 0.17);
-  }
-
-  .rails-default-error-page h1 {
-    font-size: 100%;
-    color: #730E15;
-    line-height: 1.5em;
-  }
-
-  .rails-default-error-page div.dialog > p {
-    margin: 0 0 1em;
-    padding: 1em;
-    background-color: #F7F7F7;
-    border: 1px solid #CCC;
-    border-right-color: #999;
-    border-left-color: #999;
-    border-bottom-color: #999;
-    border-bottom-left-radius: 4px;
-    border-bottom-right-radius: 4px;
-    border-top-color: #DADADA;
-    color: #666;
-    box-shadow: 0 3px 8px rgba(50, 50, 50, 0.17);
-  }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2c1c14">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  * { box-sizing: border-box; }
+  html { min-width: 0; background: #241914; }
+  body { min-width: 0; min-height: 100vh; margin: 0; color: #302219; background: linear-gradient(135deg, #261b16 0%, #503725 100%); }
+  .shell { width: min(92%, 680px); margin: 0 auto; padding: clamp(20px, 8vh, 96px) 0 32px; }
+  .brand { display: inline-flex; align-items: center; gap: 12px; margin-bottom: 20px; color: #fff3e4; font-weight: 750; font-size: 1.1rem; text-decoration: none; }
+  .brand-mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: #fff3e4; background: #90603b; font-weight: 800; }
+  .panel { padding: clamp(24px, 6vw, 48px); border: 1px solid #e6d6c5; border-radius: 18px; background: #fffaf2; box-shadow: 0 20px 50px rgba(12, 6, 3, .22); }
+  .eyebrow { font-size: .78rem; color: #765137; text-transform: uppercase; letter-spacing: .12em; font-weight: 800; }
+  h1 { margin: .5em 0 .4em; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.12; letter-spacing: -.025em; }
+  .description { font-size: 1.08rem; color: #5e524b; line-height: 1.6; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+  .button { display: inline-flex; min-height: 46px; align-items: center; justify-content: center; padding: .7rem 1.1rem; border: 1px solid #6a4228; border-radius: 10px; color: #fff; background: #6a4228; font-weight: 700; text-decoration: none; }
+  .button.secondary { color: #55371f; background: #fffaf2; }
+  .button:hover { background: #482b1c; color: #fff; }
+  .button:focus-visible, .brand:focus-visible { outline: 3px solid #d6a46c; outline-offset: 3px; }
+  footer { margin-top: 22px; color: #e6d5c2; font-size: .84rem; line-height: 1.5; }
+  @media (max-width: 420px) { .actions { flex-direction: column; } .button { width: 100%; } }
+</style>
+<title>422 — We couldn't complete that change · Gor's Coffee</title>
+<meta name="robots" content="noindex">
 </head>
-
-<body class="rails-default-error-page">
-  <!-- This file lives in public/422.html -->
-  <div class="dialog">
-    <div>
-      <h1>The change you wanted was rejected.</h1>
-      <p>Maybe you tried to change something you didn't have access to.</p>
-    </div>
-    <p>If you are the application owner check the logs for more information.</p>
+<body>
+  <div class="shell">
+    <a class="brand" href="/" aria-label="Gor's Coffee home"><span class="brand-mark" aria-hidden="true">GC</span> Gor's Coffee</a>
+    <main class="panel" id="main-content">
+      <p class="eyebrow">422 · Request not accepted</p>
+      <h1>We couldn't complete that change</h1>
+      <p class="description">The request could not be processed. Please return to the menu and try again. If you were submitting a form, check your entries.</p>
+      <div class="actions">
+        <a class="button" href="/menu">Browse the demo menu</a>
+        <a class="button secondary" href="/">Return home</a>
+      </div>
+    </main>
+    <footer>Gor's Coffee is a portfolio demonstration. No real café, orders or payments.</footer>
   </div>
 </body>
 </html>
