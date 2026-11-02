@@ -1,65 +1,50 @@
-<div class="container mt-5 mb-5">
-  <div class="row">
-    <div class="col-6">
-      <div class="card p-5 bg-light">
-        <h5>Edit <%= resource_name.to_s.humanize %></h5>
-
-        <%= form_for(resource, as: resource_name, url: registration_path(resource_name), html: { method: :put }) do |f| %>
-          <%= render "devise/shared/error_messages", resource: resource %>
-
-          <% if devise_mapping.confirmable? && resource.pending_reconfirmation? %>
-          <div>Currently waiting confirmation for: <%= resource.unconfirmed_email %></div>
-          <% end %>
-
-          <div class="form-group">
-            <%= f.label :email %>
-            <%= f.email_field :email, autofocus: true, autocomplete: "email", class: 'form-control' %>
-          </div>
-
-          <div class="form-group">
-            <%= f.label :username %>
-            <%= f.text_field :username, class: 'form-control' %>
-          </div>
-
-          <div class="form-group">
-            <div class="custom-file">
-              <%= f.label :avatar, class: 'custom-file-label' %>
-              <%= f.file_field :avatar, type: 'file', class: 'custom-file-input' %>
-              <%#= f.hidden_field :avatar_cache %>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <%= f.label :password %> <small class="text-muted">(leave blank if you don't want to change it)</small>
-            <%= f.password_field :password, autocomplete: "new-password", class: 'form-control' %>
-            <% if @minimum_password_length %>
-              <small class="text-muted"><%= @minimum_password_length %> characters minimum</small>
-            <% end %>
-          </div>
-
-          <div class="form-group">
-            <%= f.label :password_confirmation %>
-            <%= f.password_field :password_confirmation, autocomplete: "new-password", class: 'form-control' %>
-          </div>
-
-          <div class="form-group">
-            <%= f.label :current_password %><br> <small class="text-muted">(we need your current password to confirm your changes)</small>
-            <%= f.password_field :current_password, autocomplete: "current-password", class: 'form-control' %>
-          </div>
-
-          <div class="form-group">
-            <%= f.submit "Update", class: 'btn btn-success btn-sm' %>
-          </div>
-        <% end %>
+<% content_for :title, "Edit Profile · Gor's Coffee" %>
+<main class="cafe-auth" aria-labelledby="cafe-auth-title">
+  <header class="cafe-auth__intro">
+    <p class="cafe-auth__eyebrow">My demo account</p>
+    <h1 id="cafe-auth-title">Edit your profile</h1>
+    <p>Change your account details. Your current password is required to save changes.</p>
+  </header>
+  <section class="cafe-auth__card">
+    <%= form_for(resource, as: resource_name, url: registration_path(resource_name), html: { method: :put }) do |f| %>
+      <%= render 'devise/shared/error_messages', resource: resource %>
+      <% if devise_mapping.confirmable? && resource.pending_reconfirmation? %>
+        <p class="cafe-auth__notice">Pending email confirmation: <%= resource.unconfirmed_email %></p>
+      <% end %>
+      <div class="cafe-auth__field">
+        <%= f.label :email %>
+        <%= f.email_field :email, autofocus: true, autocomplete: 'email', required: true, class: 'form-control' %>
       </div>
-    </div>
-  </div>
-
-  <div class="row mt-5">
-    <div class="col-6">
-      <div class="card p-5">
-        <small><%= link_to "Cancel my account", registration_path(resource_name), data: { confirm: "Are you sure?" }, method: :delete, class: 'text-decoration-none text-danger' %></small>
+      <div class="cafe-auth__field">
+        <%= f.label :username %>
+        <%= f.text_field :username, autocomplete: 'username', class: 'form-control' %>
       </div>
+      <div class="cafe-auth__field">
+        <%= f.label :password, 'New password' %>
+        <small class="cafe-auth__hint">Leave blank to keep your existing password.</small>
+        <%= f.password_field :password, autocomplete: 'new-password', class: 'form-control' %>
+      </div>
+      <div class="cafe-auth__field">
+        <%= f.label :password_confirmation %>
+        <%= f.password_field :password_confirmation, autocomplete: 'new-password', class: 'form-control' %>
+      </div>
+      <div class="cafe-auth__field">
+        <%= f.label :current_password %>
+        <small class="cafe-auth__hint">Required to confirm changes to your account.</small>
+        <%= f.password_field :current_password, autocomplete: 'current-password', required: true, class: 'form-control' %>
+      </div>
+      <p class="cafe-auth__hint">Avatar uploads remain temporarily disabled until private storage is configured safely. Existing avatars are not deleted.</p>
+      <%= f.submit 'Save profile', class: 'cafe-auth__submit' %>
+    <% end %>
+    <div class="cafe-auth__links">
+      <%= link_to 'Back to my account', account_path %>
     </div>
-  </div>
-</div>
+  </section>
+  <section class="cafe-auth__danger" aria-labelledby="cafe-auth-danger-title">
+    <h2 id="cafe-auth-danger-title">Close your demo account</h2>
+    <p>This removes your account record. Your session basket is not a purchase history.</p>
+    <%= link_to 'Cancel my account', registration_path(resource_name),
+          method: :delete, data: { confirm: 'Permanently delete this demo account?' },
+          class: 'cafe-auth__delete' %>
+  </section>
+</main>
