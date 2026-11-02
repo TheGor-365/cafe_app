@@ -11,6 +11,7 @@ Rails.application.routes.draw do
   get 'menu',     to: 'menu#index'
   get 'search',   to: 'menu#search'
   get 'cart',     to: 'cart#show'
+  post 'cart/consolidate', to: 'cart#consolidate', as: :consolidate_cart
   
   get 'info',     to: 'pages#info'
   get 'catering', to: 'pages#catering'

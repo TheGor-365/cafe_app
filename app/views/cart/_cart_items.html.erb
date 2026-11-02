@@ -42,6 +42,13 @@
     <span>Subtotal · <%= pluralize(@order_items.sum { |item| item.quantity.to_i }, 'item') %></span>
     <strong><%= number_to_currency(@order_items.sum { |item| item.total || 0 }) %></strong>
   </aside>
+  <% if @mergeable_lines %>
+    <div class="cafe-cart__merge-block">
+      <p>Identical items can be grouped without changing their saved price or chosen extras.</p>
+      <%= button_to 'Combine matching items', consolidate_cart_path, method: :post,
+            class: 'cafe-cart__merge-button' %>
+    </div>
+  <% end %>
   <p class="cafe-cart__disclaimer">Demo checkout is under development. No real orders or payments are available.</p>
   <%= link_to 'Continue shopping', menu_path, class: 'cafe-cart__secondary-action' %>
 <% end %>

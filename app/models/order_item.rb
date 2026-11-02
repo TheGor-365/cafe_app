@@ -28,7 +28,7 @@ class OrderItem < ApplicationRecord
 
   def verify_variant_and_modifier_groups
     if product
-      if product.product_variants.exists? && product_variant.nil?
+      if new_record? && product.product_variants.exists? && product_variant.nil?
         errors.add(:product_variant, 'is required for this drink')
       elsif product_variant &&
             (product_variant.product_id != product.id || (!persisted? && !product_variant.available?))
