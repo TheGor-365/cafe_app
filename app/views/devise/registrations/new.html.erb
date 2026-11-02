@@ -1,56 +1,39 @@
-<div class="container mt-5 mb-5">
-  <div class="row">
-    <div class="col-6">
-      <div class="card p-5">
-        <h5>Sign up</h5>
-
-        <%= form_for(resource, as: resource_name, url: registration_path(resource_name)) do |f| %>
-          <%= render "devise/shared/error_messages", resource: resource %>
-
-          <div class="form-group">
-            <%= f.label :email %>
-            <%= f.email_field :email, autofocus: true, autocomplete: "email", class: 'form-control' %>
-          </div>
-
-          <div class="form-group">
-            <%= f.label :username %>
-            <%= f.text_field :username, class: 'form-control' %>
-          </div>
-
-          <div class="form-group">
-            <div class="custom-file">
-              <%= f.label :avatar, class: 'custom-file-label' %>
-              <%= f.file_field :avatar, type: 'file', class: 'custom-file-input' %>
-              <%#= f.hidden_field :avatar_cache %>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <%= f.label :password %>
-            <% if @minimum_password_length %>
-            <small class="text-muted">(<%= @minimum_password_length %> characters minimum)</small>
-            <% end %>
-            <%= f.password_field :password, autocomplete: "new-password", class: 'form-control' %>
-          </div>
-
-          <div class="form-group">
-            <%= f.label :password_confirmation %>
-            <%= f.password_field :password_confirmation, autocomplete: "new-password", class: 'form-control' %>
-          </div>
-
-          <div class="form-group">
-            <%= f.submit "Sign up", class: 'btn btn-success btn-sm' %>
-          </div>
+<% content_for :title, "Create Account · Gor's Coffee" %>
+<main class="cafe-auth" aria-labelledby="cafe-auth-title">
+  <header class="cafe-auth__intro">
+    <p class="cafe-auth__eyebrow">Join our demo café</p>
+    <h1 id="cafe-auth-title">Create an account</h1>
+    <p>Save your basic profile and explore the sample menu. No real orders or payments.</p>
+  </header>
+  <section class="cafe-auth__card">
+    <%= form_for(resource, as: resource_name, url: registration_path(resource_name)) do |f| %>
+      <%= render 'devise/shared/error_messages', resource: resource %>
+      <div class="cafe-auth__field">
+        <%= f.label :email %>
+        <%= f.email_field :email, autofocus: true, autocomplete: 'email', required: true, class: 'form-control' %>
+      </div>
+      <div class="cafe-auth__field">
+        <%= f.label :username %>
+        <%= f.text_field :username, autocomplete: 'username', class: 'form-control' %>
+      </div>
+      <div class="cafe-auth__field">
+        <%= f.label :password %>
+        <% if @minimum_password_length %>
+          <small class="cafe-auth__hint">At least <%= @minimum_password_length %> characters</small>
         <% end %>
+        <%= f.password_field :password, autocomplete: 'new-password', required: true, class: 'form-control' %>
       </div>
-    </div>
-  </div>
-
-  <div class="row mt-5">
-    <div class="col-6">
-      <div class="card p-5">
-        <small><%= render "devise/shared/links" %></small>
+      <div class="cafe-auth__field">
+        <%= f.label :password_confirmation %>
+        <%= f.password_field :password_confirmation, autocomplete: 'new-password', required: true, class: 'form-control' %>
       </div>
-    </div>
-  </div>
-</div>
+      <%# Local read-only Docker cannot store CarrierWave uploads. Don't expose a broken upload input. %>
+      <p class="cafe-auth__hint">Profile image uploads are temporarily unavailable in this demo environment. You can create an account without a photo.</p>
+      <%= f.submit 'Create demo account', class: 'cafe-auth__submit' %>
+    <% end %>
+    <nav class="cafe-auth__links" aria-label="Account access links">
+      <%= render 'devise/shared/links' %>
+    </nav>
+  </section>
+  <p class="cafe-auth__disclaimer">No real orders or payments. The demo basket remains in your browser session.</p>
+</main>
