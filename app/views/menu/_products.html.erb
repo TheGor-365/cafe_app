@@ -50,6 +50,23 @@
                 </strong>
                 <%= link_to 'Details', product_path(product), class: 'coffee-product-card__details' %>
               </div>
+              <%# Without JavaScript, this native details element exposes the full working HTML form. %>
+              <details class="coffee-config" data-coffee-config>
+                <summary class="coffee-config__trigger" aria-label="<%= configurable ? 'Customize' : 'Add' %> <%= product.name %>">
+                  <span><%= configurable ? 'Customize' : 'Add to cart' %></span>
+                  <span aria-hidden="true">↗</span>
+                </summary>
+                <div class="coffee-config__sheet" data-coffee-config-panel
+                     aria-labelledby="coffee-config-title-<%= product.id %>">
+                  <div class="coffee-config__header">
+                    <div>
+                      <p class="coffee-config__eyebrow">Gor's Coffee · Demo order</p>
+                      <h4 id="coffee-config-title-<%= product.id %>"><%= product.name %></h4>
+                      <p><%= truncate(product.description.to_s, length: 170) %></p>
+                    </div>
+                    <button type="button" class="coffee-config__close" data-coffee-config-close
+                            aria-label="Close configuration for <%= product.name %>">Close ×</button>
+                  </div>
               <%= form_with url: order_items_path, scope: :order_item, method: :post,
                     local: true, class: 'coffee-product-card__cart-form',
                     data: { coffee_price_form: true,
@@ -98,6 +115,9 @@
                 <%= form.submit 'Add to cart', class: 'coffee-product-card__add',
                       disabled: configurable && variants.empty? %>
               <% end %>
+                  <p class="coffee-config__disclaimer">Demo basket only · No payment or actual order is placed.</p>
+                </div>
+              </details>
             </div>
           </article>
         <% end %>
