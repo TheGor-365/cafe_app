@@ -41,6 +41,112 @@
     </section>
   <% end %>
 
+
+  <% available_sizes = @product.product_variants.select(&:available?).sort_by(&:price_cents) %>
+  <% available_extras = @product.product_modifier_options.select(&:available?).group_by(&:group_code) %>
+
+  <section class="coffee-product-detail__information" aria-labelledby="coffee-detail-facts-title">
+    <h2 id="coffee-detail-facts-title">A closer look at this item</h2>
+    <p class="coffee-product-detail__section-intro">The details below come from the sample catalogue, beyond the short menu card. Prices and dietary labels are for demonstration.</p>
+    <dl class="coffee-product-detail__facts">
+      <div>
+        <dt>Menu category</dt>
+        <dd><%= @product.category.heading %></dd>
+      </div>
+      <div>
+        <dt>Demo availability</dt>
+        <dd><%= @product.available? ? 'Available for the demo basket' : 'Currently unavailable' %></dd>
+      </div>
+      <div>
+        <dt>Starting sample price</dt>
+        <dd>
+          <% if @product.product_variants.any? %>
+            <%= available_sizes.any? ? number_to_currency(BigDecimal(available_sizes.first.price_cents.to_s) / 100) : 'No size currently available' %>
+          <% else %>
+            <%= number_to_currency(@product.price) %>
+          <% end %>
+        </dd>
+      </div>
+    </dl>
+
+    <div class="coffee-product-detail__info-grid">
+      <div class="coffee-product-detail__info-card">
+        <h3>Sizes & pricing</h3>
+        <% if available_sizes.any? %>
+          <ul class="coffee-product-detail__price-list">
+            <% available_sizes.each do |size| %>
+              <li><span><%= size.label %></span><strong><%= number_to_currency(BigDecimal(size.price_cents.to_s) / 100) %></strong></li>
+            <% end %>
+          </ul>
+        <% elsif @product.product_variants.any? %>
+          <p>Size options are currently unavailable in this demo.</p>
+        <% else %>
+          <p>This item has one standard sample price and no separate size options.</p>
+        <% end %>
+      </div>
+      <div class="coffee-product-detail__info-card">
+        <h3>Optional extras</h3>
+        <% if available_extras.values.any?(&:any?) %>
+          <% [['milk', 'Milk choices'], ['syrup', 'Syrups'], ['shot', 'Extra espresso']].each do |group, title| %>
+            <% next unless available_extras[group].present? %>
+            <h4><%= title %></h4>
+            <ul class="coffee-product-detail__price-list">
+              <% available_extras[group].sort_by(&:price_cents).each do |option| %>
+                <li><span><%= option.label %></span><strong>+<%= number_to_currency(BigDecimal(option.price_cents.to_s) / 100) %></strong></li>
+              <% end %>
+            </ul>
+          <% end %>
+        <% else %>
+          <p>No additional customizations are listed for this sample item.</p>
+        <% end %>
+      </div>
+      <div class="coffee-product-detail__info-card">
+        <h3>Dietary information</h3>
+        <% labels = { vegan: 'Vegan', vegetarian: 'Vegetarian', dairy_free: 'Dairy free', gluten_free: 'Gluten free', peanut_free: 'Peanut free', kosher: 'Kosher' } %>
+        <% present_labels = labels.select { |flag, _| @product.public_send(flag) }.values %>
+        <% if present_labels.any? %>
+          <p>Catalogued demo attributes:</p>
+          <ul class="coffee-product-detail__dietary-list">
+            <% present_labels.each do |label| %><li><%= label %></li><% end %>
+          </ul>
+        <% else %>
+          <p>No dietary suitability attributes are listed for this sample.</p>
+        <% end %>
+        <p class="coffee-product-detail__caution">Ingredients, allergens and preparation practices have not been independently verified. A missing label does not establish that an ingredient is present or absent.</p>
+      </div>
+    </div>
+  </section>
+
+  <% if @related_products.any? %>
+    <section class="coffee-product-detail__related" aria-labelledby="coffee-detail-related-title">
+      <div class="coffee-product-detail__related-heading">
+        <div>
+          <h2 id="coffee-detail-related-title">More from <%= @product.category.heading %></h2>
+          <p>Discover other currently available sample items in the same category.</p>
+        </div>
+        <%= link_to 'See this category', menu_path(category_id: @product.category_id), class: 'coffee-product-detail__back' %>
+      </div>
+      <div class="coffee-product-detail__related-grid">
+        <% @related_products.each do |item| %>
+          <% other_sizes = item.product_variants.select(&:available?).map(&:price_cents) %>
+          <article class="coffee-product-detail__related-card">
+            <div class="coffee-product-detail__related-icon" aria-hidden="true">☕</div>
+            <h3><%= item.name %></h3>
+            <p><%= truncate(item.description.to_s, length: 95) %></p>
+            <strong>
+              <% if item.product_variants.any? %>
+                <%= other_sizes.any? ? "From #{number_to_currency(BigDecimal(other_sizes.min.to_s) / 100)}" : 'Sizes unavailable' %>
+              <% else %>
+                <%= number_to_currency(item.price) %>
+              <% end %>
+            </strong>
+            <%= link_to 'View details', product_path(item), 'aria-label': "View details for #{item.name}" %>
+          </article>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
   <aside class="coffee-product-detail__disclaimer">
     <strong>Demo only.</strong> Sample pricing and catalogue information; no real order or payment is placed. Product dietary flags are demonstration attributes, not food-safety guarantees.
   </aside>

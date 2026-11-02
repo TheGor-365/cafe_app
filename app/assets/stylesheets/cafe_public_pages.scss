@@ -212,3 +212,133 @@
   .cafe-site-footer__nav { grid-template-columns: minmax(0,1fr); }
   .cafe-content-page__actions .cafe-content-page__button { width: 100%; }
 }
+
+
+/* Gentle native-details motion on modern browsers; older engines retain accessible instant toggles. */
+.cafe-content-page__faq details {
+  interpolate-size: allow-keywords;
+}
+.cafe-content-page__faq details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  list-style: none;
+}
+.cafe-content-page__faq details summary::-webkit-details-marker { display: none; }
+.cafe-content-page__faq details summary::after {
+  content: '+';
+  flex: 0 0 auto;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #85532e;
+  transition: transform .24s ease;
+}
+.cafe-content-page__faq details[open] summary::after { transform: rotate(45deg); }
+.cafe-content-page__faq details::details-content {
+  block-size: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: block-size .28s ease, opacity .24s ease, content-visibility .28s allow-discrete;
+}
+.cafe-content-page__faq details[open]::details-content {
+  block-size: auto;
+  opacity: 1;
+}
+/* Native details remain functional and instantly accessible with no animation. */
+@media (prefers-reduced-motion: reduce) {
+  .cafe-content-page__faq details::details-content,
+  .cafe-content-page__faq details summary::after { transition: none; }
+}
+
+.coffee-product-detail__information,
+.coffee-product-detail__related {
+  padding: 1.5rem 0 0;
+  margin: 1.5rem 0 0;
+  border-top: 1px solid #e5d5c3;
+}
+.coffee-product-detail__information h2,
+.coffee-product-detail__related h2 {
+  margin: 0 0 .5rem;
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+.coffee-product-detail__section-intro { color: #6b5748; line-height: 1.55; max-width: 72ch; }
+.coffee-product-detail__facts {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: .7rem;
+  margin: 1rem 0 1.5rem;
+}
+.coffee-product-detail__facts > div {
+  padding: 1rem;
+  min-width: 0;
+  border: 1px solid #e4d2bb;
+  border-radius: .7rem;
+  background: #f6ebdc;
+}
+.coffee-product-detail__facts dt { color: #79573e; font-weight: 750; font-size: .8rem; }
+.coffee-product-detail__facts dd { margin: .35rem 0 0; color: #342317; font-weight: 750; line-height: 1.45; overflow-wrap: anywhere; }
+.coffee-product-detail__info-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .85rem; }
+.coffee-product-detail__info-card {
+  min-width: 0;
+  border: 1px solid #e4d5c3;
+  border-radius: .8rem;
+  background: #fff;
+  padding: 1.2rem;
+}
+.coffee-product-detail__info-card h3 { font-size: 1.1rem; font-weight: 800; margin: 0 0 .8rem; }
+.coffee-product-detail__info-card h4 { margin: .85rem 0 .3rem; font-size: .87rem; font-weight: 800; color: #705035; }
+.coffee-product-detail__info-card p { color: #695848; line-height: 1.6; font-size: .88rem; }
+.coffee-product-detail__price-list {
+  padding: 0;
+  margin: .5rem 0;
+  list-style: none;
+}
+.coffee-product-detail__price-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .7rem;
+  padding: .4rem 0;
+  border-bottom: 1px solid #f0e5d8;
+  font-size: .87rem;
+  line-height: 1.45;
+}
+.coffee-product-detail__price-list li span { min-width: 0; overflow-wrap: anywhere; }
+.coffee-product-detail__price-list li strong { flex: 0 0 auto; white-space: nowrap; }
+.coffee-product-detail__dietary-list { padding-left: 1.2rem; }
+.coffee-product-detail__dietary-list li { padding: .15rem 0; }
+.coffee-product-detail__info-card .coffee-product-detail__caution { font-size: .78rem; color: #795c4c; }
+.coffee-product-detail__related-heading {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+  gap: 1rem; margin-bottom: .9rem;
+}
+.coffee-product-detail__related-heading p { color: #685548; margin: 0; }
+.coffee-product-detail__related-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .85rem; }
+.coffee-product-detail__related-card {
+  display: flex; flex-direction: column; gap: .4rem;
+  min-width: 0; padding: 1.1rem;
+  border: 1px solid #e6d5c3; border-radius: .8rem; background: #fff;
+}
+.coffee-product-detail__related-icon { font-size: 1.8rem; }
+.coffee-product-detail__related-card h3 { margin: .15rem 0 0; font-size: 1.05rem; font-weight: 800; }
+.coffee-product-detail__related-card p { margin: 0 0 auto; font-size: .86rem; color: #695849; line-height: 1.5; }
+.coffee-product-detail__related-card strong { margin-top: .6rem; }
+.coffee-product-detail__related-card a {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px;
+  color: #fff; background: #694329; border-radius: .55rem; padding: .6rem .9rem;
+  font-size: .86rem; font-weight: 800; text-decoration: none;
+}
+.coffee-product-detail__related-card a:hover { background: #4b3020; color: #fff; }
+.coffee-product-detail__related-card a:focus-visible { outline: 3px solid #bd8650; outline-offset: 2px; }
+@media (max-width: 900px) {
+  .coffee-product-detail__info-grid { grid-template-columns: minmax(0,1fr); }
+  .coffee-product-detail__related-grid { grid-template-columns: repeat(auto-fit,minmax(170px,1fr)); }
+}
+@media (max-width: 600px) {
+  .coffee-product-detail__facts { grid-template-columns: minmax(0,1fr); }
+  .coffee-product-detail__related-grid { grid-template-columns: minmax(0,1fr); }
+  .coffee-product-detail__information h2 { font-size: 1.4rem; }
+}

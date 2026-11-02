@@ -17,12 +17,16 @@ class ProductsController < ApplicationController
     # Keep the exact menu configuration form and server-side cart logic as
     # the single source of truth for the product detail page.
     @page = 'menu'
+    @product = Product.includes(:category, :product_variants, :product_modifier_options).find(@product.id)
     @cats = [@product.category]
     @products = @product.available? ? [@product] : []
-    if @product.available?
-      @product = Product.includes(:category, :product_variants, :product_modifier_options).find(@product.id)
-      @products = [@product]
-    end
+
+    # Only suggest available products from the same published category.
+    # No user tracking or invented recommendations; stable, bounded query.
+    @related_products = Product.includes(:product_variants)
+                               .where(available: true, category_id: @product.category_id)
+                               .where.not(id: @product.id)
+                               .order(:name).limit(3).to_a
   end
   def edit; end
 
