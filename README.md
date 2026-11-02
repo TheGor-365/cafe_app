@@ -10,9 +10,9 @@
 
 Gor's Coffee — учебно-портфолийный веб-сервис кофейни с демонстрационным каталогом, конструктором напитков и корзиной. Цель: показать клиенту реальные навыки Ruby on Rails, PostgreSQL, серверной проверки цен, адаптивной вёрстки и тестирования.
 
-**Статус на 2 ноября 2026:** разработка ведётся цепочкой **Draft PR** (#6–#20), поверх исторического `master`. Ветка `master` сама по себе **не содержит всех описанных ниже улучшений**. Смотрите [PR #20](https://github.com/TheGor-365/cafe_app/pull/20) (управление количеством), [PR #19](https://github.com/TheGor-365/cafe_app/pull/19) (панель настройки) и [план доведения проекта](https://github.com/TheGor-365/cafe_app/issues/21). Изображения и действия, отмеченные как «запланировано», не считаются реализованными.
+**Статус на 2 ноября 2026:** разработка ведётся цепочкой **Draft PR** (#6–#23), поверх исторического `master`. Ветка `master` сама по себе **не содержит всех описанных ниже улучшений**. Смотрите [PR #23](https://github.com/TheGor-365/cafe_app/pull/23) (публичные страницы), [PR #20](https://github.com/TheGor-365/cafe_app/pull/20) (управление количеством), [PR #19](https://github.com/TheGor-365/cafe_app/pull/19) (панель настройки) и [план доведения проекта](https://github.com/TheGor-365/cafe_app/issues/21). Изображения и действия, отмеченные как «запланировано», не считаются реализованными.
 
-### Реализованные сценарии в ветке PR #20
+### Реализованные сценарии в ветке PR #23
 
 - Главная `/`: категории, популярные товары, переход в меню.
 - Каталог `/menu`: поиск по названию, категория, пищевой фильтр, пустые результаты.
@@ -23,7 +23,7 @@ Gor's Coffee — учебно-портфолийный веб-сервис ко�
 - Корзина `/cart`: добавление, редактирование количества, удаление, объединение совпадающих конфигураций, сохранение снимка цены и добавок. В PR #20 добавлены кнопки `−` и `+` (1–20), но сохранён ручной ввод. В корзине изменение сохраняется только по `Update`.
 - Rails Devise: базовые аккаунты и административные операции; создание/изменение/удаление товаров и категорий проверяет права на сервере.
 
-**Ограничения:** `/products/:id` пока использует старый технический шаблон; `/info` и `/catering` пока пусты. Дизайн Devise и административных экранов ещё не выровнен. Полная проверка реального Android/клавиатуры не завершена. В рамках этой ветки обновлены брендированные статические страницы `404`, `422`, `500`, метатеги и SVG favicon, однако это **ещё не протестированный публичный релиз**. Checkout, email-доставка, реальные цены, CRM и платежи отсутствуют.
+Дополнение PR #23: публичные `/products/:id` переиспользуют настоящий конфигуратор и добавление в корзину; `/info` содержит About, FAQ, контакт разработчика и честно обозначенный декоративный блок карты без адреса; `/catering` описывает концепцию без приёма заказов; общий подвал ведёт на все эти разделы. Дизайн Devise и административных экранов ещё не выровнен. Полная проверка реального Android/клавиатуры не завершена. В рамках этой ветки обновлены брендированные статические страницы `404`, `422`, `500`, метатеги и SVG favicon, однако это **ещё не протестированный публичный релиз**. Checkout, email-доставка, реальные цены, CRM и платежи отсутствуют.
 
 ### Стек
 
@@ -76,7 +76,7 @@ Browser ── Rails routes/controllers ── ActiveRecord ── PostgreSQL
 
 ### Тестирование и CI
 
-GitHub Actions на PR #20 (Ruby / Node.js / Webpack) проверяет интеграцию с временным PostgreSQL и настоящую сборку JavaScript. Последний подтверждённый запуск на этой ветке: **82 runs / 496 assertions / 0 failures / 0 errors / 0 skips**, Node unit tests и Webpack PASS.
+GitHub Actions на PR #20 (Ruby / Node.js / Webpack) проверяет интеграцию с временным PostgreSQL и настоящую сборку JavaScript. Подтверждённый запуск PR #22: **86 runs / 566 assertions / 0 failures / 0 errors / 0 skips**, Node unit tests и Webpack PASS. Итоговые CI результаты PR #23 проверяются отдельно.
 
 ```sh
 # Только в подготовленном временном test-окружении:
@@ -100,7 +100,7 @@ node test/javascript/coffee_quantity_stepper.test.js
 
 ### План завершения
 
-Полная матрица страниц, приоритеты и условия принятия: [GitHub Issue #21](https://github.com/TheGor-365/cafe_app/issues/21). Критические этапы: локальная приёмка PR #20 → полноценная карточка товара и страницы Info/Catering → оформление Devise/админки и mobile → browser regression и security → разрешённые медиа, двуязычные скриншоты, проверенный deploy → отдельная миграция с устаревшего стека.
+Полная матрица страниц, приоритеты и условия принятия: [GitHub Issue #21](https://github.com/TheGor-365/cafe_app/issues/21). Критические этапы: локальная приёмка PR #23 (новые публичные страницы) → оформление Devise/админки и mobile → browser regression и security → разрешённые медиа, двуязычные скриншоты, проверенный deploy → отдельная миграция с устаревшего стека.
 
 ### Публикация
 
@@ -116,7 +116,7 @@ node test/javascript/coffee_quantity_stepper.test.js
 
 ### Project status
 
-The latest functionality lives in stacked **unmerged Draft PRs**, culminating in [PR #20](https://github.com/TheGor-365/cafe_app/pull/20); `master` is not yet this complete version. Source audit and acceptance plan: [Issue #21](https://github.com/TheGor-365/cafe_app/issues/21). On PR #20, Ruby CI verified **82 runs / 496 assertions, zero failures**, plus successful Node tests and Webpack 4 build. Browser/mobile acceptance and independent clean-install verification remain open.
+The latest functionality lives in stacked **unmerged Draft PRs**, culminating in [PR #23](https://github.com/TheGor-365/cafe_app/pull/23); `master` is not yet this complete version. Source audit and acceptance plan: [Issue #21](https://github.com/TheGor-365/cafe_app/issues/21). On PR #22, Ruby CI verified **86 runs / 566 assertions, zero failures**, plus successful Node tests and Webpack 4 build. CI on PR #23 is checked independently. Browser/mobile acceptance and independent clean-install verification remain open.
 
 ### Stack and setup
 
@@ -129,11 +129,11 @@ The repository **does not provide a complete Docker Compose or Dockerfile**. Use
 - `/`: home and featured catalogue
 - `/menu`, `/search`: filters, catalogue and accessible drink options
 - `/cart`: demo cart, quantity controls, explicit updates and removal
-- `/products/:id`: **legacy details layout, redesign required**
-- `/info`, `/catering`: **blank placeholders, content required**
+- `/products/:id`: redesigned demo product details reusing the same configurable form and server-owned price logic
+- `/info`: About / FAQ / location disclaimer / developer project contact; `/catering`: concept showcase (no bookings)
 - `/users/sign_in` etc.: Devise auth screens, legacy layout, email delivery not verified
 - `/products`, `/categories`: technical/admin lists requiring UI separation
-- `public/404.html`, `422.html`, `500.html`: standalone styled errors in the branding feature PR
+- `public/404.html`, `422.html`, `500.html`: standalone branded static error pages; all ordinary pages include a shared footer in PR #23
 
 ### Release and attribution policy
 

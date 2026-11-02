@@ -13,7 +13,17 @@ class ProductsController < ApplicationController
     @product = Product.new
   end
   
-  def show; end
+  def show
+    # Keep the exact menu configuration form and server-side cart logic as
+    # the single source of truth for the product detail page.
+    @page = 'menu'
+    @cats = [@product.category]
+    @products = @product.available? ? [@product] : []
+    if @product.available?
+      @product = Product.includes(:category, :product_variants, :product_modifier_options).find(@product.id)
+      @products = [@product]
+    end
+  end
   def edit; end
 
   def create
