@@ -39,7 +39,7 @@ class CoffeeMobileShellTest < ActionDispatch::IntegrationTest
     assert_includes css, '.cafe-cart__update-form'
     assert_includes css, '.coffee-config.is-modal'
     assert_includes css, '@media (prefers-reduced-motion: reduce)'
-    assert_includes css, 'grid-area'
+    assert_includes css, 'grid-template-areas'
     refute_match(/display:\s*none\s*!important/, css)
   end
 
