@@ -3,15 +3,29 @@ class OrderItemsController < ApplicationController
 
   def create
     payload = params.require(:order_item)
-    @order_item = @order.order_items.new(payload.permit(:product_id, :quantity))
+    candidate = OrderItem.new(payload.permit(:product_id, :quantity))
+    candidate.order = @order
 
-    if @order_item.product&.available? &&
-       apply_drink_configuration(@order_item, payload) &&
-       @order_item.valid? && @order.save
-      session[:order_id] = @order.id
-      respond_to do |format|
-        format.html { redirect_to cart_path, notice: 'Added to your demo cart.' }
-        format.js
+    if candidate.product&.available? &&
+       apply_drink_configuration(candidate, payload) &&
+       candidate.valid?
+      begin
+        @order_item = CartLineConsolidator.new(@order).add!(candidate)
+        session[:order_id] = @order.id
+        respond_to do |format|
+          format.html { redirect_to cart_path, notice: 'Added to your demo cart.' }
+          format.js
+        end
+      rescue CartLineConsolidator::QuantityLimitExceeded
+        respond_to do |format|
+          format.html { redirect_to cart_path, alert: 'Maximum 20 items per matching configuration. Adjust your cart quantity first.' }
+          format.js { head :unprocessable_entity }
+        end
+      rescue ActiveRecord::RecordInvalid
+        respond_to do |format|
+          format.html { redirect_to menu_path, alert: 'Unable to save this item. Please check the selection.' }
+          format.js { head :unprocessable_entity }
+        end
       end
     else
       respond_to do |format|
