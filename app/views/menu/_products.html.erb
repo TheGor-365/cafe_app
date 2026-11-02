@@ -36,20 +36,32 @@
                 <% if product.dairy_free? %><span>Dairy free</span><% end %>
                 <% if product.gluten_free? %><span>Gluten free</span><% end %>
               </div>
+              <% variants = product.product_variants.select(&:available?).sort_by(&:price_cents) %>
+              <% configurable = product.product_variants.any? %>
               <div class="coffee-product-card__footer">
-                <strong class="coffee-product-card__price"><%= number_to_currency(product.price) %></strong>
+                <strong class="coffee-product-card__price">
+                  <% if configurable && variants.any? %>
+                    From <%= number_to_currency(BigDecimal(variants.first.price_cents.to_s) / 100) %>
+                  <% elsif configurable %>
+                    Temporarily unavailable
+                  <% else %>
+                    <%= number_to_currency(product.price) %>
+                  <% end %>
+                </strong>
                 <%= link_to 'Details', product_path(product), class: 'coffee-product-card__details' %>
               </div>
               <%= form_with url: order_items_path, scope: :order_item, method: :post,
-                    local: true, class: 'coffee-product-card__cart-form' do |form| %>
+                    local: true, class: 'coffee-product-card__cart-form',
+                    data: { coffee_price_form: true,
+                            base_price_cents: (product.price * 100).round.to_i } do |form| %>
                 <%= form.hidden_field :product_id, value: product.id, id: nil %>
-                <% variants = product.product_variants.select(&:available?) %>
                 <% if variants.any? %>
                   <div class="coffee-product-card__config">
                     <%= form.label :product_variant_id, 'Drink size', for: "coffee-size-#{product.id}" %>
                     <%= form.select :product_variant_id,
                         options_for_select(variants.sort_by(&:price_cents).map { |v|
-                          ["#{v.label} — #{number_to_currency(BigDecimal(v.price_cents.to_s) / 100)}", v.id]
+                          ["#{v.label} — #{number_to_currency(BigDecimal(v.price_cents.to_s) / 100)}",
+                            v.id, { data: { price_cents: v.price_cents } }]
                         }),
                         {}, id: "coffee-size-#{product.id}", class: 'coffee-product-card__select' %>
                   </div>
@@ -61,16 +73,30 @@
                     <% field_id = "coffee-#{group_code}-#{product.id}" %>
                     <%= label_tag field_id, label %>
                     <%= select_tag 'order_item[modifier_option_ids][]',
-                          options_for_select([['No extra (+$0.00)', '']] +
+                          options_for_select([['No extra (+$0.00)', '', { data: { price_cents: 0 } }]] +
                             options.sort_by(&:price_cents).map { |o|
-                              ["#{o.label} (+#{number_to_currency(BigDecimal(o.price_cents.to_s) / 100)})", o.id]
+                              ["#{o.label} (+#{number_to_currency(BigDecimal(o.price_cents.to_s) / 100)})",
+                                o.id, { data: { price_cents: o.price_cents } }]
                             }), id: field_id, class: 'coffee-product-card__select' %>
                   </div>
                 <% end %>
                 <%= form.label :quantity, 'Qty', for: "coffee-qty-#{product.id}" %>
                 <%= form.number_field :quantity, value: 1, min: 1, max: 20, required: true,
-                      id: "coffee-qty-#{product.id}", class: 'coffee-product-card__quantity' %>
-                <%= form.submit 'Add to cart', class: 'coffee-product-card__add' %>
+                      id: "coffee-qty-#{product.id}", class: 'coffee-product-card__quantity',
+                      data: { coffee_quantity: true } %>
+                <% if variants.any? %>
+                  <output class="coffee-product-card__live-price"
+                          data-coffee-price-output aria-live="polite" aria-atomic="true"
+                          for="coffee-size-#{product.id} coffee-qty-#{product.id}">
+                    <span data-coffee-unit-price>Unit: <%= number_to_currency(BigDecimal(variants.first.price_cents.to_s) / 100) %></span>
+                    <strong data-coffee-total-price>Total: <%= number_to_currency(BigDecimal(variants.first.price_cents.to_s) / 100) %></strong>
+                  </output>
+                  <p class="coffee-product-card__price-note">Estimate shown before checkout; the server verifies your selections and final price.</p>
+                <% elsif configurable %>
+                  <p class="coffee-product-card__unavailable" role="status">All sizes are currently unavailable.</p>
+                <% end %>
+                <%= form.submit 'Add to cart', class: 'coffee-product-card__add',
+                      disabled: configurable && variants.empty? %>
               <% end %>
             </div>
           </article>
