@@ -11,6 +11,7 @@ require("channels")
 import 'bootstrap'
 import '../stylesheets/application'
 import '../coffee_price_preview'
+import '../coffee_config_panel'
 import "@fortawesome/fontawesome-free/css/all.css"
 
 window.jQuery = $;
