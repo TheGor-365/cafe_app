@@ -17,6 +17,13 @@
     <%= link_to 'More Info', info_path, class: "link #{@page == 'info' ? 'active' : ''}", 'aria-current': (@page == 'info' ? 'page' : nil) %>
   </h5>
 
+  <% if user_signed_in? %>
+    <h5 class="link-container">
+      <%= link_to 'My account', account_path, class: "link #{@page == 'account' ? 'active' : ''}",
+            'aria-current': (@page == 'account' ? 'page' : nil) %>
+    </h5>
+  <% end %>
+
   <% if current_user&.admin? %>
     <h5 class="link-container">
       <%= link_to 'Manage products', products_path, class: 'link' %>
