@@ -1,0 +1,282 @@
+/*
+ * Mobile QA pass for the legacy Rails shell (PR #25).
+ * Loaded AFTER zz_cafe_layout_reflow.scss via Sprockets require_tree.
+ * The owner's customized application layout is deliberately not modified.
+ * No JS, no new dependency, no hidden navigation controls.
+ */
+html body .page-container.row > nav.cafe-sidebar:focus-visible {
+  outline: 3px solid #eac18c;
+  outline-offset: -3px;
+}
+html body nav.cafe-sidebar a:focus-visible {
+  outline: 3px solid #efc98f;
+  outline-offset: 2px;
+  border-radius: .35rem;
+}
+html body nav.cafe-sidebar a[aria-current="page"] {
+  color: #ffe5b8;
+  background: rgba(194, 132, 70, .2);
+  box-shadow: inset 3px 0 #e3ab61;
+  border-radius: .4rem;
+}
+
+/* Tablet shell: reserve enough width for real forms and product content. */
+@media (min-width: 761px) and (max-width: 980px) {
+  html body .page-container.row {
+    grid-template-columns: 128px minmax(0, 1fr) 36px 90px;
+  }
+  html body .page-container.row > .col-2 .link-container {
+    padding-left: .2rem;
+    font-size: .82rem;
+  }
+  html body .page-container.row > .col-1.p-2 h6 { font-size: .76rem; }
+  html body .cafe-brandbar.title-card { padding: .75rem; }
+  html body .cafe-brandbar__brand { font-size: 1.25rem; }
+  html body .coffee-product-detail__facts { grid-template-columns: minmax(0,1fr); }
+}
+
+/* Phone: one horizontal scrollable navigation strip, no overlapping sidebar. */
+@media (max-width: 760px) {
+  html body .page-container.row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "nav nav"
+      "account avatar"
+      "main main";
+  }
+  html body .page-container.row > nav.cafe-sidebar {
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: .35rem;
+    align-items: stretch;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: .4rem .55rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: .55rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #d0a46c #302219;
+  }
+  html body .page-container.row > nav.cafe-sidebar .link-container {
+    display: flex;
+    align-items: stretch;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+    line-height: 1.25;
+    font-size: .86rem;
+    font-weight: 650;
+    scroll-snap-align: start;
+  }
+  html body .page-container.row > nav.cafe-sidebar .link-container > a {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    padding: .65rem .8rem;
+    margin: 0;
+    text-decoration: none;
+    border-radius: .5rem;
+    box-shadow: none;
+  }
+  html body nav.cafe-sidebar a[aria-current="page"] {
+    background: #f0d8b6;
+    color: #302016 !important;
+    box-shadow: none;
+  }
+  html body .page-container.row > .col-1.p-2 {
+    min-height: 44px;
+    padding: .45rem .65rem;
+    overflow-wrap: anywhere;
+    gap: .45rem;
+  }
+  html body .page-container.row > .col-1.p-2 a {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    padding: .2rem;
+  }
+  html body .page-container.row > .col-1:not(.p-2) {
+    min-height: 44px;
+    max-width: 78px;
+    padding: .35rem;
+  }
+  html body .page-container.row > .col-8 {
+    padding: .5rem;
+    max-width: 100%;
+    min-width: 0;
+  }
+  html body .cafe-brandbar.title-card {
+    min-height: 66px;
+    padding: .8rem .85rem;
+    margin: 0;
+    gap: .4rem;
+  }
+  html body .cafe-brandbar__brand {
+    min-width: 0;
+    font-size: 1.2rem;
+    gap: .55rem;
+    overflow-wrap: anywhere;
+  }
+  html body .cafe-brandbar__mark {
+    flex: 0 0 auto;
+    height: 2.35rem;
+    width: 2.35rem;
+  }
+  html body .cafe-home,
+  html body .coffee-menu,
+  html body .cafe-cart,
+  html body .cafe-content-page,
+  html body .coffee-product-detail {
+    padding: .8rem;
+    border-radius: .75rem;
+    min-width: 0;
+  }
+  html body .cafe-home__hero-content,
+  html body .coffee-menu__hero,
+  html body .cafe-content-page__hero {
+    padding: 1.25rem;
+  }
+  html body .coffee-menu__hero h1,
+  html body .cafe-content-page__hero h1,
+  html body .coffee-product-detail__heading h1 {
+    font-size: 1.9rem;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+  html body .coffee-menu__search {
+    display: grid;
+    grid-template-columns: minmax(0,1fr);
+    align-items: stretch;
+    margin: 1rem 0;
+    gap: .75rem;
+  }
+  html body .coffee-menu__field,
+  html body .coffee-menu__field--wide {
+    flex: initial;
+    min-width: 0;
+    width: 100%;
+  }
+  html body .coffee-menu__search input,
+  html body .coffee-menu__search select,
+  html body .coffee-menu__search-button {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-height: 44px;
+    font-size: 1rem;
+  }
+  html body .coffee-menu__categories {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding: .25rem 0 .65rem;
+  }
+  html body .coffee-menu__category {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
+  html body .coffee-product-card__add,
+  html body .coffee-config__trigger,
+  html body .coffee-config__close {
+    min-height: 44px;
+  }
+  html body .cafe-cart__item {
+    display: grid;
+    grid-template-columns: minmax(0,1fr);
+    padding: .85rem;
+    overflow-wrap: anywhere;
+  }
+  html body .cafe-cart__item-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    max-width: 100%;
+    min-width: 0;
+  }
+  html body .cafe-cart__update-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+    min-width: 0;
+  }
+  html body .cafe-cart__update-form label {
+    flex: 1 0 100%;
+    line-height: 1.35;
+    font-size: .88rem;
+    overflow-wrap: anywhere;
+  }
+  html body .cafe-cart__update-button,
+  html body .cafe-cart__remove-button {
+    min-height: 44px;
+    padding: .5rem .8rem;
+  }
+  html body .cafe-cart__remove-form {
+    align-self: flex-start;
+  }
+  html body .cafe-cart__summary {
+    align-items: center;
+    padding: .85rem;
+    overflow-wrap: anywhere;
+  }
+  html body .cafe-site-footer { padding: 1.15rem; }
+  html body .cafe-site-footer__nav a { min-height: 44px; display: flex; align-items: center; }
+  html body .cafe-content-page__faq summary {
+    min-height: 44px;
+    align-items: center;
+  }
+  html body .coffee-config.is-modal {
+    padding: 0;
+  }
+  html body .coffee-config.is-modal .coffee-config__sheet {
+    max-height: 94vh;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+  html body .coffee-config.is-modal .coffee-config__header {
+    flex-wrap: wrap;
+  }
+  html body .coffee-config.is-modal .coffee-config__close {
+    margin-left: auto;
+  }
+}
+@supports (height: 100dvh) {
+  @media (max-width: 760px) {
+    html body .coffee-config.is-modal .coffee-config__sheet {
+      max-height: calc(100dvh - .5rem);
+    }
+  }
+}
+@media (max-width: 360px) {
+  html body .cafe-brandbar__brand { font-size: 1.08rem; }
+  html body .cafe-home__hero h1,
+  html body .coffee-menu__hero h1,
+  html body .cafe-content-page__hero h1 { font-size: 1.75rem; }
+  html body .cafe-site-footer__nav { grid-template-columns: minmax(0,1fr); }
+  html body .coffee-product-detail__facts,
+  html body .coffee-product-detail__info-grid,
+  html body .coffee-product-detail__related-grid { grid-template-columns: minmax(0,1fr); }
+  html body .cafe-cart__update-form { gap: .35rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html body nav.cafe-sidebar,
+  html body .coffee-menu__categories {
+    scroll-behavior: auto;
+    scroll-snap-type: none;
+  }
+}
