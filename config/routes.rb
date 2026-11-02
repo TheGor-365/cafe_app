@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
 
   devise_for :users
+  get 'account', to: 'account#show', as: :account
 
   root to: 'pages#home'
 
