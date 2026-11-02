@@ -30,6 +30,7 @@ const body = {
 global.document = {
   readyState: 'loading', body, activeElement: null,
   addEventListener(name, callback) { listeners[name] = callback },
+  querySelectorAll() { return [] },
   createComment() { return { parentNode: null } }
 }
 
