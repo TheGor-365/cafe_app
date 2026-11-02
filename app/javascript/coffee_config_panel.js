@@ -6,6 +6,8 @@
  */
 'use strict'
 
+const { initializeCoffeePricePreviews } = require('./coffee_price_preview')
+
 let activePanel = null
 let handlersInstalled = false
 
@@ -25,6 +27,7 @@ function closeCoffeeConfig(restoreFocus = true) {
   const state = activePanel
   activePanel = null
 
+  state.inerted.forEach(node => node.removeAttribute('inert'))
   state.details.open = false
   state.details.classList.remove('is-modal')
   state.sheet.removeAttribute('role')
@@ -53,8 +56,14 @@ function openCoffeeConfig(details) {
   sheet.setAttribute('role', 'dialog')
   sheet.setAttribute('aria-modal', 'true')
   document.body.style.overflow = 'hidden'
+  // Keep assistive technology and keyboard navigation inside the modal.
+  const inerted = Array.from(document.body.children).filter(node =>
+    node !== details && node.nodeType === 1 && !node.hasAttribute('inert'))
+  inerted.forEach(node => node.setAttribute('inert', ''))
 
-  activePanel = { details, sheet, trigger, anchor, bodyOverflow }
+  activePanel = { details, sheet, trigger, anchor, bodyOverflow, inerted }
+  // AJAX menu search can inject fresh forms after the initial page load.
+  initializeCoffeePricePreviews()
   const focusables = focusableElements(sheet)
   if (focusables.length) focusables[0].focus()
   else { sheet.setAttribute('tabindex', '-1'); sheet.focus() }
