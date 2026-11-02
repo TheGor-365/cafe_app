@@ -1,7 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Cafe App</title>
+    <title><%= content_for?(:title) ? yield(:title) : "Gor's Coffee · Demo Café" %></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Gor's Coffee is a portfolio demonstration of an interactive café menu and demo cart. No real orders or payments.">
+    <meta name="theme-color" content="#2c1c14">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
