@@ -1,0 +1,40 @@
+/* Coffee V1: visible price preview beside selectors, no added dependency. */
+.coffee-product-card__live-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem 1rem;
+  margin: .85rem 0 .45rem;
+  padding: .85rem 1rem;
+  color: #35261a;
+  background: #f3e8d5;
+  border: 1px solid #e0c9a8;
+  border-radius: .7rem;
+  font-size: .92rem;
+}
+.coffee-product-card__live-price strong {
+  color: #523217;
+  font-size: 1.14rem;
+  font-variant-numeric: tabular-nums;
+}
+.coffee-product-card__live-price[data-price-valid="false"] {
+  color: #773d2f;
+  border-color: #cf9384;
+  background: #fff1e9;
+}
+.coffee-product-card__price-note {
+  color: #736356;
+  font-size: .72rem;
+  line-height: 1.4;
+  margin: 0 0 .55rem;
+}
+.coffee-product-card__unavailable {
+  color: #8b4c2d;
+  font-weight: 700;
+  margin: .6rem 0;
+}
+.coffee-product-card__cart-form input[type="submit"]:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
