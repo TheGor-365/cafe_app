@@ -28,8 +28,14 @@
         <div class="cafe-cart__item-actions">
           <%= form_with model: item, local: true, class: 'cafe-cart__update-form' do |form| %>
             <%= form.label :quantity, "Quantity for #{item.product.name}" %>
-            <%= form.number_field :quantity, min: 1, max: 20, required: true,
-                  class: 'cafe-cart__quantity' %>
+            <div class="coffee-quantity" data-coffee-quantity-control>
+              <button type="button" class="coffee-quantity__step" data-coffee-quantity-step="-1"
+                      aria-label="Decrease quantity for <%= item.product.name %>">−</button>
+              <%= form.number_field :quantity, min: 1, max: 20, required: true,
+                    class: 'cafe-cart__quantity', data: { coffee_quantity_input: true } %>
+              <button type="button" class="coffee-quantity__step" data-coffee-quantity-step="1"
+                      aria-label="Increase quantity for <%= item.product.name %>">+</button>
+            </div>
             <%= form.submit 'Update', class: 'cafe-cart__update-button' %>
           <% end %>
           <%= button_to 'Remove', order_item_path(item), method: :delete,
