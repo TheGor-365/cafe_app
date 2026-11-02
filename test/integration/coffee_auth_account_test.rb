@@ -80,7 +80,9 @@ class CoffeeAuthAndAccountTest < ActionDispatch::IntegrationTest
       assert_select 'input[name="user[current_password]"]', count: 1
       assert_select 'input[name="user[avatar]"]', count: 0
     end
-    assert_select "a[href='#{account_path}']", count: 1
+    assert_select 'main.cafe-auth' do
+      assert_select "a[href='#{account_path}']", count: 1
+    end
     assert_select 'a.cafe-auth__delete', count: 1
   end
 
