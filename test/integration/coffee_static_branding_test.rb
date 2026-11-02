@@ -37,8 +37,8 @@ class CoffeeStaticBrandingTest < ActionDispatch::IntegrationTest
     assert_equal 'svg', doc.root.name
     assert_equal 'http://www.w3.org/2000/svg', doc.root.namespace.href
     assert_includes svg, 'viewBox="0 0 64 64"'
-    refute_includes svg, 'http://', 'No remote asset references except XML namespace'
-    refute_includes svg, 'https://'
+    assert_empty doc.xpath('//*[local-name()="script" or local-name()="image"]')
+    refute_includes svg, 'href="http', 'SVG must not link external files'
   end
 
   test 'README accurately documents draft-only status and legacy limitations' do
