@@ -1,0 +1,78 @@
+/* Product-detail sheet. Without JS, <details> expands inline and the HTML form works. */
+.coffee-config { margin-top: .65rem; }
+.coffee-config__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  list-style: none;
+  cursor: pointer;
+  color: #fff;
+  background: #694329;
+  border: 1px solid #694329;
+  border-radius: .7rem;
+  padding: .7rem .9rem;
+  font-weight: 700;
+}
+.coffee-config__trigger::-webkit-details-marker { display: none; }
+.coffee-config__trigger:hover { background: #4b3020; }
+.coffee-config__trigger:focus-visible, .coffee-config__close:focus-visible {
+  outline: 3px solid #b27c40;
+  outline-offset: 3px;
+}
+.coffee-config__sheet {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding: 1rem;
+  background: #fffaf2;
+  border: 1px solid #e1cbb3;
+  border-radius: .8rem;
+  color: #29201b;
+}
+.coffee-config:not(.is-modal) .coffee-config__sheet { margin-top: .5rem; }
+.coffee-config__header { display: flex; align-items: flex-start; gap: .75rem; justify-content: space-between; margin-bottom: 1rem; }
+.coffee-config__eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: .69rem; font-weight: 700; color: #765039; }
+.coffee-config__header h4 { font-size: 1.35rem; font-weight: 700; margin: .25rem 0; }
+.coffee-config__header p { font-size: .85rem; color: #665c52; margin-bottom: 0; }
+.coffee-config__close { display: none; flex-shrink: 0; border: 1px solid #b89878; background: #fff; border-radius: .55rem; padding: .45rem .65rem; color: #35261a; cursor: pointer; }
+.coffee-config__disclaimer { margin: 1rem 0 0; font-size: .75rem; color: #665c52; }
+.coffee-config .coffee-product-card__cart-form { display: flex; flex-direction: column; align-items: stretch; gap: .5rem; }
+.coffee-config .coffee-product-card__config { margin: .2rem 0; }
+.coffee-config .coffee-product-card__quantity { width: 6.25rem; }
+.coffee-config .coffee-product-card__add { width: 100%; background: #694329; border-color: #694329; color: #fff; }
+.coffee-config .coffee-product-card__add:hover { background: #4b3020; }
+.coffee-config.is-modal {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  margin: 0;
+  padding: 1.25rem;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  overflow-y: auto;
+  background: rgba(25, 15, 10, .78);
+}
+.coffee-config.is-modal > .coffee-config__trigger { display: none; }
+.coffee-config.is-modal .coffee-config__sheet {
+  width: min(100%, 600px);
+  max-height: calc(100vh - 2.5rem);
+  overflow-y: auto;
+  box-shadow: 0 26px 80px rgba(11, 6, 3, .5);
+}
+.coffee-config.is-modal .coffee-config__close { display: inline-flex; }
+@media (max-width: 640px) {
+  .coffee-menu__grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+  .coffee-product-card__visual { min-height: 115px; }
+  .coffee-product-card__image { height: 135px; }
+  .coffee-product-card__content { padding: .85rem; }
+  .coffee-product-card__description { min-height: 0; }
+  .coffee-config.is-modal { padding: 0; align-items: end; }
+  .coffee-config.is-modal .coffee-config__sheet { width: 100%; border-radius: 1rem 1rem 0 0; max-height: 94vh; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .coffee-config__trigger { transition: background-color .15s ease, box-shadow .15s ease; }
+  .coffee-config__trigger:hover { box-shadow: 0 5px 18px rgba(65, 39, 21, .22); }
+}
