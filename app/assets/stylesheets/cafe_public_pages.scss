@@ -1,0 +1,214 @@
+/* Public site pages / footer. Standalone scoped styles to preserve the legacy local layout. */
+.cafe-content-page, .coffee-product-detail {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding: clamp(1rem, 2.5vw, 1.7rem);
+  border-radius: 1.1rem;
+  background: #fffaf2;
+  color: #312319;
+}
+.cafe-content-page *, .coffee-product-detail *, .cafe-site-footer * { box-sizing: border-box; }
+.cafe-content-page__hero {
+  padding: clamp(1.4rem, 3.5vw, 3rem);
+  border-radius: .9rem;
+  background: linear-gradient(125deg, #342318, #765039);
+  color: #fff9ef;
+}
+.cafe-content-page__eyebrow, .coffee-product-detail__eyebrow {
+  font-size: .76rem;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  font-weight: 750;
+}
+.cafe-content-page__hero .cafe-content-page__eyebrow { color: #f6d7aa; }
+.cafe-content-page__hero h1 {
+  font-size: clamp(2rem, 4vw, 3.1rem);
+  line-height: 1.13;
+  font-weight: 800;
+  max-width: 23ch;
+  margin: .4rem 0 .7rem;
+}
+.cafe-content-page__hero p { max-width: 62ch; font-size: 1.05rem; line-height: 1.6; }
+.cafe-content-page__button, .coffee-product-detail__back {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: .68rem 1.1rem;
+  border: 1px solid #e6b987;
+  border-radius: .6rem;
+  background: #f3d3a5;
+  color: #362115;
+  font-size: .93rem;
+  font-weight: 750;
+  text-decoration: none;
+  text-align: center;
+}
+.cafe-content-page__button:hover, .coffee-product-detail__back:hover {
+  background: #f6e1c3;
+  color: #301b0f;
+  text-decoration: none;
+}
+.cafe-content-page__button--light { background: transparent; color: #5c3a27; border-color: #bfa18a; }
+.cafe-content-page__section { padding: 1.6rem .25rem; }
+.cafe-content-page__section + .cafe-content-page__section { border-top: 1px solid #e6d9c9; }
+.cafe-content-page__section h2 {
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+  font-weight: 800;
+  margin: .25rem 0 1.1rem;
+}
+.cafe-content-page__section h3 { font-size: 1.13rem; font-weight: 750; }
+.cafe-content-page__section p { line-height: 1.65; }
+.cafe-content-page__grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px, 1fr)); gap: 1rem; }
+.cafe-content-page__card {
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #e8d8c5;
+  border-radius: .85rem;
+  padding: 1.3rem;
+  box-shadow: 0 4px 15px rgba(58,38,22,.04);
+}
+.cafe-content-page__card p { color: #66574a; }
+.cafe-content-page__text-link { font-weight: 750; color: #674028; text-decoration: underline; }
+.cafe-content-page__text-link:hover { color: #412514; }
+.cafe-content-page__faq { display: grid; gap: .6rem; }
+.cafe-content-page__faq details {
+  border: 1px solid #e5d3bc;
+  border-radius: .7rem;
+  background: white;
+  padding: .9rem 1.1rem;
+}
+.cafe-content-page__faq summary { cursor: pointer; font-weight: 740; line-height: 1.5; }
+.cafe-content-page__faq details[open] summary { margin-bottom: .6rem; }
+.cafe-content-page__faq p { margin: 0; color: #66574a; }
+.cafe-content-page__faq a { color: #674028; text-decoration: underline; }
+.cafe-content-page__location { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr); gap: 1.5rem; align-items: center; }
+.cafe-content-page__map-placeholder {
+  position: relative;
+  display: flex;
+  min-height: 225px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: .8rem;
+  overflow: hidden;
+  border: 1px solid #c7b39b;
+  border-radius: .9rem;
+  background-color: #e8ddca;
+  background-image:
+    linear-gradient(25deg, transparent 44%, #fff6e7 44%, #fff6e7 49%, transparent 49%, transparent 55%, #fff6e7 55%, #fff6e7 60%, transparent 60%),
+    linear-gradient(105deg, transparent 36%, #fff6e7 36%, #fff6e7 43%, transparent 43%, transparent 67%, #fff6e7 67%, #fff6e7 74%, transparent 74%),
+    linear-gradient(165deg, #d5dcc7, #eadac2);
+}
+.cafe-content-page__map-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 3px solid #fffaf2;
+  border-radius: 50%;
+  box-shadow: 0 5px 20px rgba(46,29,17,.3);
+  background: #75472a;
+  color: #fff;
+  font-weight: 850;
+  font-size: 1.1rem;
+}
+.cafe-content-page__map-caption {
+  position: relative;
+  display: block;
+  max-width: calc(100% - 1.5rem);
+  border-radius: .5rem;
+  padding: .55rem .7rem;
+  background: rgba(255,250,242,.94);
+  color: #523721;
+  font-weight: 750;
+  font-size: .78rem;
+  text-align: center;
+}
+.cafe-content-page__fineprint { font-size: .82rem; color: #756255; }
+.cafe-content-page__steps { display: grid; gap: .65rem; padding-left: 1.5rem; }
+.cafe-content-page__steps li { line-height: 1.65; padding-left: .25rem; }
+.cafe-content-page__actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.cafe-content-page__closing { background: #f5ebdc; padding: 1.5rem; border-radius: .85rem; }
+
+.coffee-product-detail__breadcrumbs { display: flex; flex-wrap: wrap; gap: .55rem; align-items: center; margin-bottom: 1.2rem; color: #6b5546; font-size: .87rem; }
+.coffee-product-detail__breadcrumbs a { color: #66442b; text-decoration: underline; }
+.coffee-product-detail__heading {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: 1.5rem; border-bottom: 1px solid #e8d7c5; padding-bottom: 1.35rem;
+}
+.coffee-product-detail__heading h1 { margin: .35rem 0 .6rem; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.1; font-weight: 800; }
+.coffee-product-detail__heading p { max-width: 58ch; }
+.coffee-product-detail__eyebrow { color: #815a3d; }
+.coffee-product-detail__badges { display: flex; flex-wrap: wrap; gap: .4rem; }
+.coffee-product-detail__badges span { background: #e6f0e5; color: #31513b; border-radius: 2rem; padding: .28rem .6rem; font-size: .78rem; }
+.coffee-product-detail__back { background: white; border-color: #c5a785; }
+.coffee-product-detail__intro { padding-top: 1.3rem; }
+.coffee-product-detail__intro h2 { font-size: 1.5rem; font-weight: 800; }
+.coffee-product-detail__intro p { color: #695a4e; }
+.coffee-product-detail .coffee-menu__result-count,
+.coffee-product-detail .coffee-menu__section-header,
+.coffee-product-detail .coffee-product-card__details { display: none; }
+.coffee-product-detail .coffee-menu__section { margin: 0; }
+.coffee-product-detail .coffee-menu__grid { display: block; }
+.coffee-product-detail .coffee-product-card {
+  display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+  overflow: visible; box-shadow: none;
+}
+.coffee-product-detail .coffee-product-card__visual { min-height: 330px; border-radius: 1rem 0 0 1rem; }
+.coffee-product-detail .coffee-product-card__image { height: 330px; border-radius: 1rem 0 0 1rem; }
+.coffee-product-detail .coffee-product-card__placeholder { font-size: 5rem; }
+.coffee-product-detail .coffee-product-card__content { padding: 1.5rem; }
+.coffee-product-detail .coffee-product-card__description { min-height: 0; }
+.coffee-product-detail .coffee-product-card__footer { margin: 1rem 0; }
+.coffee-product-detail .coffee-config { max-width: 100%; }
+.coffee-product-detail__disclaimer,
+.coffee-product-detail__unavailable {
+  margin-top: 1rem; padding: 1.1rem 1.25rem;
+  border: 1px solid #e3d2bd; border-radius: .8rem;
+  background: #f5eddf; color: #594735; line-height: 1.6;
+}
+.coffee-product-detail__unavailable h2 { color: #322218; font-size: 1.4rem; }
+
+.cafe-site-footer {
+  min-width: 0;
+  margin-top: 1.3rem;
+  padding: clamp(1.3rem, 3vw, 2rem);
+  background: #261c17;
+  border: 1px solid rgba(243,219,192,.15);
+  border-radius: .95rem;
+  color: #f5eadd;
+}
+.cafe-site-footer__top { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1.5fr); gap: 1.8rem; }
+.cafe-site-footer__name { font-weight: 800; color: #fff8ed; text-decoration: none; font-size: 1.5rem; }
+.cafe-site-footer__brand p { max-width: 38ch; margin: .6rem 0; color: #e3cdb7; font-size: .88rem; }
+.cafe-site-footer__brand .cafe-site-footer__disclaimer { color: #d3baa5; font-size: .8rem; }
+.cafe-site-footer__nav { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
+.cafe-site-footer__nav h2 { font-size: .9rem; text-transform: uppercase; letter-spacing: .12em; color: #e9c6a1; font-weight: 800; }
+.cafe-site-footer__nav a { display: block; width: fit-content; padding: .28rem 0; color: #fbede0; font-size: .87rem; text-decoration: none; }
+.cafe-site-footer a:hover { color: #f2c48e; text-decoration: underline; }
+.cafe-site-footer__bottom {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: .7rem;
+  border-top: 1px solid rgba(243,219,192,.18);
+  padding-top: 1rem; margin-top: 1.3rem; color: #dcc9b5; font-size: .81rem;
+}
+.cafe-site-footer__bottom a { color: #f4dfc7; text-decoration: underline; }
+.cafe-content-page a:focus-visible,
+.coffee-product-detail a:focus-visible,
+.cafe-site-footer a:focus-visible,
+.cafe-content-page summary:focus-visible { outline: 3px solid #c28b51; outline-offset: 3px; border-radius: .25rem; }
+@media (max-width: 760px) {
+  .cafe-content-page__location { grid-template-columns: minmax(0,1fr); }
+  .cafe-site-footer__top { grid-template-columns: minmax(0,1fr); }
+  .coffee-product-detail .coffee-product-card { grid-template-columns: minmax(0,1fr); }
+  .coffee-product-detail .coffee-product-card__visual { min-height: 170px; border-radius: .8rem .8rem 0 0; }
+  .coffee-product-detail .coffee-product-card__image { height: 205px; border-radius: .8rem .8rem 0 0; }
+}
+@media (max-width: 400px) {
+  .cafe-content-page, .coffee-product-detail { padding: .65rem; border-radius: .6rem; }
+  .cafe-content-page__grid { grid-template-columns: minmax(0,1fr); }
+  .cafe-site-footer__nav { grid-template-columns: minmax(0,1fr); }
+  .cafe-content-page__actions .cafe-content-page__button { width: 100%; }
+}
