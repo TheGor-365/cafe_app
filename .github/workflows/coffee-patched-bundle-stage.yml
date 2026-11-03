@@ -1,0 +1,36 @@
+name: Cafe isolated patched bundle stage script
+on:
+  push:
+    branches: [feature/cafe-patched-bundle-stage-20261104]
+  pull_request:
+    branches: [feature/cafe-upload-security-gate-20261104]
+
+permissions:
+  contents: read
+
+jobs:
+  static-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python compile
+        run: python3 -m py_compile scripts/cafe_patched_bundle_stage.py
+      - name: Show help without accessing local Docker
+        run: python3 scripts/cafe_patched_bundle_stage.py --help
+      - name: Assert isolated mounts and no destructive Docker verbs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('scripts/cafe_patched_bundle_stage.py').read_text()
+          for needed in [
+              '--check', '--build', 'carrierwave', '2.2.7',
+              'cafe-legacy-bundle-20261101', 'type=bind,source={}',
+              '"--network", "bridge"', 'NO EXISTING APP CONTAINER OR BUNDLE SWITCHED',
+          ]:
+              assert needed in src, needed
+          for dangerous in ['docker stop', 'docker rm -f', 'docker volume rm',
+                            'git reset --hard', 'docker network connect']:
+              assert dangerous not in src, dangerous
+          print('PATCHED BUNDLE SCRIPT GUARD PASS')
+          PY
