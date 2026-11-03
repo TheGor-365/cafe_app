@@ -1,0 +1,66 @@
+name: Cafe CarrierWave security upgrade compatibility probe
+on:
+  push:
+    branches: [feature/cafe-carrierwave-security-probe-20261104]
+  pull_request:
+    branches: [feature/cafe-admin-crud-lifecycle-20261104]
+
+permissions:
+  contents: read
+
+jobs:
+  upgraded-legacy-ruby:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ruby:2.5.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install legacy Bundler
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Pin CarrierWave only inside ephemeral CI checkout
+        run: |
+          ruby -e "p = 'Gemfile'; s=File.read(p); old=%q(gem 'carrierwave'); abort('unexpected Gemfile') unless s.scan(old).length == 1; File.write(p,s.sub(old,%q(gem 'carrierwave', '= 2.2.7')))"
+          bundle _2.2.13_ lock --add-platform x86_64-linux
+          bundle _2.2.13_ update carrierwave --conservative
+          ruby -e "s=File.read('Gemfile.lock'); abort('patch not resolved') unless s.include?('carrierwave (2.2.7)'); puts 'CARRIERWAVE 2.2.7 LOCK RESOLVED'"
+          echo "=== REVIEWABLE DEPENDENCY LOCK DIFF (CI-ONLY, no commit) ==="
+          git diff -- Gemfile Gemfile.lock
+      - name: Install CI gems and validate locked version
+        run: |
+          bundle _2.2.13_ install --jobs 2 --retry 2
+          bundle _2.2.13_ exec ruby -e "require 'carrierwave'; abort('wrong CarrierWave') unless Gem.loaded_specs.fetch('carrierwave').version.to_s == '2.2.7'; puts 'CARRIERWAVE PATCH LEVEL PASS'"
+      - name: Load disposable test schema
+        run: bundle _2.2.13_ exec rails db:schema:load
+      - name: Provide test-only Webpacker manifest
+        run: |
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Rails security and admin regression suites
+        run: |
+          bundle _2.2.13_ exec rails test \
+            test/controllers/admin_access_test.rb \
+            test/controllers/products_controller_test.rb \
+            test/controllers/categories_controller_test.rb \
+            test/integration/coffee_admin_console_test.rb \
+            test/integration/coffee_admin_crud_lifecycle_test.rb \
+            test/integration/coffee_auth_account_test.rb \
+            test/integration/coffee_public_pages_footer_test.rb \
+            test/integration/coffee_storefront_test.rb
