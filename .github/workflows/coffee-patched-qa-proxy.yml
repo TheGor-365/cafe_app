@@ -1,0 +1,83 @@
+name: Cafe patched QA proxy cutover guard
+on:
+  push:
+    branches: [feature/cafe-patched-qa-proxy-cutover-20261104]
+  pull_request:
+    branches: [feature/cafe-patched-qa-candidate-20261104]
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax and explicit CLI
+        run: |
+          python3 -m py_compile scripts/cafe_patched_qa_proxy_cutover.py
+          python3 scripts/cafe_patched_qa_proxy_cutover.py --help
+      - name: Regression check HTTP helper on a real local test server
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from http.server import BaseHTTPRequestHandler, HTTPServer
+          from threading import Thread
+
+          spec = importlib.util.spec_from_file_location(
+              "qa_proxy_switch", "scripts/cafe_patched_qa_proxy_cutover.py"
+          )
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  self.send_response(200 if self.path == "/menu" else 404)
+                  self.end_headers()
+                  self.wfile.write(b"OK")
+              def log_message(self, *args):
+                  pass
+
+          server = HTTPServer(("127.0.0.1", 0), Handler)
+          t = Thread(target=server.serve_forever, daemon=True)
+          t.start()
+          try:
+              assert module.response(server.server_address[1], "/menu")[0] == 200
+              assert module.response(server.server_address[1], "/missing")[0] == 404
+              print("QA PROXY HTTP HELPER PASS")
+          finally:
+              server.shutdown()
+              server.server_close()
+              t.join(timeout=3)
+          PY
+      - name: Ensure rollback and restrictions are present
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("scripts/cafe_patched_qa_proxy_cutover.py").read_text()
+          for expected in [
+              "OLD QA PROXY PRESERVED (STOPPED)",
+              "PATCHED QA PORT 3002 SWITCH VERIFIED",
+              "QA PROXY ROLLBACK HTTP:",
+              "CUTOVER READY — NO CHANGES MADE",
+              "127.0.0.1:3002:3002",
+              "QA_NET not in nets(live)",
+              "NEW_WEB",
+              "BUNDLE_GEMFILE",
+              "image",
+              "--check",
+              "--switch",
+          ]:
+              assert expected in source, expected
+          for blocked in [
+              '"docker", "rm"',
+              '"docker", "volume", "rm"',
+              '"--privileged"',
+              '"docker", "restart"',
+              'db:drop',
+              'db:reset',
+          ]:
+              assert blocked not in source, blocked
+          print("QA PROXY STATIC ROLLBACK SAFETY PASS")
+          PY
