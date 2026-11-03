@@ -1,0 +1,21 @@
+name: Cafe QA-only avatar rollout script
+on:
+  pull_request:
+    branches: [feature/cafe-admin-console-20261103]
+    paths:
+      - scripts/cafe_qa_avatar_rollout.py
+      - docs/CAFE_QA_AVATAR_ROLLOUT.md
+      - .github/workflows/coffee-qa-avatar-rollout.yml
+  push:
+    branches: [feature/cafe-qa-avatar-rollout-20261103]
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Python syntax without contacting Docker or production
+        run: python3 -m py_compile scripts/cafe_qa_avatar_rollout.py
+      - name: Validate CLI entrypoint
+        run: python3 scripts/cafe_qa_avatar_rollout.py --help
