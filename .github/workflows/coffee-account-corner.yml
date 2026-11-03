@@ -1,0 +1,101 @@
+name: Coffee responsive account corner CSS acceptance
+
+on:
+  pull_request:
+    branches: [feature/cafe-carrierwave-security-probe-20261104]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coffee-account-corner-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruby:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: ruby:2.5.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install legacy Bundler
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Linux lockfile platform in temporary checkout
+        run: bundle _2.2.13_ lock --add-platform x86_64-linux
+      - name: Install gems
+        run: bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Load disposable test schema
+        run: bundle _2.2.13_ exec rails db:schema:load
+      - name: Test-only Webpacker manifest
+        run: |
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Run Rails integration suites
+        run: |
+          bundle _2.2.13_ exec rails test \
+            test/controllers/admin_access_test.rb \
+            test/controllers/products_controller_test.rb \
+            test/controllers/categories_controller_test.rb \
+            test/controllers/order_items_requests_test.rb \
+            test/controllers/menu_controller_test.rb \
+            test/models/order_item_test.rb \
+            test/helpers/application_helper_test.rb \
+            test/integration/session_layout_isolation_test.rb \
+            test/models/local_seeds_test.rb \
+            test/integration/coffee_storefront_test.rb \
+            test/models/coffee_catalog_seed_test.rb \
+            test/integration/coffee_home_cart_flow_test.rb \
+            test/integration/coffee_layout_reflow_test.rb \
+            test/integration/coffee_drink_configurator_test.rb \
+            test/models/coffee_drink_seed_test.rb \
+            test/integration/coffee_live_price_preview_test.rb \
+            test/integration/coffee_cart_consolidation_test.rb \
+            test/integration/coffee_product_panel_test.rb \
+            test/integration/coffee_quantity_stepper_test.rb \
+            test/integration/coffee_static_branding_test.rb \
+            test/integration/coffee_public_pages_footer_test.rb \
+            test/integration/coffee_rich_details_faq_motion_test.rb \
+            test/integration/coffee_mobile_shell_test.rb \
+            test/integration/coffee_auth_account_test.rb \
+            test/integration/coffee_admin_console_test.rb \
+            test/integration/coffee_admin_crud_lifecycle_test.rb \
+            test/integration/coffee_account_corner_style_test.rb
+
+  javascript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: node:14.21.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install locked JS dependencies
+        run: yarn install --frozen-lockfile --non-interactive
+      - name: Test cents calculation and DOM update
+        run: |
+          node test/javascript/coffee_price_preview.test.js
+          node test/javascript/coffee_config_panel.test.js
+          node test/javascript/coffee_quantity_stepper.test.js
+      - name: Compile genuine Webpack 4 entry
+        run: ./node_modules/.bin/webpack --config config/webpack/development.js
+      - name: Verify compiled JS manifest
+        run: |
+          test -s public/packs/manifest.json
+          node -e 'const m=require("./public/packs/manifest.json"); if(!m["application.js"]) process.exit(1); console.log(m["application.js"]);'
