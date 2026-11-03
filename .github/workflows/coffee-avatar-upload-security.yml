@@ -9,6 +9,13 @@ permissions:
   contents: read
 
 jobs:
+  read-only-preflight-syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile local preflight without accessing Docker
+        run: python3 -m py_compile scripts/cafe_security_preflight.py
   patched-avatar-policy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
