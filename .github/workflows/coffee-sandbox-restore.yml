@@ -1,0 +1,108 @@
+name: Cafe isolated QA backup restore safety
+on:
+  push:
+    branches: [feature/cafe-sandbox-restore-20261104]
+  pull_request:
+    branches: [feature/cafe-qa-security-snapshot-20261104]
+permissions:
+  contents: read
+jobs:
+  safe-restore-helpers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax and CLI
+        run: |
+          python3 -m py_compile scripts/cafe_restore_security_sandbox.py
+          python3 scripts/cafe_restore_security_sandbox.py --help
+      - name: Archive parsing and SHA256 extraction regression
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import io
+          import tarfile
+          import tempfile
+          from pathlib import Path
+
+          spec = importlib.util.spec_from_file_location(
+              "restore_sandbox", "scripts/cafe_restore_security_sandbox.py"
+          )
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          with tempfile.TemporaryDirectory() as temp:
+              base = Path(temp)
+              archive = base / "media.tar.gz"
+              data = b"\x89PNG\r\n\x1a\n" + bytes(range(32))
+              with tarfile.open(archive, "w:gz") as tar:
+                  root = tarfile.TarInfo("patched_qa_uploads")
+                  root.type = tarfile.DIRTYPE
+                  tar.addfile(root)
+                  avatar_dir = tarfile.TarInfo("patched_qa_uploads/user")
+                  avatar_dir.type = tarfile.DIRTYPE
+                  tar.addfile(avatar_dir)
+                  info = tarfile.TarInfo(
+                      "patched_qa_uploads/user/sample image.png"
+                  )
+                  info.size = len(data)
+                  tar.addfile(info, io.BytesIO(data))
+              expected = m.archive_manifest(archive)
+              assert len(expected) == 3, expected
+              assert expected["user/sample image.png"][1] == len(data)
+              destination = base / "private_media"
+              assert m.extract_media(archive, destination, expected) == 1
+              assert m.disk_inventory(destination) == expected
+              assert destination.stat().st_mode & 0o077 == 0
+              print("SHA256 VERIFIED MEDIA RESTORE PASS")
+
+              evil = base / "bad.tar.gz"
+              with tarfile.open(evil, "w:gz") as tar:
+                  root = tarfile.TarInfo("patched_qa_uploads")
+                  root.type = tarfile.DIRTYPE
+                  tar.addfile(root)
+                  bad = tarfile.TarInfo("patched_qa_uploads/../../escape")
+                  bad.size = 2
+                  tar.addfile(bad, io.BytesIO(b"no"))
+              try:
+                  m.archive_manifest(evil)
+              except RuntimeError:
+                  pass
+              else:
+                  raise AssertionError("unsafe traversal accepted")
+
+              evil_link = base / "link.tar.gz"
+              with tarfile.open(evil_link, "w:gz") as tar:
+                  root = tarfile.TarInfo("patched_qa_uploads")
+                  root.type = tarfile.DIRTYPE
+                  tar.addfile(root)
+                  link = tarfile.TarInfo("patched_qa_uploads/symlink")
+                  link.type = tarfile.SYMTYPE
+                  link.linkname = "/etc/passwd"
+                  tar.addfile(link)
+              try:
+                  m.archive_manifest(evil_link)
+              except RuntimeError:
+                  pass
+              else:
+                  raise AssertionError("unsafe symlink accepted")
+              print("PATH TRAVERSAL AND SYMLINK REJECTION PASS")
+          PY
+      - name: Static no-live-mutation guards
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("scripts/cafe_restore_security_sandbox.py").read_text()
+          for expected in [
+              "--check", "--restore", "--internal",
+              "pg_restore", "sha256", "ISOLATED QA DATABASE + MEDIA RESTORE VERIFIED",
+              "SANDBOX RESTORE COMPLETE", "SNAP",
+          ]:
+              assert expected in s, expected
+          for forbidden in [
+              '"docker", "stop"', '"docker", "rm"', '"docker", "volume", "rm"',
+              "db:drop", "db:reset", "git reset --hard",
+              "tar.extractall(", "POSTGRES_PASSWORD=",
+          ]:
+              assert forbidden not in s, forbidden
+          print("SANDBOX RESTORE STATIC ISOLATION PASS")
+          PY
