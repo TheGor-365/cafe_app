@@ -86,14 +86,15 @@ html body .page-container.row > .col-1.p-2 > a:hover h6 {
   text-decoration: underline;
 }
 
-/* Sign-out is a Rails button_to form, not a styled link. */
+/* Rails 6 button_to generates <input type="submit"> by default (not <button>).\n * Keep both elements styled for compatibility with alternate button_to renderers. */
 html body .page-container.row > .col-1.p-2 form,
 html body .page-container.row > .col-1.p-2 form.button_to {
   margin: 0;
   padding: 0;
   width: 100%;
 }
-html body .page-container.row > .col-1.p-2 form button {
+html body .page-container.row > .col-1.p-2 form button,
+html body .page-container.row > .col-1.p-2 form input[type="submit"] {
   appearance: none;
   display: inline-flex;
   align-items: center;
@@ -115,15 +116,18 @@ html body .page-container.row > .col-1.p-2 form button {
   cursor: pointer;
   transition: background-color .15s ease, border-color .15s ease;
 }
-html body .page-container.row > .col-1.p-2 form button:hover {
+html body .page-container.row > .col-1.p-2 form button:hover,
+html body .page-container.row > .col-1.p-2 form input[type="submit"]:hover {
   background: #8a5631;
   border-color: #e6b67e;
 }
-html body .page-container.row > .col-1.p-2 form button:active {
+html body .page-container.row > .col-1.p-2 form button:active,
+html body .page-container.row > .col-1.p-2 form input[type="submit"]:active {
   background: #4e301d;
 }
 html body .page-container.row > .col-1.p-2 a:focus-visible,
-html body .page-container.row > .col-1.p-2 button:focus-visible {
+html body .page-container.row > .col-1.p-2 button:focus-visible,
+html body .page-container.row > .col-1.p-2 form input[type="submit"]:focus-visible {
   outline: 3px solid #e6b47c;
   outline-offset: 3px;
 }
@@ -207,7 +211,8 @@ html body .page-container.row > .col-1.p-2 > h6 > a:hover {
     min-width: 0;
     margin: 0;
   }
-  html body .page-container.row > .col-1.p-2 form button {
+  html body .page-container.row > .col-1.p-2 form button,
+html body .page-container.row > .col-1.p-2 form input[type="submit"] {
     min-height: 44px;
     padding: .5rem .55rem;
   }
@@ -250,7 +255,8 @@ html body .page-container.row > .col-1.p-2 > h6 > a:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html body .page-container.row > .col-1.p-2 form button {
+  html body .page-container.row > .col-1.p-2 form button,
+html body .page-container.row > .col-1.p-2 form input[type="submit"] {
     transition: none;
   }
 }
