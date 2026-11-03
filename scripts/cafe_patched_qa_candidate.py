@@ -13,7 +13,7 @@ Do not retry blindly. Never removes/restarts live or existing QA containers.
 """
 import argparse
 import hashlib
-import http.client
+import http.client as http_client
 import json
 import os
 from pathlib import Path
@@ -85,7 +85,7 @@ def sql(name, query):
 
 
 def http(port, url):
-    client = http.client.HTTPConnection("127.0.0.1", port, timeout=8)
+    client = http_client.HTTPConnection("127.0.0.1", port, timeout=8)
     try:
         client.request("GET", url)
         response = client.getresponse()
