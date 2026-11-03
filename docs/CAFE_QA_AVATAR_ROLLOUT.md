@@ -46,3 +46,26 @@ If --apply stops with a mismatch or partial resource creation, do **not** blindl
 ## Rollback and privacy
 
 If new proxy fails, the script attempts stopping the new QA proxy and restarting `cafe-upload-qa-proxy-db-20261103`. It keeps both QA Rails containers and original QA DB/media; never deletes or resets them. If host is compromised or DB/secret mount differs from the verified baseline, stop with explicit diagnostics. Avoid Git-tracking or Drive-uploading original `public/uploads`, `cafe.dump`, secrets, or real accounts.
+
+## 2026-11-04: QA avatar persistence accepted, security release blocker
+
+Owner verified QA browser registration with PNG and avatar thumb visible, then restarted **only** QA web. Before/after SHA-256 hashes of original and thumbnail matched, DB user lookup succeeded, and main 3001 returned HTTP 200: `QA PERSISTENCE VERIFIED`.
+
+**Security finding (block public uploads):** `Gemfile.lock` locks `carrierwave 2.2.1`. CarrierWave 2.2.1 has multiple documented Content-Type validation bypass advisories (e.g. GHSA-gxhx-g4fq-49hj, GHSA-vfmv-jfc5-pjjw, GHSA-7g26-2qgj-chfg). The 2.2 line fixes those by 2.2.7, released May 2026, but compatibility with this app and lockfile must be tested with an isolated Rails image. Existing local uploader has `extension_allowlist`, not a confirmed actual-content MIME allowlist or size cap. **Do not publicly enable uploads or claim security certification.** Add extension + strict image MIME + byte-size limits and adversarial negative tests. Upgrade and audit image processor as well, with test-only fixtures. No changes to real production dependencies or uploader were made in this PR.
+
+## Protected local import of Draft PR #27 (admin panel)
+
+Script `scripts/cafe_admin_local_import.py` offers `--check` and `--apply` to import the **15 exact PR #27 files** into the user's dirty local integration branch, after comparing the 12 existing local file Git blob IDs against the PR #26 base and confirming 3 paths are absent. It rejects any unexpected Git SHA or local edits, backs up current status/patch and all 12 affected files into private backups, then imports only the scoped 15 files. It never checks out/merges/rebases branches and never touches protected `application.html.erb`, `app/models/user.rb`, `app/uploaders/*`, `db/schema.rb`, database or uploads.
+
+After verifying the latest SHA in GitHub, on Linux:
+```bash
+cd "$HOME/Рабочий стол/rails_projects/lite/cafe_app"
+git fetch --no-tags origin feature/cafe-admin-console-20261103
+python3 path/to/cafe_admin_local_import.py --check
+# Apply only when "ADMIN PREFLIGHT PASS" and backup plan confirmed:
+python3 path/to/cafe_admin_local_import.py --apply
+```
+
+If `--check` reports any mismatch, **do not force an overwrite**. Inspect only the named file differences and reconcile manually with existing local changes. Do not grant admin to a demo user solely for a screenshot. Public `/menu` remains accessible regardless of admin privileges. Product/category admin index and modifications require prior authenticated `admin` role.
+
+All browser/DB uploads stayed in QA network and in nonpublic QA storage; no private avatar media, database dumps or user password are committed.
