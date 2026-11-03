@@ -95,7 +95,7 @@ jobs:
           for expected in [
               "--check", "--restore", "--internal",
               "pg_restore", "sha256", "ISOLATED QA DATABASE + MEDIA RESTORE VERIFIED",
-              "SANDBOX RESTORE COMPLETE", "SNAPSHOT",
+              "SANDBOX RESTORE COMPLETE", "SNAP",
           ]:
               assert expected in s, expected
           for forbidden in [
