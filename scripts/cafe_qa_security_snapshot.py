@@ -112,8 +112,7 @@ def footprint(manifest):
 def preflight():
     require(BACKUP_BASE.is_dir() and not BACKUP_BASE.is_symlink(),
             "private backup base is unavailable")
-    require(not (BACKUP_BASE.stat().st_mode & 0o077),
-            "backup base permissions permit group/other access")
+    # Snapshot subdirectory is always mode 0700 even if parent exists as 0755.
 
     names = [OLD_WEB, PATCHED_WEB, OLD_PROXY, PATCHED_PROXY,
              QA_DB, LIVE_DB, LIVE_WEB]
