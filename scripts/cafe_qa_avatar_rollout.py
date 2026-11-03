@@ -190,7 +190,7 @@ def check_new_backend():
         "h.open_timeout = 3; h.read_timeout = 8; "
         "r = h.get('/users/sign_up'); "
         "raise 'registration HTTP not 200' unless r.code == '200'; "
-        "raise 'missing avatar field' unless r.body.include?('name=\\\"user[avatar]\\\"'); "
+        "raise 'missing avatar field' unless r.body.include?('name=\"user[avatar]\"'); "
         "raise 'missing multipart form' unless r.body.include?('multipart/form-data'); "
         "puts 'QA AVATAR REGISTRATION HTML PASS'"
     )
