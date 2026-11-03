@@ -218,7 +218,7 @@ def create():
         if dest == "/bundle":
             spec = "type=bind,source={},target=/bundle,readonly".format(BUNDLE)
         elif dest == "/app/public/uploads":
-            spec = "type=bind,source={},target={},rw".format(NEW_UPLOADS, dest)
+            spec = "type=bind,source={},target={}".format(NEW_UPLOADS, dest)
         elif mount["Type"] == "volume":
             spec = "type=volume,source={},target={}".format(mount["Name"], dest)
         elif mount["Type"] == "bind":
