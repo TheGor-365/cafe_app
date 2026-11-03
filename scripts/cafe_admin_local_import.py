@@ -41,6 +41,11 @@ NEW = [
 ]
 FILES = list(BEFORE) + NEW
 
+# Owner's actual local tree (2026-11-04) lacks this historical integration
+# test although it exists on the GitHub PR #26 base. Allow restoring ONLY
+# this absent test from the reviewed PR #27; any symlink still aborts.
+OPTIONAL_ABSENT_TEST = "test/integration/session_layout_isolation_test.rb"
+
 
 def run(*args, capture=True):
     result = subprocess.run(args, cwd=str(PROJECT), check=True,
@@ -63,10 +68,20 @@ def preflight():
     require(BACKUP_BASE.is_dir(), "Private backup base directory missing")
 
     mismatches = []
+    restored_missing_test = False
     for rel, expected in BEFORE.items():
         path = PROJECT / rel
-        if not path.is_file() or path.is_symlink():
-            mismatches.append(rel + " (missing or symlink)")
+        if path.is_symlink():
+            mismatches.append(rel + " (symlink: never overwrite)")
+            continue
+        if not path.exists():
+            if rel == OPTIONAL_ABSENT_TEST:
+                restored_missing_test = True
+                continue
+            mismatches.append(rel + " (missing)")
+            continue
+        if not path.is_file():
+            mismatches.append(rel + " (not a regular file)")
             continue
         if run("git", "hash-object", "--", rel) != expected:
             mismatches.append(rel + " (local content differs)")
@@ -85,7 +100,11 @@ def preflight():
     for rel in FILES:
         run("git", "cat-file", "-e", REF + ":" + rel)
 
-    print("ADMIN PREFLIGHT PASS: 12 EXISTING + 3 NEW FILES", flush=True)
+    previous = 11 if restored_missing_test else 12
+    added = 4 if restored_missing_test else 3
+    print("ADMIN PREFLIGHT PASS: {} EXISTING + {} NEW FILES".format(previous, added), flush=True)
+    if restored_missing_test:
+        print("SAFE EXCEPTION: historical session test absent; will create it from PR #27", flush=True)
     print("PROTECTED: app/views/layouts/application.html.erb, user/uploader, DB, uploads", flush=True)
 
 
@@ -102,12 +121,21 @@ def save_backup():
         run("git", "status", "--porcelain=v1", "-uall") + "\n",
         encoding="utf-8"
     )
+    absent = [rel for rel in BEFORE if not (PROJECT / rel).exists()]
+    require(set(absent).issubset({OPTIONAL_ABSENT_TEST}),
+            "Unexpected missing local files before backup")
+    (directory / "absent_before_import.txt").write_text(
+        "\\n".join(absent) + ("\\n" if absent else ""),
+        encoding="utf-8"
+    )
     with tarfile.open(directory / "affected_files.tar.gz", "w:gz") as tar:
         for rel in BEFORE:
-            tar.add(PROJECT / rel, arcname=rel, recursive=False)
+            if rel not in absent:
+                tar.add(PROJECT / rel, arcname=rel, recursive=False)
     with tarfile.open(directory / "affected_files.tar.gz", "r:gz") as tar:
         members = tar.getmembers()
-        require(len(members) == len(BEFORE), "Backup archive is incomplete")
+        require(len(members) == len(BEFORE) - len(absent),
+                "Backup archive is incomplete")
     print("ADMIN BACKUP VERIFIED:", directory, flush=True)
     return directory
 
