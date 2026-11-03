@@ -125,7 +125,7 @@ def save_backup():
     require(set(absent).issubset({OPTIONAL_ABSENT_TEST}),
             "Unexpected missing local files before backup")
     (directory / "absent_before_import.txt").write_text(
-        "\\n".join(absent) + ("\\n" if absent else ""),
+        "\n".join(absent) + ("\n" if absent else ""),
         encoding="utf-8"
     )
     with tarfile.open(directory / "affected_files.tar.gz", "w:gz") as tar:
