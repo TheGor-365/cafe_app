@@ -1,0 +1,262 @@
+/*
+ * Gor's Coffee — accessible account corner refinement.
+ * Scoped to the legacy two-column avatar/account markup in the local
+ * application.html.erb; intentionally does not overwrite that protected file.
+ * Loaded after zzz_cafe_mobile_quality via require_tree's alphabetical order.
+ *
+ * Both 3001 and QA 3002 share the read-only /app bind: this is a presentation
+ * fix for both, not an authorization, upload, session or database change.
+ */
+
+@media (min-width: 761px) {
+  html body .page-container.row {
+    grid-template-columns: 192px minmax(0, 1fr) 64px 164px;
+  }
+  html body .page-container.row > .col-1:not(.p-2),
+  html body .page-container.row > .col-1.p-2 {
+    min-height: 78px;
+    background: rgba(37, 27, 20, .95);
+    box-sizing: border-box;
+  }
+  html body .page-container.row > .col-1:not(.p-2) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: .6rem .3rem;
+    border-radius: .7rem 0 0 .7rem;
+    border-left: 1px solid rgba(233, 192, 139, .17);
+    border-top: 1px solid rgba(233, 192, 139, .17);
+    border-bottom: 1px solid rgba(233, 192, 139, .17);
+  }
+  html body .page-container.row > .col-1.p-2 {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: .35rem;
+    padding: .55rem .6rem !important;
+    border-radius: 0 0 .7rem 0;
+    border-top: 1px solid rgba(233, 192, 139, .17);
+    border-right: 1px solid rgba(233, 192, 139, .17);
+    border-bottom: 1px solid rgba(233, 192, 139, .17);
+  }
+}
+
+/* Fixed circular thumbnail, no dependency on Bootstrap's .rounded or mt-2. */
+html body .page-container.row > .col-1:not(.p-2) img {
+  display: block;
+  width: 44px;
+  height: 44px;
+  max-width: 44px;
+  max-height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 50% !important;
+  margin: 0 !important;
+  border: 2px solid #dfb77b;
+  box-shadow: 0 0 0 2px rgba(28, 19, 13, .75);
+}
+
+/* Undo h6's original spacing without requiring a protected ERB edit. */
+html body .page-container.row > .col-1.p-2 h6 {
+  font-size: .82rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0;
+  min-width: 0;
+}
+html body .page-container.row > .col-1.p-2 > a {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  color: #ffe1b6;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  border-radius: .35rem;
+}
+html body .page-container.row > .col-1.p-2 > a h6 {
+  color: #ffe4bf !important;
+  font-size: .82rem;
+  font-weight: 750;
+}
+html body .page-container.row > .col-1.p-2 > a:hover h6 {
+  color: #fff9ed !important;
+  text-decoration: underline;
+}
+
+/* Rails 6 button_to generates <input type="submit"> by default (not <button>).\n * Keep both elements styled for compatibility with alternate button_to renderers. */
+html body .page-container.row > .col-1.p-2 form,
+html body .page-container.row > .col-1.p-2 form.button_to {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+html body .page-container.row > .col-1.p-2 form button,
+html body .page-container.row > .col-1.p-2 form input[type="submit"] {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 38px;
+  padding: .45rem .65rem;
+  margin: 0;
+  font: inherit;
+  font-size: .82rem;
+  line-height: 1.2;
+  font-weight: 750;
+  letter-spacing: .01em;
+  color: #fff5e5 !important;
+  background: #714426;
+  border: 1px solid #aa7548;
+  border-radius: .5rem;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+html body .page-container.row > .col-1.p-2 form button:hover,
+html body .page-container.row > .col-1.p-2 form input[type="submit"]:hover {
+  background: #8a5631;
+  border-color: #e6b67e;
+}
+html body .page-container.row > .col-1.p-2 form button:active,
+html body .page-container.row > .col-1.p-2 form input[type="submit"]:active {
+  background: #4e301d;
+}
+html body .page-container.row > .col-1.p-2 a:focus-visible,
+html body .page-container.row > .col-1.p-2 button:focus-visible,
+html body .page-container.row > .col-1.p-2 form input[type="submit"]:focus-visible {
+  outline: 3px solid #e6b47c;
+  outline-offset: 3px;
+}
+
+/* Guest auth links are not raw underlined h6's anymore. */
+html body .page-container.row > .col-1.p-2 > h6 > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 34px;
+  padding: .4rem .55rem;
+  border-radius: .45rem;
+  color: #ffe3bf;
+  border: 1px solid rgba(235, 191, 144, .35);
+  text-decoration: none;
+}
+html body .page-container.row > .col-1.p-2 > h6 > a:hover {
+  background: #5d3d28;
+  color: #fff7ec;
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  html body .page-container.row {
+    grid-template-columns: 152px minmax(0, 1fr) 58px 142px;
+  }
+}
+@media (min-width: 761px) and (max-width: 980px) {
+  html body .page-container.row {
+    grid-template-columns: 128px minmax(0, 1fr) 56px 134px;
+  }
+}
+
+@media (max-width: 760px) {
+  /* Reuse the existing navigation strip; keep identity + exit below it.
+     The avatar appears to the left of the account controls, not far away. */
+  html body .page-container.row {
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-areas:
+      "nav nav"
+      "avatar account"
+      "main main";
+  }
+  html body .page-container.row > .col-1:not(.p-2),
+  html body .page-container.row > .col-1.p-2 {
+    min-height: 66px;
+    box-sizing: border-box;
+    background: #2c2018;
+    border-top: 1px solid rgba(228, 186, 137, .18);
+    border-bottom: 1px solid rgba(228, 186, 137, .18);
+  }
+  html body .page-container.row > .col-1:not(.p-2) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: none;
+    padding: .5rem .3rem;
+    border-radius: 0 0 0 .65rem;
+  }
+  html body .page-container.row > .col-1.p-2 {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    flex-direction: row-reverse;
+    min-width: 0;
+    gap: .5rem;
+    padding: .45rem .7rem !important;
+    border-radius: 0 0 .65rem 0;
+  }
+  html body .page-container.row > .col-1.p-2 > a {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: .15rem .25rem;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  html body .page-container.row > .col-1.p-2 > h6 {
+    flex: 0 1 110px;
+    min-width: 0;
+    margin: 0;
+  }
+  html body .page-container.row > .col-1.p-2 form button,
+html body .page-container.row > .col-1.p-2 form input[type="submit"] {
+    min-height: 44px;
+    padding: .5rem .55rem;
+  }
+  html body .page-container.row > .col-1.p-2 > h6 > a {
+    min-height: 44px;
+  }
+  /* Give guest sign-in and sign-up two consistently sized targets. */
+  html body .page-container.row > .col-1.p-2:not(:has(form)) {
+    justify-content: flex-end;
+  }
+  html body .page-container.row > .col-1:not(.p-2) img {
+    width: 42px;
+    height: 42px;
+    max-width: 42px;
+    max-height: 42px;
+    min-width: 42px;
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 360px) {
+  html body .page-container.row {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+  html body .page-container.row > .col-1.p-2 {
+    gap: .25rem;
+    padding: .4rem .45rem !important;
+  }
+  html body .page-container.row > .col-1.p-2 > a h6 {
+    font-size: .76rem;
+  }
+  html body .page-container.row > .col-1:not(.p-2) img {
+    width: 38px;
+    height: 38px;
+    max-width: 38px;
+    max-height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body .page-container.row > .col-1.p-2 form button,
+html body .page-container.row > .col-1.p-2 form input[type="submit"] {
+    transition: none;
+  }
+}
