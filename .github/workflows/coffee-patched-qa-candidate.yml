@@ -1,0 +1,46 @@
+name: Cafe isolated patched QA candidate controls
+on:
+  push:
+    branches: [feature/cafe-patched-qa-candidate-20261104]
+  pull_request:
+    branches: [feature/cafe-patched-bundle-stage-20261104]
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-static-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax and CLI usage
+        run: |
+          python3 -m py_compile scripts/cafe_patched_qa_candidate.py
+          python3 scripts/cafe_patched_qa_candidate.py --help
+      - name: Verify staging constraints without Docker access
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("scripts/cafe_patched_qa_candidate.py").read_text()
+          for required in [
+              "PATCHED QA CANDIDATE INTERNAL SMOKE PASS",
+              "NO QA PROXY SWITCH",
+              "--check", "--create", "--smoke",
+              "cafe-app-patched-qa-candidate-20261104",
+              "bundle_carrierwave_227_20261104",
+              "qa_patched_avatar_20261104",
+              "uploads_patched_qa_20261104",
+              "qa/security/avatar_uploader.rb",
+              "QA/LIVE ISOLATION PASS",
+          ]:
+              assert required in s, required
+          for forbidden in [
+              '"docker", "stop"', '"docker", "restart"',
+              '"docker", "rm"', '"docker", "network", "connect"',
+              '"docker", "volume", "rm"', '"--publish"',
+              '"--privileged"',
+          ]:
+              assert forbidden not in s, forbidden
+          print("PATCHED QA CANDIDATE STATIC SAFETY PASS")
+          PY
