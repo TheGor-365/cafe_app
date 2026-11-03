@@ -1,0 +1,72 @@
+name: Cafe private QA backup verification
+on:
+  push:
+    branches: [feature/cafe-qa-security-snapshot-20261104]
+  pull_request:
+    branches: [feature/cafe-patched-qa-proxy-cutover-20261104]
+permissions:
+  contents: read
+jobs:
+  snapshot-helpers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and show CLI help
+        run: |
+          python3 -m py_compile scripts/cafe_qa_security_snapshot.py
+          python3 scripts/cafe_qa_security_snapshot.py --help
+      - name: Test SHA256 inventory, reversible archive integrity and symlink rejection
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          from pathlib import Path
+          import tempfile
+
+          p = "scripts/cafe_qa_security_snapshot.py"
+          spec = importlib.util.spec_from_file_location("cafe_snapshot", p)
+          script = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(script)
+          with tempfile.TemporaryDirectory() as tmp:
+              tmp = Path(tmp)
+              root = tmp / "original"
+              root.mkdir()
+              (root / "user" / "avatar").mkdir(parents=True)
+              (root / "tmp").mkdir()
+              (root / "user" / "avatar" / "sample.png").write_bytes(
+                  b"\x89PNG\r\n\x1a\n" + bytes(range(40))
+              )
+              (root / "tmp" / "file with spaces.txt").write_bytes(b"test")
+              manifest = script.inventory(root)
+              assert len([v for v in manifest.values() if v[0] == "file"]) == 2
+              archive = tmp / "copy.tar.gz"
+              digest = script.tar_and_verify(root, "qa_media", archive, manifest)
+              assert digest == script.sha256_file(archive)
+              assert script.inventory(root) == manifest
+              assert archive.is_file()
+              # A new symlink is forbidden rather than archived/followed.
+              (root / "escape").symlink_to(tmp)
+              try:
+                  script.inventory(root)
+              except RuntimeError as e:
+                  assert "symlink" in str(e).lower()
+              else:
+                  raise AssertionError("symlink was not blocked")
+              print("QA SNAPSHOT ARCHIVE ROUNDTRIP AND SYMLINK TEST PASS")
+          PY
+      - name: Confirm script never runs destructive host operations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("scripts/cafe_qa_security_snapshot.py").read_text()
+          for required in ["--snapshot", "--check", "pg_dump", "pg_restore",
+                           "sha256_stream", "QA SECURITY SNAPSHOT VERIFIED:",
+                           "PATCHED_PROXY", "OLD_UPLOADS", "PATCHED_UPLOADS"]:
+              assert required in s, required
+          for forbidden in ["docker rm", "docker stop", "docker restart",
+                            "db:drop", "db:reset", "pg_restore --clean",
+                            "docker volume rm", "git reset --hard"]:
+              assert forbidden not in s, forbidden
+          print("QA SNAPSHOT STATIC SAFETY PASS")
+          PY
