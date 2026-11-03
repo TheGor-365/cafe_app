@@ -65,7 +65,6 @@ jobs:
               "QA_NET not in nets(live)",
               "NEW_WEB",
               "BUNDLE_GEMFILE",
-              "image",
               "--check",
               "--switch",
           ]:
