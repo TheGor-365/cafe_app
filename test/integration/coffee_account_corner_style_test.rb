@@ -6,6 +6,10 @@ class CoffeeAccountCornerStyleTest < ActionDispatch::IntegrationTest
     css = SassC::Engine.new(source, syntax: :scss).render
 
     assert_includes css, '.page-container.row > .col-1.p-2 form button'
+    assert_includes css, '.page-container.row > .col-1.p-2 form input[type="submit"]'
+    assert_includes css, 'form input[type="submit"]:hover'
+    assert_includes css, 'form input[type="submit"]:active'
+    assert_includes css, 'form input[type="submit"]:focus-visible'
     assert_includes css, 'background: #714426'
     assert_includes css, ':focus-visible'
     assert_includes css, 'border-radius: 50% !important'
