@@ -73,7 +73,7 @@ jobs:
           for value in ["NEW PRE-CACHE SANDBOX SMOKE PASS",
                         "NEW PRE-CACHE SANDBOX RAILS CREATED",
                         "PRECACHE SANDBOX HTTP MULTIPART + CLEANUP PASS",
-                        "qa_avatar_precache_qa_20261104.rb",
+                        "cafe_avatar_precache_qa_20261104.rb",
                         "SANDBOX_NET", "RUBY_PROBE_BLOB"]:
               assert value in rollback, value
           for unsafe in ["docker stop", "docker rm", "db:drop", "db:reset",
