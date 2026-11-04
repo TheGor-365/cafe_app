@@ -316,8 +316,9 @@ def check():
             "extra member on E2E PG network before QA web creation")
     require(inspect(DB_NAME)["State"]["Status"] == "running",
             "fourth Postgres stopped")
-    require(headers.sha(headers.CONFIG) ==
-            headers.sha(headers.CONFIG), "source rack hash unavailable")
+    require(headers.CONFIG.read_text(encoding="utf-8") ==
+            headers.bundled_rack_config(),
+            "source Rack config is not the reviewed CSP/405 candidate")
     print("PRIVATE FOURTH-DB/OWNER QA ISOLATION PREFLIGHT PASS", flush=True)
     print("FOURTH NETWORK ONLY-POSTGRES MEMBERSHIP PASS", flush=True)
     print("NEW READ-ONLY WEB/MEDIA TARGETS AVAILABLE — NO CHANGES", flush=True)
