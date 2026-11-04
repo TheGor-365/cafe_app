@@ -85,6 +85,41 @@ jobs:
               assert forbidden not in source, forbidden
           print("EXISTING MOUNTPOINT / REVIEWED HEADER / FORCED READONLY QA CI PASS")
           PY
+      - name: Disposable Docker/runc mountpoint regression (synthetic files only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          scratch="$(mktemp -d "${RUNNER_TEMP}/cafe-oci-synth.XXXXXX")"
+          trap 'rm -rf "$scratch"' EXIT
+          mkdir -p "$scratch/app"
+          printf '# synthetic existing Rack file\n' > "$scratch/app/config.ru"
+          printf '# synthetic replacement\n' > "$scratch/reviewed-config.ru"
+          printf '# synthetic old missing target\n' > "$scratch/old-helper.rb"
+          chmod 755 "$scratch" "$scratch/app"
+          chmod 644 "$scratch/app/config.ru" "$scratch/reviewed-config.ru" "$scratch/old-helper.rb"
+          docker pull alpine:3.20
+          docker run --rm --network none --read-only --user 1000:1000 \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --mount "type=bind,source=$scratch/app,target=/app,readonly" \
+            --mount "type=bind,source=$scratch/reviewed-config.ru,target=/app/config.ru,readonly" \
+            alpine:3.20 sh -c \
+              'test -f /app/config.ru && grep -q "synthetic replacement" /app/config.ru && test ! -e /app/qa_headers_candidate.rb'
+          echo "OCI EXISTING FILE MOUNT UNDER RO /app PASS"
+
+          # Fail if the former missing-target design unexpectedly succeeds.
+          if docker run --rm --network none --read-only --user 1000:1000 \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --mount "type=bind,source=$scratch/app,target=/app,readonly" \
+            --mount "type=bind,source=$scratch/old-helper.rb,target=/app/qa_headers_candidate.rb,readonly" \
+            alpine:3.20 sh -c 'test -f /app/qa_headers_candidate.rb' > "$scratch/old-output" 2>&1; then
+            echo "OLD OCI MISSING-TARGET SCENARIO UNEXPECTEDLY SUCCEEDED"
+            exit 1
+          fi
+          if ! grep -qiE 'read.only file system|mountpoint|no such file' "$scratch/old-output"; then
+            echo "OLD OCI MISSING-TARGET FAILURE CLASS NOT RECOGNIZED"
+            exit 1
+          fi
+          echo "OCI OLD MISSING FILE TARGET NEGATIVE CONTROL PASS"
       - name: Ensure ImageMagick resource policy matches reviewed profile
         run: |
           python3 - <<'PY'
