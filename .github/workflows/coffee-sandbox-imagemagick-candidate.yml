@@ -1,0 +1,87 @@
+name: Cafe sandbox ImageMagick bounded resource candidate (CI only)
+on:
+  push:
+    branches: [feature/cafe-sandbox-imagemagick-limits-candidate-20261104]
+  pull_request:
+    branches: [feature/cafe-header-content-type-null-safe-20261104]
+permissions:
+  contents: read
+jobs:
+  candidate-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: CLI and isolated parser tests (no Docker)
+        run: |
+          python3 -m py_compile scripts/cafe_sandbox_imagemagick_limits_candidate.py
+          python3 scripts/cafe_sandbox_imagemagick_limits_candidate.py --help
+          python3 scripts/cafe_sandbox_imagemagick_limits_candidate.py --self-test
+      - name: Exact env profile, safe Ruby syntax, no writes
+        run: |
+          python3 - <<'PY'
+          import ast
+          import importlib.util
+          from pathlib import Path
+          import subprocess
+
+          path = Path("scripts/cafe_sandbox_imagemagick_limits_candidate.py")
+          module = ast.parse(path.read_text())
+          ruby = None
+          for statement in module.body:
+              if isinstance(statement, ast.Assign) and any(
+                  isinstance(target, ast.Name) and target.id == "RUBY_JPEG"
+                  for target in statement.targets
+              ):
+                  ruby = ast.literal_eval(statement.value)
+                  break
+          assert ruby is not None
+          check = subprocess.run(["ruby", "-c"], input=ruby, text=True,
+                                 capture_output=True, check=True)
+          assert "Syntax OK" in check.stdout
+
+          spec = importlib.util.spec_from_file_location("cafe_limits", str(path))
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          pairs = [line.strip().split("=", 1) for line in Path(
+              "qa/security/imagemagick_resource_limits.env"
+          ).read_text().splitlines() if line.strip()]
+          assert len(pairs) == 9
+          assert dict(pairs) == m.POLICY
+          assert set(m.FIELDS) == set(m.POLICY)
+          source = path.read_text()
+          for forbidden in ("docker stop", "docker rm", "docker restart",
+                            "docker create", "docker run", "db:drop",
+                            "db:migrate", ".write_bytes(", ".unlink(", "DELETE FROM"):
+              assert forbidden not in source, forbidden
+          print("PROFILE/RUBY/NO-MUTATION STATIC GATE PASS")
+          PY
+      - name: Apply profile to throwaway CI identify process only
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+
+          assert shutil.which("identify"), "ImageMagick identify must be installed on runner"
+          src = "scripts/cafe_sandbox_imagemagick_limits_candidate.py"
+          spec = importlib.util.spec_from_file_location("cafe_limits", src)
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          env = os.environ.copy()
+          env.update(m.POLICY)
+          output = subprocess.run(["identify", "-list", "resource"],
+                                  env=env, capture_output=True, text=True, check=True,
+                                  timeout=20)
+          m.verify_policy(m.parse_resource(output.stdout))
+          small = subprocess.run(["identify", "-size", "8x8", "xc:white"],
+                                 env=env, capture_output=True, timeout=20)
+          assert small.returncode == 0, "8x8 synthetic positive failed"
+          large = subprocess.run(["identify", "-size", "10000x1", "xc:white"],
+                                 env=env, capture_output=True, timeout=20)
+          assert large.returncode != 0, "10000x1 synthetic negative accepted"
+          print("HOST IMAGEMAGICK LIMITS + SYNTHETIC WIDTH ENFORCEMENT PASS")
+          print("NOT OWNER SANDBOX / NOT RAILS WORKER CONFIGURATION")
+          PY
