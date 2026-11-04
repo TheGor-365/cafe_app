@@ -23,3 +23,13 @@ Do not edit the original private `app/uploaders/avatar_uploader.rb` file or exis
 Before rerunning multipart tests, preserve the error evidence and remove only the exact three-byte generated temporary file within sandbox if path, SHA, signature, baseline and DB/network identity all agree. Do not delete arbitrary files or cache directories; maintain the private snapshot of ten originals. Adapt the probe to report signed-off per-case statuses and investigate other potential leaks (reject files, no persistent user, no orphans).
 
 The private image/SQL backups must remain only on owner Linux. Ruby 2.5/Rails 6 EOL and image processing limits remain blockers to public uploads.
+
+## Surgical sandbox-only evidence cleanup — no action until path check passes
+
+The new `scripts/cafe_sandbox_scoped_cache_cleanup.py` uses the *unchanged* verified read-only forensic helper to enforce: private snapshot is still SHA256-valid; exactly ten original files remain byte-identical; only one extra file of exactly 3 bytes exists under `tmp`; its path SHA256 prefix matches the owner-observed opaque ID `c7f26d5886cc`; its bytes equal the original truncated-JPEG fixture `FF D8 FF`; file is a regular, non-symlink, single-link object inside the private sandbox; sandbox vs QA vs production PG clusters are distinct and generated synthetic users are zero. `--check` makes no changes. `--clean` performs **one `unlink` only on that exact sandbox file**, and verifies the entire 10-file baseline again. It never removes a directory, changes a DB row or touches the original QA/live upload trees. If any guard fails, stop without any deletion.
+
+## New isolated acceptance candidate
+
+`scripts/cafe_precache_sandbox_acceptance.py` uses the owner-reverified private 10-file sandbox baseline and original sandbox Rails configuration to create **another** internal-only sandbox Rails instance, with the new `qa/security/avatar_uploader_preflight.rb` mounted as a distinct read-only private file. The old local uploader and the *currently running patched QA* uploader mount remain untouched. The script has `--check`, `--create`, `--smoke` and `--test` stages. Only `--test` invokes the existing Git-blob-pinned real HTTP multipart Ruby suite inside that new sandbox container (same disposable sandbox DB/media). The new sandbox has **no host port** and no DB migration. Any failed test preserves evidence and blocks release; never rerun `--create` over an existing container.
+
+Before the owner runs acceptance, the Ruby 2.5 pre-cache policy CI must pass, and the helper/uploader Git blob IDs must be fetched, checked and copied into new private host paths. No public upload or master merge is implied by CI success.
