@@ -16,7 +16,7 @@ import sys
 ROOT = Path.home() / ".local/share/cafe_app"
 LAUNCHER = ROOT / "cafe_sandbox_rails_20261104.py"
 RUBY = ROOT / "cafe_sandbox_multipart_probe_20261104.rb"
-RUBY_BLOB = "PLACEHOLDER"
+RUBY_BLOB = "750cad1022099dd6d9d632908a0a8fa4276e356f"
 NEW = "cafe-upload-security-sandbox-rails-20261104"
 SANDBOX_DB = "cafe-upload-security-sandbox-pg-20261104"
 SANDBOX_NET = "cafe-upload-security-sandbox-20261104"
