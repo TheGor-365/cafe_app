@@ -1,9 +1,9 @@
 name: Cafe sandbox headers and ImageMagick read-only audit
 on:
   push:
-    branches: [feature/cafe-sandbox-headers-imagemagick-audit-20261104]
+    branches: [feature/cafe-header-audit-safe-failure-diagnostics-20261104]
   pull_request:
-    branches: [feature/cafe-upload-precache-validation-20261104]
+    branches: [feature/cafe-sandbox-headers-imagemagick-audit-20261104]
 permissions:
   contents: read
 jobs:
@@ -72,6 +72,7 @@ jobs:
               "EXPECTED_SANDBOX_CLUSTER", "identify", "-list", "resource",
               "SANDBOX IMAGE/HEADER AUDIT OBSERVATIONS COMPLETE",
               "OBSERVATION ONLY", "IMAGE_HEAD_SAMPLE", "READ-ONLY",
+              "CAFE_HEADER_AUDIT_ERROR", "raw details suppressed",
           ]:
               assert needed.lower() in s.lower(), needed
           for forbidden in [
