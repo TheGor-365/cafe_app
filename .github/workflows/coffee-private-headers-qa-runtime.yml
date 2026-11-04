@@ -83,6 +83,9 @@ jobs:
               "require(candidate_env.get",
               "PRIVATE_QA_POST_BLOCKED_405_PASS",
               "PRIVATE_QA_REAL_HTTP_JPEG_SHA_PASS",
+              "PGOPTIONS=-c default_transaction_read_only=on",
+              "SHOW default_transaction_read_only",
+              "QA PostgreSQL session must be read-only",
           ):
               assert required in src, required
           for prohibited in (
