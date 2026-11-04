@@ -71,7 +71,7 @@ jobs:
               "PRE-CACHE", "CAFE_SECURITY_HEADERS_JSON",
               "EXPECTED_SANDBOX_CLUSTER", "identify", "-list", "resource",
               "SANDBOX IMAGE/HEADER AUDIT OBSERVATIONS COMPLETE",
-              "OBSERVATION ONLY", "HTTP_HEAD", "READ-ONLY",
+              "OBSERVATION ONLY", "IMAGE_HEAD_SAMPLE", "READ-ONLY",
           ]:
               assert needed.lower() in s.lower(), needed
           for forbidden in [
