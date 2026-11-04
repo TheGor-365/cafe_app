@@ -74,7 +74,7 @@ jobs:
                         "NEW PRE-CACHE SANDBOX RAILS CREATED",
                         "PRECACHE SANDBOX HTTP MULTIPART + CLEANUP PASS",
                         "cafe_avatar_precache_qa_20261104.rb",
-                        "SANDBOX_NET", "RUBY_PROBE_BLOB"]:
+                        "NETWORK = ", "RUBY_PROBE_BLOB"]:
               assert value in rollback, value
           for unsafe in ["docker stop", "docker rm", "db:drop", "db:reset",
                          "docker volume rm", "git reset --hard"]:
