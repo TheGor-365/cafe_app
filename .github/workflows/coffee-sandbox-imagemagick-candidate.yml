@@ -80,11 +80,15 @@ jobs:
                                   env=env, capture_output=True, text=True, check=True,
                                   timeout=20)
           m.verify_policy(m.parse_resource(output.stdout))
-          small = subprocess.run(["identify", "-size", "8x8", "xc:white"],
-                                 env=env, capture_output=True, timeout=20)
-          assert small.returncode == 0, "8x8 synthetic positive failed"
-          large = subprocess.run(["identify", "-size", "10000x1", "xc:white"],
-                                 env=env, capture_output=True, timeout=20)
+          assert shutil.which("convert"), "ImageMagick convert must be installed on runner"
+          small = subprocess.run(
+              ["convert", "-size", "8x8", "xc:white", "-format", "%w", "info:"],
+              env=env, capture_output=True, timeout=20)
+          assert small.returncode == 0 and small.stdout.strip() == b"8", (
+              "8x8 synthetic positive failed")
+          large = subprocess.run(
+              ["convert", "-size", "10000x1", "xc:white", "-format", "%w", "info:"],
+              env=env, capture_output=True, timeout=20)
           assert large.returncode != 0, "10000x1 synthetic negative accepted"
           print("HOST IMAGEMAGICK LIMITS + SYNTHETIC WIDTH ENFORCEMENT PASS")
           print("NOT OWNER SANDBOX / NOT RAILS WORKER CONFIGURATION")
