@@ -33,3 +33,21 @@ scripts/cafe_private_e2e_web_readonly.py imports owner-pinned verified helpers b
 GitHub Actions checks Python, Ruby smoke syntax, exact source/helper pins, no source/PG live-mutating commands, synthetic existing-file Rack OCI mount and inspect. It cannot boot the owner's private Rails image or use private snapshots.
 
 Status: Draft, no owner web object created. First action: fetch SHA-pinned helper into new local private filename and run --check only. Next creation, verify-created and smoke are separate owner-local actions.
+
+## Incident checkpoint: owner --create returned internal audit failed
+
+Owner executed the original SHA-pinned `scripts/cafe_private_e2e_web_readonly.py` (Git blob `c9d76b1858617d3f2407a43dbde613d06ef6d0f9`) with `--create` after its read-only preflight PASS. The command repeated original QA and fourth-PG security checks, then printed `E2E FOURTH WEB BLOCKED: internal audit failed`, with no success marker.
+
+Source-level root cause is proven: `create()` obtains the Docker candidate configuration as local variable `source` from `preflight`, then inside the copying loop reuses `as source` for a media file reader. After copying and writing config.ru, `source_environment(source)` attempts to treat the closed stream as a Docker inspect dictionary, causing a TypeError that the script intentionally redacts. This is a deterministic Python variable-shadowing bug; no Rails application failure is established. It is **likely but not yet verified on the owner machine** that the new private stage and its 10 media/config.ru were created while the new web Docker object was not.
+
+### Safe repair
+
+Updated helper now:
+- fixes `as source` to `as reader` and extracts creation from the reviewed inspect dict into `create_container_from_stage`;
+- exposes `--inspect-partial`: strictly read-only, repeats original 3001/3002/PG/media checks, requires fourth network membership exactly {fourth PG}, verifies intended E2E web container **absent**, private staging directory owner and restrictive modes, reviewed config.ru and SHA256 of exactly 10 copied private files; only aggregate PASS markers are emitted;
+- exposes `--resume-create`: requires the successful partial-stage audit, repeats original isolation preflight, then creates ONLY the missing E2E web Docker object using existing private staged assets. It does NOT recopy media, overwrite source, restart existing containers, create a network, write to DB or remove old objects; new web remains **stopped**.
+- CI includes an actual Python regression using ten synthetic fake JPEG payloads and mocks to confirm that `create()` passes the original Docker inspect dictionary to `create_container_from_stage`, plus AST checks preventing file creation/Docker mutation in partial inspection and copy/restart in resume.
+
+**Do NOT repeat the old local `--create`**, delete the old partial stage, run `--smoke` or switch any web app. Owner first fetches the UPDATED SHA-pinned GitHub helper into a *different* local filename and runs **`--inspect-partial` only**. If it fails, read-only diagnosis is required. If successful, the separate `--resume-create` action is eligible; following that, `--verify-created` and `--smoke` are still separate gates. PostgreSQL #4 and the owner source are protected throughout.
+
+Status: patch CI PASS, owner partial-stage audit pending.
