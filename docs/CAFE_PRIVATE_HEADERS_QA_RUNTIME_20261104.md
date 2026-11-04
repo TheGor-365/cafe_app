@@ -23,7 +23,7 @@ No host port, public DNS, Railway deploy, or QA 3002 cutover. Existing source is
 
 ## Important database constraint
 
-The new QA web initially uses the existing INTERNAL-ONLY SANDBOX Postgres cluster, **not** production or QA 3002 Postgres. Its Rack config blocks ALL HTTP methods except GET and HEAD (405); it is suitable only for read-only HTML/static smoke. It is **not** an independent writable test database and must not be used yet for real login, admin mutations, avatar upload, or multipart testing. A separate fourth internal PostgreSQL cluster and distinct test fixtures are prerequisites before enabling POST or exposing a local browser preview.
+The new QA web initially uses the existing INTERNAL-ONLY SANDBOX Postgres cluster, **not** production or QA 3002 Postgres. Its Rack config blocks ALL HTTP methods except GET and HEAD (405). The new container also sets PGOPTIONS=-c default_transaction_read_only=on, verified by a SHOW query in smoke, to keep normal libpq sessions read-only. A privileged DB role can override this option, so it is defense-in-depth, not a strict independent read-only database permission. It is suitable only for read-only HTML/static smoke. It is **not** an independent writable test database and must not be used yet for real login, admin mutations, avatar upload, or multipart testing. A separate fourth internal PostgreSQL cluster and distinct test fixtures are prerequisites before enabling POST or exposing a local browser preview.
 
 ## ImageMagick and CSP boundaries
 
