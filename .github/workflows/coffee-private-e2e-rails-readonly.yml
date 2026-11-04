@@ -72,7 +72,7 @@ jobs:
           assert mod.RACK_DEST == "/app/config.ru"
           assert mod.DB_BLOB == "068ac1ac8625c0993cfdc2bc33f4e8d688738e47"
           assert mod.HEADER_BLOB == "0990c74fc281d236332116a2cff44df360a9482c"
-          assert mod.MODES == ("check", "create", "verify-created", "smoke")
+          assert mod.MODES == ("check", "create", "inspect-partial", "resume-create", "verify-created", "smoke")
           assert "headers.check_new_container(" in source
           assert "fourth.verify_running()" in source
           assert "headers.bundled_rack_config()" in source
@@ -103,6 +103,103 @@ jobs:
           ):
               assert banned not in source, banned
           print("PRIVATE FOURTH PG RAILS BOOTSTRAP STATIC NO-LIVE-MUTATION PASS")
+          PY
+      - name: Regression synthetic copied-media variable collision and safe recovery
+        run: |
+          python3 - <<'PY'
+          import hashlib, importlib.util, os, tempfile
+          from pathlib import Path
+          from unittest.mock import patch
+          spec = importlib.util.spec_from_file_location(
+              "cafe_e2e_regress", "scripts/cafe_private_e2e_web_readonly.py")
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+
+          class ReviewedSource:
+              def __init__(self, source_path, config_path, manifest):
+                  self.COPIED_MEDIA = source_path
+                  self.CONFIG = config_path
+                  self._manifest = manifest
+              def existing(self, _): return False
+              def files_manifest(self, _): return self._manifest
+              def bundled_rack_config(self): return "synthetic reviewed config.ru"
+              def sha(self, p): return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+          with tempfile.TemporaryDirectory() as root:
+              root = Path(root)
+              src = root / "source"
+              src.mkdir()
+              manifest = {}
+              for idx in range(10):
+                  name = "sample" + str(idx) + ".jpg"
+                  payload = ("synthetic fake JPEG " + str(idx)).encode()
+                  (src / name).write_bytes(payload)
+                  manifest[name] = hashlib.sha256(payload).hexdigest()
+              config = root / "reviewed_config.ru"
+              config.write_text("synthetic reviewed config.ru")
+              headers = ReviewedSource(src, config, manifest)
+              stage = root / "stage"
+              stub_docker_source = {
+                  "Config": {"Env": ["RAILS_ENV=development",
+                                      "BUNDLE_GEMFILE=/app/Gemfile",
+                                      "DATABASE_URL=postgresql://postgres@old.example:5432/cafe",
+                                      "PGOPTIONS=-c default_transaction_read_only=on"]},
+                  "HostConfig": {"Tmpfs": {}},
+                  "Mounts": [
+                      {"Destination": "/app", "Type": "bind", "Source": "/nonexistent/project", "RW": False},
+                      {"Destination": "/app/config.ru", "Type": "bind", "Source": "/nonexistent/overlay", "RW": False},
+                      {"Destination": "/app/public/uploads", "Type": "bind", "Source": "/nonexistent/media", "RW": True},
+                  ],
+              }
+              calls = []
+              def fake_create(source, headers_value, launcher, media_manifest):
+                  assert isinstance(source, dict), (
+                      "Docker source was shadowed by a private media file reader")
+                  assert source is stub_docker_source
+                  assert media_manifest == manifest
+                  calls.append("docker-source-preserved")
+              def fake_preflight(require_free=False):
+                  assert require_free is True
+                  return None, headers, object(), stub_docker_source, manifest
+              def fake_members():
+                  return {m.DB_NAME}
+              def fake_media_match(h, expected):
+                  assert h is headers
+                  assert expected == manifest
+                  assert len(list((stage / "uploads").glob("*.jpg"))) == 10
+                  assert (stage / "config.ru").read_text() == config.read_text()
+              with patch.object(m, "preflight", fake_preflight), \
+                   patch.object(m, "STAGE", stage), \
+                   patch.object(m, "MEDIA", stage / "uploads"), \
+                   patch.object(m, "RACK", stage / "config.ru"), \
+                   patch.object(m, "get_members", fake_members), \
+                   patch.object(m, "create_container_from_stage", fake_create), \
+                   patch.object(m, "media_matches", fake_media_match):
+                  m.create()
+              assert calls == ["docker-source-preserved"]
+              for name, expected in manifest.items():
+                  assert hashlib.sha256((stage / "uploads" / name).read_bytes()).hexdigest() == expected
+              print("COPIED 10 SYNTHETIC MEDIA AND DOCKER SOURCE VARIABLE REGRESSION PASS")
+
+          # Recovery flow must never recopy the stage, use Docker create exactly once.
+          source_text = Path("scripts/cafe_private_e2e_web_readonly.py").read_text()
+          import ast
+          root = ast.parse(source_text)
+          defs = {x.name: x for x in root.body if isinstance(x, ast.FunctionDef)}
+          for name in ("inspect_partial", "resume_create", "create_container_from_stage"):
+              assert name in defs
+          resume = ast.get_source_segment(source_text, defs["resume_create"])
+          inspector = ast.get_source_segment(source_text, defs["inspect_partial"])
+          assert "inspect_partial()" in resume
+          assert "preflight()" in resume
+          assert "create_container_from_stage(source, headers, launcher, manifest)" in resume
+          for banned in ("STAGE.mkdir", "MEDIA.mkdir", "shutil.copyfileobj", "docker(",
+                         "shutil.rmtree", "unlink(", "docker start"):
+              assert banned not in resume, banned
+          for banned in ("STAGE.mkdir", "MEDIA.mkdir", "shutil.copyfileobj", "docker(",
+                         "docker start", "create_container_from_stage("):
+              assert banned not in inspector, banned
+          print("READ-ONLY PARTIAL INSPECT AND NO-RECOPY RESUME CONTRACT PASS")
           PY
       - name: Disposable OCI nested existing config.ru mount; no old file mount
         shell: bash
