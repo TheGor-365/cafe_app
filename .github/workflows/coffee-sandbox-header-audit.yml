@@ -1,9 +1,9 @@
 name: Cafe sandbox headers and ImageMagick read-only audit
 on:
   push:
-    branches: [feature/cafe-header-audit-safe-failure-diagnostics-20261104]
+    branches: [feature/cafe-header-content-type-null-safe-20261104]
   pull_request:
-    branches: [feature/cafe-sandbox-headers-imagemagick-audit-20261104]
+    branches: [feature/cafe-header-audit-safe-failure-diagnostics-20261104]
 permissions:
   contents: read
 jobs:
@@ -40,6 +40,34 @@ jobs:
                                   text=True, capture_output=True, check=True)
           assert "Syntax OK" in result.stdout
           print("EMBEDDED RUBY SYNTAX PASS")
+
+          # Run the actual embedded parser against synthetic HTTP responses;
+          # no Rails, network requests, user data or Docker involved.
+          header_body = ruby.split("def safe_headers(response)\n", 1)[1].split("\nend\n", 1)[0]
+          probe = (
+              "def safe_headers(response)\n" + header_body + "\nend\n"
+              + "class SyntheticResponse\n"
+              + "  def initialize(type, disposition = nil); @type = type; @disposition = disposition; end\n"
+              + "  def code; '200'; end\n"
+              + "  def [](key)\n"
+              + "    return @type if key == 'Content-Type'\n"
+              + "    return @disposition if key == 'Content-Disposition'\n"
+              + "    nil\n"
+              + "  end\n"
+              + "end\n"
+              + "raise 'absent Content-Type crashed or misreported' unless "
+              + "safe_headers(SyntheticResponse.new(nil))['content_type'] == ''\n"
+              + "raise 'empty Content-Type crashed or misreported' unless "
+              + "safe_headers(SyntheticResponse.new(''))['content_type'] == ''\n"
+              + "raise 'valid Content-Type parsing failed' unless "
+              + "safe_headers(SyntheticResponse.new('text/html; charset=UTF-8'))['content_type'] == 'text/html'\n"
+              + "raise 'missing Content-Disposition crashed or misreported' unless "
+              + "safe_headers(SyntheticResponse.new('text/html'))['content_disposition'] == ''\n"
+              + "raise 'valid Content-Disposition parsing failed' unless "
+              + "safe_headers(SyntheticResponse.new('image/png', 'attachment; filename=example.png'))['content_disposition'] == 'attachment'\n"
+          )
+          subprocess.run(["ruby", "-e", probe], text=True, capture_output=True, check=True)
+          print("NULL-SAFE HTTP CONTENT-TYPE PARSER PASS")
 
           spec = importlib.util.spec_from_file_location("audit", str(script))
           m = importlib.util.module_from_spec(spec)
