@@ -97,3 +97,55 @@ jobs:
           finally:
               subprocess.run(["docker", "rm", "-f", name], capture_output=True, text=True)
           PY
+
+      - name: Disposable internal network Postgres16 startup and PostgreSQL identity
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, time, uuid
+          suffix = uuid.uuid4().hex[:12]
+          network, db = "cafe-ci-e2e-net-" + suffix, "cafe-ci-e2e-pg-" + suffix
+          def cmd(*args, ok=True):
+              p = subprocess.run(["docker", *args], capture_output=True, text=True)
+              if ok and p.returncode:
+                  raise RuntimeError("synthetic Docker test stopped at " + args[0])
+              return p
+          try:
+              cmd("network", "create", "--internal", network)
+              cmd("create", "--name", db, "--network", network,
+                  "--network-alias", "cafe-e2e-postgres",
+                  "--memory", "768m", "--pids-limit", "256",
+                  "--restart", "no",
+                  "--tmpfs", "/var/lib/postgresql/data:rw,size=512m,mode=700",
+                  "--tmpfs", "/var/run/postgresql:rw,size=16m,mode=3775",
+                  "--env", "POSTGRES_HOST_AUTH_METHOD=trust",
+                  "--env", "POSTGRES_DB=cafe", "postgres:16")
+              c = json.loads(cmd("inspect", db).stdout)[0]
+              n = json.loads(cmd("network", "inspect", network).stdout)[0]
+              assert c["State"]["Status"] == "created"
+              assert n["Internal"] is True
+              assert not c["HostConfig"]["PortBindings"]
+              assert set(c["NetworkSettings"]["Networks"]) == {network}
+              assert all(v.get("Name") == db for v in (n.get("Containers") or {}).values())
+              cmd("start", db)
+              success = False
+              for i in range(30):
+                  p = cmd("exec", "--user", "postgres", db,
+                          "pg_isready", "-U", "postgres", "-d", "cafe", ok=False)
+                  if p.returncode == 0:
+                      success = True
+                      break
+                  time.sleep(1)
+              assert success, "Synthetic PG startup failed"
+              p = cmd("exec", "--user", "postgres", db, "psql", "-X", "-At",
+                      "-U", "postgres", "-d", "cafe",
+                      "-c", "SELECT system_identifier::text FROM pg_control_system();")
+              assert p.stdout.strip().isdigit()
+              n = json.loads(cmd("network", "inspect", network).stdout)[0]
+              assert n["Internal"] is True
+              assert len(n.get("Containers") or {}) == 1
+              assert next(iter(n["Containers"].values()))["Name"] == db
+              print("OFFICIAL PG16 TMPFS STARTUP / DISTINCT INTERNAL NETWORK PASS")
+          finally:
+              cmd("rm", "-f", db, ok=False)
+              cmd("network", "rm", network, ok=False)
+          PY
