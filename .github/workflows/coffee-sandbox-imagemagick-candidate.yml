@@ -56,6 +56,10 @@ jobs:
               assert forbidden not in source, forbidden
           print("PROFILE/RUBY/NO-MUTATION STATIC GATE PASS")
           PY
+      - name: Install ImageMagick on disposable GitHub runner only
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq imagemagick
       - name: Apply profile to throwaway CI identify process only
         run: |
           python3 - <<'PY'
