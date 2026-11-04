@@ -1,0 +1,87 @@
+name: Cafe sandbox headers and ImageMagick read-only audit
+on:
+  push:
+    branches: [feature/cafe-sandbox-headers-imagemagick-audit-20261104]
+  pull_request:
+    branches: [feature/cafe-upload-precache-validation-20261104]
+permissions:
+  contents: read
+jobs:
+  read-only-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax and CLI
+        run: |
+          python3 -m py_compile scripts/cafe_sandbox_headers_imagemagick_audit.py
+          python3 scripts/cafe_sandbox_headers_imagemagick_audit.py --help
+      - name: Real embedded Ruby syntax and ImageMagick parser regression
+        run: |
+          python3 - <<'PY'
+          import ast
+          import importlib.util
+          from pathlib import Path
+          import subprocess
+
+          script = Path("scripts/cafe_sandbox_headers_imagemagick_audit.py")
+          code = script.read_text()
+          module_ast = ast.parse(code)
+          ruby = None
+          for node in module_ast.body:
+              if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id == "RUBY"
+                for target in node.targets
+              ):
+                  ruby = ast.literal_eval(node.value)
+                  break
+          assert ruby is not None
+          result = subprocess.run(["ruby", "-c"], input=ruby,
+                                  text=True, capture_output=True, check=True)
+          assert "Syntax OK" in result.stdout
+          print("EMBEDDED RUBY SYNTAX PASS")
+
+          spec = importlib.util.spec_from_file_location("audit", str(script))
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          sample = """Resource limits:
+            Width: 16KP
+            Height: 16KP
+            Area: 128MP
+            Memory: 256MiB
+            Map: 512MiB
+            Disk: 1GiB
+            Time: infinity
+            Thread: 4
+          """
+          values = m.parse_limits(sample)
+          assert values["width"] == "16KP"
+          assert values["memory"] == "256MiB"
+          assert values["time"] == "infinity"
+          assert "secret" not in m.redact_value("not-set ;secret")
+          assert m.redact_value("foo=value") == "unreadable"
+          print("IMAGEMAGICK LIMIT PARSER PASS")
+          PY
+      - name: Verify owner runtime is not mutated
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("scripts/cafe_sandbox_headers_imagemagick_audit.py").read_text()
+          for needed in [
+              "PRE-CACHE", "CAFE_SECURITY_HEADERS_JSON",
+              "EXPECTED_SANDBOX_CLUSTER", "identify", "-list", "resource",
+              "SANDBOX IMAGE/HEADER AUDIT OBSERVATIONS COMPLETE",
+              "OBSERVATION ONLY", "HTTP_HEAD", "READ-ONLY",
+          ]:
+              assert needed.lower() in s.lower(), needed
+          for forbidden in [
+              "unlink(", ".rmtree(", ".write_bytes(",
+              ".write_text(", "docker stop", "docker rm",
+              "docker restart", "docker run", "docker create",
+              "db:drop", "db:reset", "rails db:migrate",
+              "DELETE FROM", "UPDATE users",
+              "POST /users", "git reset --hard",
+          ]:
+              assert forbidden not in s, forbidden
+          print("OBSERVATION-ONLY STATIC GUARD PASS")
+          PY
