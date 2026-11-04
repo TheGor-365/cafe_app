@@ -70,7 +70,7 @@ def safe_headers(response)
     'referrer_policy_present' => !response['Referrer-Policy'].to_s.empty?,
     'cache_control_present' => !response['Cache-Control'].to_s.empty?,
     'cors_any_origin' => response['Access-Control-Allow-Origin'].to_s.strip == '*',
-    'content_disposition' => response['Content-Disposition'].to_s.split(';').first.downcase
+    'content_disposition' => response['Content-Disposition'].to_s.split(';', 2).first.to_s.strip.downcase
   }
 end
 
