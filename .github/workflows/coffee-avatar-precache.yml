@@ -43,6 +43,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Compile scoped cleanup helper without touching Docker
+        run: |
+          python3 -m py_compile scripts/cafe_sandbox_scoped_cache_cleanup.py
+          python3 scripts/cafe_sandbox_scoped_cache_cleanup.py --help
       - name: Assert only QA policy is authored
         run: |
           python3 - <<'PY'
