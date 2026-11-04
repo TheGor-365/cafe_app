@@ -31,15 +31,20 @@ require 'json'
 require 'net/http'
 require 'uri'
 
+$header_audit_step = 'db_cluster'
+begin
 cluster = ActiveRecord::Base.connection.select_value(
   'SELECT system_identifier::text FROM pg_control_system()'
 ).to_s
 raise 'Wrong sandbox PostgreSQL cluster' unless
   cluster == ENV.fetch('EXPECTED_SANDBOX_CLUSTER')
+$header_audit_step = 'carrierwave_version'
 raise 'Wrong CarrierWave version' unless
   Gem.loaded_specs.fetch('carrierwave').version.to_s == '2.2.7'
+$header_audit_step = 'rails_environment'
 raise 'Wrong Rails environment' unless Rails.env.development?
 
+$header_audit_step = 'uploader_mount'
 ROOT = '/app/public/uploads'
 raise 'Sandbox media missing' unless File.directory?(ROOT)
 raise 'Missing pre-cache uploader' unless AvatarUploader.new.respond_to?(:verify_pre_cache_image!)
@@ -67,17 +72,23 @@ def safe_headers(response)
   }
 end
 
+$header_audit_step = 'signup_http'
+html_headers = safe_headers(http_get('/users/sign_up'))
+$header_audit_step = 'info_http'
+info_headers = safe_headers(http_get('/info'))
+$header_audit_step = 'header_summary'
 result = {
   'environment' => Rails.env,
   'development_detailed_errors' => !!Rails.application.config.consider_all_requests_local,
   'gem_version' => '2.2.7',
-  'html' => safe_headers(http_get('/users/sign_up')),
-  'info' => safe_headers(http_get('/info')),
+  'html' => html_headers,
+  'info' => info_headers,
   'image' => {'sample' => 'not_found'}
 }
 
 # Find only a file from our restored isolated media; never print its
 # private path or any bytes. The HTTP URL is constructed *internally*.
+$header_audit_step = 'image_candidate'
 extensions = %w(.png .jpg .jpeg .gif)
 paths = Dir.glob(ROOT + '/**/*').sort.select do |path|
   File.file?(path) && !File.symlink?(path) &&
@@ -88,13 +99,21 @@ if paths.any?
   url = private_path.sub('/app/public', '')
   raise 'Sample image path outside /uploads' unless url.start_with?('/uploads/')
   uri_path = URI::DEFAULT_PARSER.escape(url)
+  $header_audit_step = 'image_head_http'
   result['image'] = safe_headers(http_get(uri_path, :head))
   result['image']['sample'] = 'existing_private_media'
   result['image']['probe'] = 'HTTP HEAD (no body downloaded)'
 end
 
 # This marker is machine-readable but never contains user data.
+$header_audit_step = 'json_output'
 puts 'CAFE_SECURITY_HEADERS_JSON:' + JSON.generate(result)
+rescue StandardError => error
+  error_type = error.class.name.to_s
+  error_type = 'UnknownError' unless /\A[A-Za-z][A-Za-z0-9_:]*\z/.match?(error_type)
+  puts 'CAFE_HEADER_AUDIT_ERROR:' + $header_audit_step + ':' + error_type
+  exit 9
+end
 """
 
 
@@ -201,9 +220,19 @@ def observe_ruby(rails, cluster):
         rails, "bundle", "exec", "rails", "runner", "-",
         input_data=RUBY.encode("utf-8"),
     )
+    safe_error = "runner_boot_or_unknown"
+    for output_line in proc.stdout.decode("utf-8", errors="replace").splitlines():
+        matched = re.fullmatch(
+            r"CAFE_HEADER_AUDIT_ERROR:([a-z_]+):([A-Za-z][A-Za-z0-9_:]*)",
+            output_line.strip(),
+        )
+        if matched:
+            safe_error = matched.group(1) + "/" + matched.group(2)
+            break
     require(proc.returncode == 0,
             "internal Rails HTTP header probe failed, exit " +
-            str(proc.returncode) + " (details retained locally)")
+            str(proc.returncode) + " at " + safe_error +
+            " (raw details suppressed)")
     marker = b"CAFE_SECURITY_HEADERS_JSON:"
     lines = [line[len(marker):] for line in proc.stdout.splitlines()
              if line.startswith(marker)]
