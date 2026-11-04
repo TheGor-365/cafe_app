@@ -1,0 +1,151 @@
+name: Cafe fourth private postgres QA clone — static and disposable Docker tests
+on:
+  push:
+    branches: [feature/cafe-e2e-private-postgres-clone-20261105]
+  pull_request:
+    branches: [feature/cafe-private-qa-configru-mount-fix-20261104]
+permissions:
+  contents: read
+jobs:
+  private-pg-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax and safe CLI
+        run: |
+          python3 -m py_compile scripts/cafe_private_e2e_postgres_clone.py
+          python3 scripts/cafe_private_e2e_postgres_clone.py --help
+      - name: Fail-closed static security constraints
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s = Path("scripts/cafe_private_e2e_postgres_clone.py").read_text()
+          p = ast.parse(s)
+          assignments = {}
+          for n in p.body:
+              if isinstance(n, ast.Assign):
+                  for t in n.targets:
+                      if isinstance(t, ast.Name):
+                          try:
+                              assignments[t.id] = ast.literal_eval(n.value)
+                          except Exception:
+                              pass
+          assert assignments["IMAGE"] == "postgres:16"
+          assert assignments["NETWORK"] == "cafe-upload-security-e2e-net-20261105"
+          assert assignments["DATABASE"] == "cafe-upload-security-e2e-pg-20261105"
+          assert assignments["MAX_DUMP_BYTES"] == 256 * 1024 * 1024
+          assert assignments["PREFLIGHT_BLOB"] == "0f1da472340e94a6216941bd5165cc11f2627f18"
+          assert "--internal" in s
+          assert '"create", "--name", DATABASE' in s
+          assert '"--restart", "no"' in s
+          assert '"--network", NETWORK' in s
+          assert '"--memory", "768m"' in s
+          assert '"--pids-limit", "256"' in s
+          assert '"--tmpfs", "/var/lib/postgresql/data:rw,size=512m,mode=700"' in s
+          assert '"--tmpfs", "/var/run/postgresql:rw,size=16m,mode=3775"' in s
+          assert '"--env", "POSTGRES_HOST_AUTH_METHOD=trust"' in s
+          assert "sha(dump) == record[\"sha256\"]" in s
+          assert '"--single-transaction"' in s and '"--exit-on-error"' in s
+          assert "len(set(original + [clone])) == 4" in s
+          assert 'if options.check:' in s and 'elif options.verify_created:' in s
+          assert "PRIVATE E2E PG BLOCKED:" in s
+          for forbidden in (
+              '"rm", DATABASE', '"stop", DATABASE', '"restart", DATABASE',
+              '"network", "connect"', 'docker("run"', 'docker("rm"',
+              '"db:migrate"', '"db:drop"', 'git reset --hard',
+              'docker("cp"', '"-p", "5432:5432"',
+          ):
+              assert forbidden not in s, forbidden
+          for name in ("check", "create", "verify_created", "restore", "verify_running"):
+              assert any(isinstance(n, ast.FunctionDef) and n.name == name for n in p.body)
+          print("FOURTH PRIVATE PG SCRIPT STATIC SECURITY PASS")
+          PY
+      - name: Docker official postgres:16 tempfs and private container configuration
+        run: |
+          python3 - <<'PY'
+          import json
+          import subprocess
+          import uuid
+
+          def run(*args):
+              return subprocess.run(["docker", *args], capture_output=True,
+                                    text=True, check=True).stdout
+          name = "cafe-ci-pg-config-" + uuid.uuid4().hex[:12]
+          try:
+              run("pull", "postgres:16")
+              run("create", "--name", name, "--network", "none",
+                  "--memory", "768m", "--pids-limit", "256", "--restart", "no",
+                  "--tmpfs", "/var/lib/postgresql/data:rw,size=512m,mode=700",
+                  "--tmpfs", "/var/run/postgresql:rw,size=16m,mode=3775",
+                  "--env", "POSTGRES_HOST_AUTH_METHOD=trust",
+                  "--env", "POSTGRES_DB=cafe", "postgres:16")
+              info = json.loads(run("inspect", name))[0]
+              assert info["State"]["Status"] == "created"
+              assert info["HostConfig"]["PortBindings"] in (None, {}, [])
+              assert info["HostConfig"]["Memory"] == 768 * 1024 * 1024
+              assert info["HostConfig"]["PidsLimit"] == 256
+              assert info["HostConfig"]["RestartPolicy"]["Name"] == "no"
+              assert info["HostConfig"]["Tmpfs"]["/var/lib/postgresql/data"].startswith("rw")
+              assert info["HostConfig"]["Tmpfs"]["/var/run/postgresql"].startswith("rw")
+              # An image-declared anonymous VOLUME would persist sensitive DB data
+              # outside private tmpfs: do not accept such a configuration.
+              mounts = info.get("Mounts") or []
+              assert not mounts, [(m.get("Type"), m.get("Destination")) for m in mounts]
+              print("POSTGRES16 CREATE-ONLY TMPFS/NO-HOST-PORT GATE PASS")
+          finally:
+              subprocess.run(["docker", "rm", "-f", name], capture_output=True, text=True)
+          PY
+
+      - name: Disposable internal network Postgres16 startup and PostgreSQL identity
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, time, uuid
+          suffix = uuid.uuid4().hex[:12]
+          network, db = "cafe-ci-e2e-net-" + suffix, "cafe-ci-e2e-pg-" + suffix
+          def cmd(*args, ok=True):
+              p = subprocess.run(["docker", *args], capture_output=True, text=True)
+              if ok and p.returncode:
+                  raise RuntimeError("synthetic Docker test stopped at " + args[0])
+              return p
+          try:
+              cmd("network", "create", "--internal", network)
+              cmd("create", "--name", db, "--network", network,
+                  "--network-alias", "cafe-e2e-postgres",
+                  "--memory", "768m", "--pids-limit", "256",
+                  "--restart", "no",
+                  "--tmpfs", "/var/lib/postgresql/data:rw,size=512m,mode=700",
+                  "--tmpfs", "/var/run/postgresql:rw,size=16m,mode=3775",
+                  "--env", "POSTGRES_HOST_AUTH_METHOD=trust",
+                  "--env", "POSTGRES_DB=cafe", "postgres:16")
+              c = json.loads(cmd("inspect", db).stdout)[0]
+              n = json.loads(cmd("network", "inspect", network).stdout)[0]
+              assert c["State"]["Status"] == "created"
+              assert n["Internal"] is True
+              assert not c["HostConfig"]["PortBindings"]
+              assert set(c["NetworkSettings"]["Networks"]) == {network}
+              assert all(v.get("Name") == db for v in (n.get("Containers") or {}).values())
+              cmd("start", db)
+              success = False
+              for i in range(30):
+                  p = cmd("exec", "--user", "postgres", db,
+                          "pg_isready", "-U", "postgres", "-d", "cafe", ok=False)
+                  if p.returncode == 0:
+                      success = True
+                      break
+                  time.sleep(1)
+              assert success, "Synthetic PG startup failed"
+              p = cmd("exec", "--user", "postgres", db, "psql", "-X", "-At",
+                      "-U", "postgres", "-d", "cafe",
+                      "-c", "SELECT system_identifier::text FROM pg_control_system();")
+              assert p.stdout.strip().isdigit()
+              n = json.loads(cmd("network", "inspect", network).stdout)[0]
+              assert n["Internal"] is True
+              assert len(n.get("Containers") or {}) == 1
+              assert next(iter(n["Containers"].values()))["Name"] == db
+              print("OFFICIAL PG16 TMPFS STARTUP / DISTINCT INTERNAL NETWORK PASS")
+          finally:
+              cmd("rm", "-f", db, ok=False)
+              cmd("network", "rm", network, ok=False)
+          PY
