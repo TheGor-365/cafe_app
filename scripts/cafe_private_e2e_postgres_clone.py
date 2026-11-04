@@ -31,7 +31,7 @@ NETWORK = "cafe-upload-security-e2e-net-20261105"
 DATABASE = "cafe-upload-security-e2e-pg-20261105"
 ALIAS = "cafe-e2e-postgres"
 IMAGE = "postgres:16"
-MAX_DUMP_BYTES = 256 * 1024 * 1024
+MAX_DUMP_BYTES = 268435456
 
 def require(condition, reason):
     if not condition:
@@ -170,13 +170,15 @@ def inspect_new(created=True):
             "isolated QA DB host authorization differs")
     # Never allow any other container to attach to this network at this stage.
     members = network.get("Containers") or {}
-    require(len(members) == 1 and
-            next(iter(members.values())).get("Name") == DATABASE,
+    require(len(members) <= 1 and
+            all(member.get("Name") == DATABASE for member in members.values()),
             "unknown Docker container joined new private PG network")
     if created:
         require(db["State"]["Status"] == "created",
                 "new DB is not in created-only state")
     else:
+        require(len(members) == 1,
+                "new running PG not visible on dedicated network")
         require(db["State"]["Status"] == "running",
                 "new private test PG is not running")
     return db
