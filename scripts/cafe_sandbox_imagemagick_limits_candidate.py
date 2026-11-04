@@ -43,6 +43,7 @@ FIELDS = {
 UNIT = {
     "": 1,
     "B": 1,
+    "P": 1,
     "K": 1024,
     "KiB": 1024,
     "KB": 1000,
@@ -112,7 +113,7 @@ def to_quantity(raw):
 def parse_resource(stdout):
     observed = {}
     for line in stdout.splitlines():
-        match = re.fullmatch(r"\s*([A-Za-z]+):\s*(\S+)\s*", line)
+        match = re.fullmatch(r"\s*([A-Za-z]+):\s*(\S+)(?:\s+seconds)?\s*", line)
         if match:
             observed[match.group(1).lower()] = match.group(2)
     return observed
@@ -131,10 +132,11 @@ def verify_policy(observed):
 
 def self_test():
     assert to_quantity("8KP") == 8192
+    assert to_quantity("8000P") == 8000
     assert to_quantity("32MP") == 32 * 1024 * 1024
     assert to_quantity("128MiB") == 128 * 1024 * 1024
-    assert parse_resource("Resource limits:\n  Time: 30\n  Width: 8KP\n") == {
-        "time": "30", "width": "8KP"}
+    assert parse_resource("Resource limits:\n  Time: 30 seconds\n  Width: 8000P\n") == {
+        "time": "30", "width": "8000P"}
     fake = {FIELDS[k]: v for k, v in POLICY.items()}
     assert verify_policy(fake)
     fake["time"] = "unlimited"
@@ -182,10 +184,12 @@ def check():
     print("CANDIDATE_RESOURCE_LIMITS_EFFECTIVE_PASS", flush=True)
 
     # Synthetic in-memory images only; no filesystem output, no untrusted data.
-    small = docker_exec("identify", "-size", "8x8", "xc:white", timeout=15)
-    require(small.returncode == 0, "synthetic small image failed")
-    oversized = docker_exec("identify", "-size", "10000x1", "xc:white",
-                            timeout=15)
+    small = docker_exec("convert", "-size", "8x8", "xc:white",
+                        "-format", "%w", "info:", timeout=15)
+    require(small.returncode == 0 and small.stdout.strip() == b"8",
+            "synthetic small image failed")
+    oversized = docker_exec("convert", "-size", "10000x1", "xc:white",
+                            "-format", "%w", "info:", timeout=15)
     require(oversized.returncode != 0,
             "synthetic width exceeded candidate cap")
     print("CANDIDATE_SYNTHETIC_WIDTH_ENFORCEMENT_PASS", flush=True)
