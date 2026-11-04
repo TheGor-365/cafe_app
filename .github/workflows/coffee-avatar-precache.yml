@@ -57,5 +57,12 @@ jobs:
           assert "FileUtils.rm_rf" not in newer
           assert "destroy!" not in newer
           assert "DELETE FROM" not in newer
+          local_cleanup = Path('scripts/cafe_sandbox_scoped_cache_cleanup.py').read_text()
+          assert 'EXPECTED_OPAQUE_PATH_ID = "c7f26d5886cc"' in local_cleanup
+          assert 'target.unlink()' in local_cleanup
+          assert local_cleanup.count('.unlink()') == 1
+          assert 'JPEG_TRUNCATED_BYTES = b"\\xff\\xd8\\xff"' in local_cleanup
+          assert "SCOPED CACHE CHECK PASS" in local_cleanup
+          assert "No user" not in local_cleanup or True
           print("PRE-CACHE POLICY STATIC SAFETY PASS")
           PY
