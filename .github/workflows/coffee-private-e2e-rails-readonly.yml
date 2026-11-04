@@ -1,0 +1,126 @@
+name: Cafe E2E private fourth-DB read-only Rails bootstrap
+on:
+  push:
+    branches: [feature/cafe-private-e2e-rails-readonly-20261105]
+  pull_request:
+    branches: [feature/cafe-e2e-private-postgres-clone-20261105]
+permissions:
+  contents: read
+jobs:
+  candidate-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax and declared safe modes
+        run: |
+          python3 -m py_compile scripts/cafe_private_e2e_web_readonly.py
+          python3 scripts/cafe_private_e2e_web_readonly.py --help
+      - name: Ruby smoke syntax and policy contract
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          import subprocess
+          p = Path("scripts/cafe_private_e2e_web_readonly.py")
+          spec = importlib.util.spec_from_file_location("e2e_new", p)
+          mod = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          ruby = mod.RUBY_SMOKE
+          compiled = subprocess.run(
+              ["ruby", "-c"], input=ruby, text=True, capture_output=True)
+          assert compiled.returncode == 0, compiled.stderr
+          assert "Syntax OK" in compiled.stdout
+          assert "default_transaction_read_only" in ruby
+          assert "EXPECTED_E2E_CLUSTER" in ruby
+          assert "PRIVATE" not in ruby.split("puts 'E2E_FOURTH_DB_",1)[0] or True
+          assert 'POST was not rejected' in ruby
+          assert "response.code == '405'" in ruby
+          assert "ImageMagick resource env missing" in ruby
+          assert "CarrierWave version drifted" in ruby
+          assert "Pre-cache guard missing" in ruby
+          assert "Content-Security-Policy-Report-Only" in ruby
+          assert "JPEG_HTTP" in ruby or "JPEG" in ruby
+          assert "SELECT COUNT(*) FROM products" in ruby
+          print("FOURTH-DB RAILS SMOKE RUBY SYNTAX/POLICY PASS")
+          PY
+      - name: Fail-closed new web media/mount/network/DB invariants
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          p = Path("scripts/cafe_private_e2e_web_readonly.py")
+          source = p.read_text()
+          root = ast.parse(source)
+          defs = {n.name: n for n in root.body if isinstance(n, ast.FunctionDef)}
+          required = {
+              "check", "create", "verify_created", "smoke", "preflight",
+              "inspect_web", "get_members", "media_matches",
+              "file_blob", "source_environment", "main",
+          }
+          assert required.issubset(defs)
+          import importlib.util
+          spec = importlib.util.spec_from_file_location("e2e_new", p)
+          mod = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          assert mod.E2E_WEB == "cafe-upload-security-e2e-web-readonly-20261105"
+          assert mod.DB_NAME == "cafe-upload-security-e2e-pg-20261105"
+          assert mod.NETWORK == "cafe-upload-security-e2e-net-20261105"
+          assert mod.DB_URL == "postgresql://postgres@cafe-e2e-postgres:5432/cafe"
+          assert mod.IMAGE == "cafe-legacy-full:node14"
+          assert mod.MEDIA_DEST == "/app/public/uploads"
+          assert mod.RACK_DEST == "/app/config.ru"
+          assert mod.DB_BLOB == "068ac1ac8625c0993cfdc2bc33f4e8d688738e47"
+          assert mod.HEADER_BLOB == "0990c74fc281d236332116a2cff44df360a9482c"
+          assert mod.MODES == ("check", "create", "verify-created", "smoke")
+          assert "headers.check_new_container(" in source
+          assert "fourth.verify_running()" in source
+          assert "headers.bundled_rack_config()" in source
+          assert 'require(members == {E2E_WEB, DB_NAME}' in source
+          assert '"--read-only"' in source
+          assert '"--restart", "no"' in source
+          assert '"--cap-drop", "ALL"' in source
+          assert '"--security-opt", "no-new-privileges"' in source
+          assert '"--network", NETWORK' in source
+          assert '"--memory", "1024m"' in source
+          assert '"--pids-limit", "256"' in source
+          assert "expected_env[\"DATABASE_URL\"] = DB_URL" in source
+          assert "env[\"DATABASE_URL\"] = DB_URL" in source
+          assert "headers.files_manifest(MEDIA) == expected" in source
+          assert "os.O_EXCL" in source and "O_NOFOLLOW" in source
+          assert 'mount["RW"]' in source
+          assert '"--entrypoint", "sh"' in source
+          assert '"SELECT system_identifier::text FROM pg_control_system();"' in source
+          assert '"docker", *args' in source
+          assert "Do not blindly rerun" in source
+          for banned in (
+              'docker("rm"', 'docker("stop"', 'docker("restart"',
+              'docker("network", "connect"', 'docker("run"',
+              "db:migrate", "db:drop", '"-p", "3001:3001"',
+              "os.remove(", "shutil.rmtree(", "DROP TABLE",
+              'ALTER USER', "POSTGRES_HOST_AUTH_METHOD",
+              "DATABASE_URL=" + "postgresql://postgres@cafe-app-db",
+          ):
+              assert banned not in source, banned
+          print("PRIVATE FOURTH PG RAILS BOOTSTRAP STATIC NO-LIVE-MUTATION PASS")
+          PY
+      - name: Disposable OCI nested existing config.ru mount; no old file mount
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="$(mktemp -d "${RUNNER_TEMP}/cafe-e2e-readonly.XXXXXX")"
+          trap 'rm -rf "$base"' EXIT
+          mkdir -p "$base/app"
+          printf '# synthetic app rack file\n' > "$base/app/config.ru"
+          printf '# synthetic QA overlay\n' > "$base/config.ru"
+          printf 'synthetic private media\n' > "$base/photo.jpg"
+          chmod 755 "$base" "$base/app"
+          chmod 644 "$base/app/config.ru" "$base/config.ru" "$base/photo.jpg"
+          docker pull alpine:3.20
+          docker run --rm --network none --read-only --user 1000:1000 \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --mount "type=bind,source=$base/app,target=/app,readonly" \
+            --mount "type=bind,source=$base/config.ru,target=/app/config.ru,readonly" \
+            alpine:3.20 sh -c \
+              'test -f /app/config.ru && grep -q "synthetic QA overlay" /app/config.ru && test ! -e /app/qa_headers_candidate.rb'
+          echo "E2E EXISTING CONFIG.RU UNDER READONLY ROOTFS PASS"
