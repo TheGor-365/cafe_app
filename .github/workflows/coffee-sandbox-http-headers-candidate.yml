@@ -1,0 +1,73 @@
+name: Cafe sandbox HTTP security headers / CSP report-only candidate
+on:
+  push:
+    branches: [feature/cafe-sandbox-http-headers-csp-report-only-20261104]
+  pull_request:
+    branches: [feature/cafe-sandbox-imagemagick-limits-candidate-20261104]
+permissions:
+  contents: read
+jobs:
+  candidate-rack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ruby 2.5-compatible candidate syntax and isolated tests
+        run: |
+          ruby -c qa/security/cafe_headers_candidate.rb
+          ruby -c qa/security/cafe_headers_candidate_test.rb
+          ruby qa/security/cafe_headers_candidate_test.rb
+      - name: Read-only in-process probe syntax (no Docker on CI)
+        run: |
+          python3 -m py_compile scripts/cafe_sandbox_headers_inprocess_candidate_audit.py
+          python3 scripts/cafe_sandbox_headers_inprocess_candidate_audit.py --help
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          import subprocess
+          script = ast.parse(Path("scripts/cafe_sandbox_headers_inprocess_candidate_audit.py").read_text())
+          exprs = [
+              ast.literal_eval(node.value)
+              for node in script.body
+              if isinstance(node, ast.Assign)
+              for target in node.targets
+              if isinstance(target, ast.Name) and target.id == "RUBY_PROBE"
+          ]
+          assert len(exprs) == 1
+          candidate = Path("qa/security/cafe_headers_candidate.rb").read_text()
+          parsed = subprocess.run(
+              ["ruby", "-c"], input=candidate + "\n" + exprs[0],
+              capture_output=True, text=True, check=True
+          )
+          assert "Syntax OK" in parsed.stdout
+          assert "QA_RACK_JPEG_HEAD_HEADERS_PASS" in exprs[0]
+          assert "EXPECTED_SANDBOX_CLUSTER" in exprs[0]
+          print("SANITIZED SHA-PINNED IN-PROCESS PROBE RUBY/PYTHON SYNTAX PASS")
+          PY
+      - name: Confirm report-only and no runtime mutations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          candidate = Path("qa/security/cafe_headers_candidate.rb").read_text()
+          tests = Path("qa/security/cafe_headers_candidate_test.rb").read_text()
+          doc = Path("docs/CAFE_SANDBOX_HTTP_HEADERS_CSP_REPORT_ONLY_20261104.md").read_text()
+          assert "Content-Security-Policy-Report-Only" in candidate
+          assert "Content-Security-Policy'" not in candidate
+          assert "X-Content-Type-Options" in candidate
+          assert "Referrer-Policy" in candidate
+          assert "default-src 'self'" in candidate
+          assert "script-src 'self'" in candidate
+          assert "https://fonts.gstatic.com" in candidate
+          assert "https://fonts.googleapis.com" in candidate
+          assert "no collector" in doc.lower()
+          assert "csp" in tests.lower()
+          for prohibited in (
+              "docker stop", "docker restart", "docker rm", "docker create",
+              "docker run", "db:drop", "db:migrate", ".write_bytes(",
+              "File.write(", "File.delete(", "system(", "exec(", "Net::HTTP",
+              "Rack::Request", "git reset", "report-uri /",
+          ):
+              assert prohibited not in candidate, prohibited
+          print("INACTIVE CANDIDATE / NO MUTATIONS STATIC GUARD PASS")
+          PY
