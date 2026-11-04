@@ -1,0 +1,61 @@
+name: Cafe patched uploader validate-before-cache
+on:
+  push:
+    branches: [feature/cafe-upload-precache-validation-20261104]
+  pull_request:
+    branches: [feature/cafe-sandbox-upload-forensics-20261104]
+
+permissions:
+  contents: read
+
+jobs:
+  ruby-25-precache-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ruby:2.5.8
+    env:
+      BUNDLE_PATH: /tmp/cafe-precache-bundle
+      RUBYOPT: -rlogger
+      RAILS_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Bundler
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Resolve patched CarrierWave in ephemeral CI only
+        run: |
+          ruby -e "s=File.read('Gemfile'); old=%q(gem 'carrierwave'); abort('unexpected source') unless s.scan(old).length==1; File.write('Gemfile',s.sub(old,%q(gem 'carrierwave', '= 2.2.7')))"
+          bundle _2.2.13_ lock --add-platform x86_64-linux
+          bundle _2.2.13_ update carrierwave --conservative
+          grep -q 'carrierwave (2.2.7)' Gemfile.lock
+          bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Validate loader and unit cache-order regression
+        run: |
+          bundle _2.2.13_ exec ruby -c qa/security/avatar_uploader_preflight.rb
+          bundle _2.2.13_ exec ruby test/security/cafe_avatar_precache_test.rb
+      - name: Confirm original QA uploader unaffected
+        run: |
+          git diff --exit-code -- qa/security/avatar_uploader.rb
+          test -f qa/security/avatar_uploader_preflight.rb
+
+  static-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert only QA policy is authored
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          newer = Path('qa/security/avatar_uploader_preflight.rb').read_text()
+          older = Path('qa/security/avatar_uploader.rb').read_text()
+          for condition in ["def cache!", "def verify_pre_cache_image!",
+                            "MiniMagick::Image.new", "image.validate!",
+                            "MAX_UPLOAD_BYTES", "verify_image_bytes!"]:
+              assert condition in newer, condition
+          assert "def cache!" not in older
+          assert "FileUtils.rm_rf" not in newer
+          assert "destroy!" not in newer
+          assert "DELETE FROM" not in newer
+          print("PRE-CACHE POLICY STATIC SAFETY PASS")
+          PY
