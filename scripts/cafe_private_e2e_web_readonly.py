@@ -3,6 +3,8 @@
 
 --check          : SHA-reviewed read-only owner preflight + 4th DB + unique targets
 --create         : copy 10 private media files, create NEW web Docker (NOT started)
+--inspect-partial : READ-ONLY, verify an interrupted v1 media/Rack stage
+--resume-create  : create ONLY missing Docker object from verified partial stage
 --verify-created : inspect mounts/PG link/network/security/medias (READ-ONLY)
 --smoke          : start ONLY new web, verify GET/HEAD, POST405, 4th PG identity
 
@@ -39,7 +41,7 @@ SOURCE_WEB = "cafe-upload-security-headers-mountfix-20261104"
 IMAGE = "cafe-legacy-full:node14"
 MEDIA_DEST = "/app/public/uploads"
 RACK_DEST = "/app/config.ru"
-MODES = ("check", "create", "verify-created", "smoke")
+MODES = ("check", "create", "inspect-partial", "resume-create", "verify-created", "smoke")
 
 RUBY_SMOKE = r"""
 require 'net/http'
@@ -345,14 +347,64 @@ def create():
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         fd = os.open(str(target), os.O_CREAT | os.O_EXCL | os.O_WRONLY |
                      getattr(os, "O_NOFOLLOW", 0), 0o600)
-        with os.fdopen(fd, "wb") as out, (original_media / rel).open("rb") as source:
-            shutil.copyfileobj(source, out, 128 * 1024)
+        with os.fdopen(fd, "wb") as out, (original_media / rel).open("rb") as reader:
+            shutil.copyfileobj(reader, out, 128 * 1024)
         require(headers.sha(target) == expected_sha,
                 "new copy private media SHA mismatch")
     with RACK.open("x", encoding="utf-8") as out:
         out.write(headers.CONFIG.read_text(encoding="utf-8"))
     media_matches(headers, manifest)
 
+    create_container_from_stage(source, headers, launcher, manifest)
+
+
+def inspect_partial():
+    _fourth, headers, _launcher, _source, manifest = preflight()
+    # No owner media bytes or filenames are logged, only SHA matches.
+    require(not headers.existing(E2E_WEB),
+            "target E2E Docker container exists; preserve it and inspect separately")
+    require(get_members() == {DB_NAME},
+            "fourth DB network has unexpected member")
+    require(STAGE.is_dir() and not STAGE.is_symlink(),
+            "interrupted new QA stage is missing or symlinked")
+    require(MEDIA.is_dir() and not MEDIA.is_symlink(),
+            "interrupted private media stage missing or symlinked")
+    require(RACK.is_file() and not RACK.is_symlink(),
+            "interrupted reviewed Rack file missing or symlinked")
+    require(STAGE.stat().st_uid == 1000 and
+            MEDIA.stat().st_uid == 1000 and
+            RACK.stat().st_uid == 1000,
+            "private QA stage owner differs")
+    require(STAGE.stat().st_mode & 0o077 == 0 and
+            MEDIA.stat().st_mode & 0o077 == 0 and
+            RACK.stat().st_mode & 0o077 == 0,
+            "private QA staging permissions are too open")
+    media_matches(headers, manifest)
+    print("E2E INTERRUPTED PRIVATE 10-MEDIA/RACK SHA256 STAGE PASS", flush=True)
+    print("FOURTH DB NETWORK ONLY HAS POSTGRES / TARGET WEB ABSENT", flush=True)
+    print("READ-ONLY PARTIAL-CREATION INSPECTION COMPLETE — NO CHANGES", flush=True)
+
+
+def resume_create():
+    # Only the new E2E web creation is permitted here. No recopy, overwrite,
+    # remove, reconnect, restart, database restore or modifications to data.
+    inspect_partial()
+    _fourth, headers, launcher, source, manifest = preflight()
+    require(not headers.existing(E2E_WEB), "new E2E web target appeared")
+    require(get_members() == {DB_NAME},
+            "fourth network changed since partial-stage inspection")
+    media_matches(headers, manifest)
+    create_container_from_stage(source, headers, launcher, manifest)
+
+
+def create_container_from_stage(source, headers, launcher, manifest):
+    # Use a stable Docker inspect dictionary; never reuse 'source' as an IO
+    # reader while copying private media. Called only after strict staging
+    # checks by --create or --resume-create.
+    require(not headers.existing(E2E_WEB), "new E2E web already exists")
+    require(get_members() == {DB_NAME},
+            "unexpected fourth PostgreSQL network attachment")
+    media_matches(headers, manifest)
     args = [
         "create", "--name", E2E_WEB, "--network", NETWORK,
         "--workdir", "/app", "--user", "1000:1000",
@@ -393,6 +445,7 @@ def create():
     print("FOURTH-DB PRIVATE RAILS WEB CREATED — NOT STARTED", flush=True)
     print("PRIVATE 10-MEDIA SHA256 COPY VERIFIED / HTTP READ-ONLY", flush=True)
     print("NO HOST PORT / ORIGINAL RAILS AND PG UNCHANGED", flush=True)
+
 
 
 def verify_created():
@@ -468,6 +521,10 @@ def main():
             check()
         elif args.create:
             create()
+        elif args.inspect_partial:
+            inspect_partial()
+        elif args.resume_create:
+            resume_create()
         elif args.verify_created:
             verify_created()
         else:
