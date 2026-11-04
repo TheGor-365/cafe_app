@@ -1,0 +1,97 @@
+name: Cafe private headers QA runtime staging (static gates only)
+on:
+  push:
+    branches: [feature/cafe-private-headers-qa-runtime-20261104]
+  pull_request:
+    branches: [feature/cafe-loopback-http-headers-audit-20261104]
+permissions:
+  contents: read
+jobs:
+  private-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax, CLI and reviewed Rack header regression
+        run: |
+          python3 -m py_compile scripts/cafe_private_headers_qa_runtime.py
+          python3 scripts/cafe_private_headers_qa_runtime.py --help
+          ruby -c qa/security/cafe_headers_candidate.rb
+          ruby qa/security/cafe_headers_candidate_test.rb
+      - name: Check config.ru Ruby DSL and smoke source syntax
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          import subprocess
+          source = Path("scripts/cafe_private_headers_qa_runtime.py").read_text()
+          tree = ast.parse(source)
+          mapped = {}
+          for node in tree.body:
+              if isinstance(node, ast.Assign):
+                  for target in node.targets:
+                      if isinstance(target, ast.Name) and target.id in ("RACK_CONFIG", "RUBY_SMOKE"):
+                          mapped[target.id] = ast.literal_eval(node.value)
+          assert set(mapped) == {"RACK_CONFIG", "RUBY_SMOKE"}
+          for name, script in mapped.items():
+              output = subprocess.run(["ruby", "-c"], input=script, text=True,
+                                      capture_output=True, check=True)
+              assert "Syntax OK" in output.stdout, name
+          cfg = mapped["RACK_CONFIG"]
+          assert "require_relative 'config/environment'" in cfg
+          assert "require_relative 'qa_headers_candidate'" in cfg
+          assert "use CafeQaReadOnlyMethods" in cfg
+          assert "use CafeHeadersCandidate" in cfg
+          assert "run Rails.application" in cfg
+          assert "method == 'GET' || method == 'HEAD'" in cfg
+          assert "405" in cfg
+          print("QA CONFIG/RUNNER RUBY SYNTAX + 405 GUARD PASS")
+          PY
+      - name: Exact bounded policy, immutable isolation and no-live-mutation markers
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          src = Path("scripts/cafe_private_headers_qa_runtime.py").read_text()
+          tree = ast.parse(src)
+          policy = None
+          for node in tree.body:
+              if isinstance(node, ast.Assign) and any(
+                  isinstance(target, ast.Name) and target.id == "POLICY" for target in node.targets
+              ):
+                  policy = ast.literal_eval(node.value)
+          assert policy is not None
+          from_env = dict(line.strip().split("=", 1) for line in Path(
+              "qa/security/imagemagick_resource_limits.env"
+          ).read_text().splitlines() if line.strip())
+          assert policy == from_env
+          assert len(policy) == 9
+          for required in (
+              'PREFLIGHT_BLOB = "0f1da472340e94a6216941bd5165cc11f2627f18"',
+              'HEADERS_BLOB = "5e708c8a84675bf30ef94f8c0583469c92304c4f"',
+              '"create", "--name", NEW_WEB',
+              '"--network", NETWORK, "--read-only"',
+              '"--security-opt", "no-new-privileges"',
+              '"--cap-drop", "ALL"',
+              '"--restart", "no"',
+              '"--mount"',
+              "STAGE.mkdir(mode=0o700)",
+              "files_manifest(COPIED_MEDIA) == expected",
+              "checked_preflight()",
+              "not STAGE.exists()",
+              "not existing(NEW_WEB)",
+              "require(candidate_env.get",
+              "PRIVATE_QA_POST_BLOCKED_405_PASS",
+              "PRIVATE_QA_REAL_HTTP_JPEG_SHA_PASS",
+          ):
+              assert required in src, required
+          for prohibited in (
+              '"stop", LIVE', '"restart", LIVE', 'docker("rm"',
+              'docker("stop"', 'docker("restart"', 'docker("network", "connect"',
+              'docker("compose"', 'docker("run"', "db:migrate",
+              "db:drop", "git reset --hard", "File.delete(",
+          ):
+              assert prohibited not in src, prohibited
+          assert "3002" in src and "3001" in src
+          print("PRIVATE QA PROFILE/SAFETY STATIC GATE PASS")
+          PY
