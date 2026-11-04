@@ -1,0 +1,103 @@
+name: Cafe private QA single mountpoint fix — static safety CI
+on:
+  push:
+    branches: [feature/cafe-private-qa-configru-mount-fix-20261104]
+  pull_request:
+    branches: [feature/cafe-private-headers-qa-runtime-20261104]
+permissions:
+  contents: read
+jobs:
+  candidate-mountfix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax and safe help
+        run: |
+          python3 -m py_compile scripts/cafe_private_headers_qa_mountfix.py
+          python3 scripts/cafe_private_headers_qa_mountfix.py --help
+      - name: Ruby candidate and synthetic Rack integration
+        run: |
+          ruby -c qa/security/cafe_headers_candidate.rb
+          ruby qa/security/cafe_headers_candidate_test.rb
+      - name: Existing config.ru mountpoint, inlined policy, and strict no-mutation regression
+        run: |
+          python3 - <<'PY'
+          import ast
+          import importlib.util
+          from pathlib import Path
+          import subprocess
+          old = Path("scripts/cafe_private_headers_qa_runtime.py").read_text()
+          path = Path("scripts/cafe_private_headers_qa_mountfix.py")
+          source = path.read_text()
+          assert Path("config.ru").is_file(), "target must exist in repository"
+          assert "qa_headers_candidate.rb" not in Path("config.ru").read_text()
+          spec = importlib.util.spec_from_file_location("cafe_fix", path)
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.HEADERS = Path("qa/security/cafe_headers_candidate.rb")
+          ruby = module.bundled_rack_config()
+          result = subprocess.run(["ruby", "-c"], text=True,
+                                  input=ruby, capture_output=True, check=True)
+          assert "Syntax OK" in result.stdout
+          reviewed = module.HEADERS.read_text()
+          assert ruby.count(reviewed) == 1, "audited header class not inlined exactly once"
+          assert ruby.count("class CafeHeadersCandidate") == 1
+          assert ruby.count("class CafeQaReadOnlyMethods") == 1
+          assert "require_relative 'config/environment'" in ruby
+          assert "require_relative 'qa_headers_candidate'" not in ruby
+          assert "use CafeHeadersCandidate" in ruby
+          assert "use CafeQaReadOnlyMethods" in ruby
+          assert "run Rails.application" in ruby
+          assert "POST" not in ruby.split("class CafeQaReadOnlyMethods",1)[1].split("end",1)[0]
+          assert "method == 'GET' || method == 'HEAD'" in ruby
+          assert module.CONFIG_DEST == "/app/config.ru"
+          assert module.HEADERS_DEST == "/app/qa_headers_candidate.rb"
+          assert module.OLD_WEB if hasattr(module, "OLD_WEB") else module.FAILED_WEB
+          assert module.NEW_WEB != module.FAILED_WEB
+          assert module.STAGE != module.FAILED_STAGE
+          assert module.POLICY["MAGICK_TIME_LIMIT"] == "30"
+          assert module.is_no_new_privileges_enabled(["no-new-privileges"])
+          # A single new config.ru file overlay must replace the old second overlay.
+          tree = ast.parse(source)
+          create = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                        and n.name == "create")
+          create_source = ast.get_source_segment(source, create)
+          assert "HEADERS, HEADERS_DEST" not in create_source
+          assert "CONFIG, CONFIG_DEST" in create_source
+          assert "bundled_rack_config()" in create_source
+          assert "docker(*args" in create_source
+          assert '"create", "--name", NEW_WEB' in create_source
+          assert "docker(" not in ast.get_source_segment(source, next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "bundled_rack_config"))
+          assert "qa_headers_candidate.rb" in source  # fail-closed forensic gate
+          assert "read-only file system" in source
+          assert '"/app"' in source and '"config.ru"' in source
+          assert "no-new-privileges" in source
+          assert "PGOPTIONS=-c default_transaction_read_only=on" in source
+          assert "PRIVATE_QA_POST_BLOCKED_405_PASS" in source
+          assert "PRIVATE_QA_REAL_HTTP_JPEG_SHA_PASS" in source
+          for forbidden in (
+              'docker("rm"', 'docker("stop"', 'docker("restart"',
+              'docker("network", "connect"', 'docker("run"',
+              "db:drop", "db:migrate", "git reset --hard",
+              "File.delete(", "File.write(",
+          ):
+              assert forbidden not in source, forbidden
+          print("EXISTING MOUNTPOINT / REVIEWED HEADER / FORCED READONLY QA CI PASS")
+          PY
+      - name: Ensure ImageMagick resource policy matches reviewed profile
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          src = Path("scripts/cafe_private_headers_qa_mountfix.py").read_text()
+          node = ast.parse(src)
+          settings = next(ast.literal_eval(n.value) for n in node.body
+                          if isinstance(n, ast.Assign)
+                          and any(isinstance(t, ast.Name) and t.id == "POLICY" for t in n.targets))
+          expected = dict(line.split("=", 1) for line in Path(
+              "qa/security/imagemagick_resource_limits.env").read_text().splitlines() if line.strip())
+          assert settings == expected
+          assert len(settings) == 9
+          print("IMAGE RESOURCE PROFILE MATCH PASS")
+          PY
