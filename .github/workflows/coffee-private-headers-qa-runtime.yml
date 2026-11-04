@@ -18,6 +18,30 @@ jobs:
           python3 scripts/cafe_private_headers_qa_runtime.py --help
           ruby -c qa/security/cafe_headers_candidate.rb
           ruby qa/security/cafe_headers_candidate_test.rb
+      - name: Regression test Docker no-new-privileges inspect variants
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          spec = importlib.util.spec_from_file_location(
+              "candidate", "scripts/cafe_private_headers_qa_runtime.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          for accepted in (
+              "no-new-privileges",
+              "no-new-privileges=true",
+              "no-new-privileges:true",
+          ):
+              assert module.is_no_new_privileges_enabled([accepted]), accepted
+              assert module.is_no_new_privileges_enabled(["other=foo", accepted])
+          for rejected in (
+              None, [], [""], ["no-new-privileges=false"],
+              ["no-new-privileges:false"], ["no-new-privilegesX"],
+              ["no-new-privileges = true"], [123], "no-new-privileges",
+          ):
+              assert not module.is_no_new_privileges_enabled(rejected), rejected
+          assert callable(module.verify_created)
+          print("DOCKER TRUE SECURITY OPTION VARIANTS / FAIL-CLOSED PASS")
+          PY
       - name: Check config.ru Ruby DSL and smoke source syntax
         run: |
           python3 - <<'PY'
