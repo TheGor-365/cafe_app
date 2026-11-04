@@ -97,6 +97,8 @@ begin
   raise 'Wrong PG cluster' unless id == ENV.fetch('EXPECTED_SANDBOX_CLUSTER')
   raise 'Wrong Rails env' unless Rails.env.development?
   raise 'Wrong ImageMagick time bound' unless ENV['MAGICK_TIME_LIMIT'] == '30'
+  mode = ActiveRecord::Base.connection.select_value('SHOW default_transaction_read_only').to_s
+  raise 'QA database connection is not read-only' unless mode == 'on'
 
   def qa_request(path, method)
     client = Net::HTTP.new('127.0.0.1', 3001, nil)
@@ -264,6 +266,8 @@ def checked_preflight():
     ), "unexpected secret-like origin environment")
     require(not any(key.startswith("MAGICK_") for key in env),
             "origin has unexpected image policy variables")
+    require("PGOPTIONS" not in env,
+            "origin has unexpected PostgreSQL session options")
     require(launcher.pgid(launcher.SANDBOX_DB) == cluster,
             "origin PostgreSQL identity changed")
     require(web["Config"].get("Cmd") == [
@@ -334,6 +338,9 @@ def check_new_container(web, launcher, expected, env):
             "QA candidate uses wrong bundle")
     require(candidate_env.get("RAILS_ENV") == "development",
             "QA candidate not in internal-only development")
+    require(candidate_env.get("PGOPTIONS") ==
+            "-c default_transaction_read_only=on",
+            "QA PostgreSQL session must be read-only")
     for key, val in POLICY.items():
         require(candidate_env.get(key) == val, "ImageMagick policy not inherited")
     for key, val in env.items():
@@ -395,6 +402,9 @@ def create():
     ]
     for key, value in sorted(env.items()):
         args.extend(["--env", key + "=" + value])
+    # Libpq makes this candidate's PostgreSQL connection read-only by default,
+    # independent of the Rack method guard. Do not forward to old containers.
+    args.extend(["--env", "PGOPTIONS=-c default_transaction_read_only=on"])
     for key, value in sorted(POLICY.items()):
         args.extend(["--env", key + "=" + value])
     for destination, opts in sorted((host.get("Tmpfs") or {}).items()):
