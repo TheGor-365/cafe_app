@@ -36,3 +36,11 @@ CSP is Report-Only, no collector; the user must inspect Chrome/Firefox Console a
 On partial --create failure leave the new stage/container in place and diagnose, **do not blindly rerun or delete**. The script offers no cleanup operation. The new container has readonly root, user 1000, 1GiB RAM, pids-limit, all caps dropped, no-new-privileges, no host ports, no restart policy. Existing 3001/3002 and Docker volumes should remain unchanged. CI validates only syntax, pure Rack tests and static safety guards, not owner's runtime.
 
 Next: owner --check after SHA-pinned fetch; then separately --create and --smoke if checks pass. No production readiness or master merge approval.
+
+## 2026-11-04 follow-up: create stopped at security-opt inspect
+
+Owner ran the original SHA-pinned --create after successful --check. Post-create validation halted at "QA candidate no-new-privileges missing". The creator used --security-opt no-new-privileges, while the checker demanded the string no-new-privileges:true. Docker accepts bare, =true and :true spellings. The actual current Docker inspect form on the owner's machine has not yet been confirmed.
+
+**Do not rerun --create or remove the created artifacts.** Corrected version accepts only those three true forms, rejects false/missing options and includes read-only --verify-created. That audit repeats the original preflight, checks the new container is still Created, validates its read-only mounts, environment and original/private-copy 10-media SHA256 without starting Docker objects or modifying files.
+
+Owner should first read Docker inspect SecurityOpt, then SHA-pin the corrected helper into a NEW local filename, run --verify-created, and only if all checks pass consider a separate --smoke. Never override the security check or assume that a missing/no-new-privileges:false option is safe.
