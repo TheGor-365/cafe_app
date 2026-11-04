@@ -113,7 +113,7 @@ class AvatarUploader < CarrierWave::Uploader::Base
       raise CarrierWave::IntegrityError, 'Image pixel dimensions exceed limit'
     end
     nil
-  rescue MiniMagick::Error
+  rescue MiniMagick::Error, MiniMagick::Invalid
     raise CarrierWave::IntegrityError, 'Image data cannot be decoded'
   end
 
