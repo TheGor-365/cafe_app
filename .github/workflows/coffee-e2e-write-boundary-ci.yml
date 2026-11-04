@@ -1,0 +1,66 @@
+name: Cafe synthetic writable-security E2E gate (CI only)
+on:
+  push:
+    branches: [feature/cafe-e2e-write-boundary-ci-20261105]
+  pull_request:
+    branches: [feature/cafe-private-e2e-rails-readonly-20261105]
+permissions:
+  contents: read
+
+jobs:
+  rails-write-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: ruby:2.5.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert ephemeral CI-only database and synthetic security suite
+        run: |
+          test "$RAILS_ENV" = test
+          test "$DATABASE_URL" = postgres://postgres:cafe_ci_only@postgres:5432/cafe_test
+          ruby -c test/integration/cafe_e2e_write_boundary_test.rb
+          ruby -e '
+            s=File.read("test/integration/cafe_e2e_write_boundary_test.rb");
+            abort("missing synthetic DB provenance") unless s.include?("disposable Rails test PostgreSQL");
+            abort("owner Docker references forbidden") if s.include?("docker exec") || s.include?("cafe-upload-security-e2e-pg-20261105");
+            abort("test must exercise CSRF") unless s.include?("InvalidAuthenticityToken");
+            abort("test must exercise cross-session basket isolation") unless s.include?("RecordNotFound");
+            puts "SYNTHETIC E2E SECURITY TEST SOURCE GUARD PASS"
+          '
+      - name: Legacy Bundler
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Add Linux lockfile platform in ephemeral CI checkout
+        run: bundle _2.2.13_ lock --add-platform x86_64-linux
+      - name: Install legacy dependencies in ephemeral CI
+        run: bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Load disposable test-only PostgreSQL schema
+        run: bundle _2.2.13_ exec rails db:schema:load
+      - name: Create disposable Webpacker manifest for view assertions
+        run: |
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Run isolation, forgery and existing lifecycle regression tests
+        run: |
+          bundle _2.2.13_ exec rails test \
+            test/integration/cafe_e2e_write_boundary_test.rb \
+            test/integration/coffee_admin_crud_lifecycle_test.rb \
+            test/integration/coffee_auth_account_test.rb \
+            test/integration/coffee_cart_consolidation_test.rb
