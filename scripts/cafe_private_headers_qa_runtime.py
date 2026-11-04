@@ -292,6 +292,18 @@ def verify_staged_media(expected):
     require(sha(HEADERS) and sha(CONFIG), "overlay source unreadable")
 
 
+def is_no_new_privileges_enabled(options):
+    """Accept Docker's three documented TRUE spellings; reject missing/false."""
+    if not isinstance(options, list):
+        return False
+    return any(isinstance(value, str) and
+               value.strip() in (
+                   "no-new-privileges",
+                   "no-new-privileges=true",
+                   "no-new-privileges:true",
+               ) for value in options)
+
+
 def check_new_container(web, launcher, expected, env):
     require(existing(NEW_WEB), "new QA container absent")
     new = inspect(NEW_WEB)
@@ -307,9 +319,9 @@ def check_new_container(web, launcher, expected, env):
     require(new["HostConfig"]["CapDrop"] and
             "ALL" in new["HostConfig"]["CapDrop"],
             "QA candidate capabilities were not dropped")
-    require(new["HostConfig"]["SecurityOpt"] and
-            "no-new-privileges:true" in new["HostConfig"]["SecurityOpt"],
-            "QA candidate no-new-privileges missing")
+    require(is_no_new_privileges_enabled(
+                new["HostConfig"].get("SecurityOpt")),
+            "QA candidate no-new-privileges missing or disabled")
     require(new["HostConfig"]["RestartPolicy"]["Name"] == "no",
             "candidate unexpectedly has restart policy")
     mounts = {item["Destination"]: item for item in new["Mounts"]}
@@ -352,6 +364,16 @@ def check_new_container(web, launcher, expected, env):
             "QA candidate status differs")
     verify_staged_media(expected)
     return new
+
+
+def verify_created():
+    _prior, launcher, web, _cluster, original, env = checked_preflight()
+    candidate = check_new_container(web, launcher, original, env)
+    require(candidate["State"]["Status"] == "created",
+            "candidate must remain unstarted for this audit")
+    print("PRIVATE QA CREATED-CONTAINER SECURITY OPTIONS PASS", flush=True)
+    print("PRIVATE QA STAGED 10-MEDIA SHA256 COPY PASS", flush=True)
+    print("PRIVATE QA CREATED-ONLY VALIDATION COMPLETE — NO CHANGES", flush=True)
 
 
 def check():
@@ -498,12 +520,14 @@ def smoke():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group(required=True)
-    for name in ("check", "create", "smoke"):
+    for name in ("check", "create", "verify-created", "smoke"):
         modes.add_argument("--" + name, action="store_true")
     options = parser.parse_args()
     try:
         if options.check:
             check()
+        elif options.verify_created:
+            verify_created()
         elif options.create:
             create()
         else:
