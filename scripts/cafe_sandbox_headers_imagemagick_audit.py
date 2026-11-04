@@ -58,9 +58,11 @@ def http_get(path, method = :get)
 end
 
 def safe_headers(response)
+  # Empty or absent Content-Type is a finding, not a Ruby NoMethodError.
+  content_type = response['Content-Type'].to_s.split(';', 2).first.to_s.strip.downcase
   {
     'status' => response.code.to_i,
-    'content_type' => response['Content-Type'].to_s.split(';').first.strip.downcase,
+    'content_type' => content_type,
     'nosniff' => response['X-Content-Type-Options'].to_s.downcase == 'nosniff',
     'csp_present' => !response['Content-Security-Policy'].to_s.empty?,
     'csp_report_only' => !response['Content-Security-Policy-Report-Only'].to_s.empty?,
@@ -73,9 +75,13 @@ def safe_headers(response)
 end
 
 $header_audit_step = 'signup_http'
-html_headers = safe_headers(http_get('/users/sign_up'))
+signup_response = http_get('/users/sign_up')
+$header_audit_step = 'signup_headers'
+html_headers = safe_headers(signup_response)
 $header_audit_step = 'info_http'
-info_headers = safe_headers(http_get('/info'))
+info_response = http_get('/info')
+$header_audit_step = 'info_headers'
+info_headers = safe_headers(info_response)
 $header_audit_step = 'header_summary'
 result = {
   'environment' => Rails.env,
@@ -100,7 +106,9 @@ if paths.any?
   raise 'Sample image path outside /uploads' unless url.start_with?('/uploads/')
   uri_path = URI::DEFAULT_PARSER.escape(url)
   $header_audit_step = 'image_head_http'
-  result['image'] = safe_headers(http_get(uri_path, :head))
+  image_response = http_get(uri_path, :head)
+  $header_audit_step = 'image_head_headers'
+  result['image'] = safe_headers(image_response)
   result['image']['sample'] = 'existing_private_media'
   result['image']['probe'] = 'HTTP HEAD (no body downloaded)'
 end
