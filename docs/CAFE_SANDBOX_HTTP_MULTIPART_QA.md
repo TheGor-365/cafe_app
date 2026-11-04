@@ -1,0 +1,26 @@
+# Gor's Coffee — isolated Rails sandbox and real multipart HTTP security gate (2026-11-04)
+
+## Owner-reported restored checkpoint
+
+Owner executed `scripts/cafe_restore_security_sandbox.py --check` and `--restore` successfully on Linux; output confirms QA and live PostgreSQL clusters distinct, all private snapshot hashes match, restored patched QA media **10 files**, restored PostgreSQL with 20 products and ID21 absent, 3001 and 3002 HTTP 200, and `ISOLATED QA DATABASE + MEDIA RESTORE VERIFIED`. The PostgreSQL is `cafe-upload-security-sandbox-pg-20261104` attached solely to **internal** Docker network `cafe-upload-security-sandbox-20261104`. Private media copy is at `~/.local/share/cafe_app/uploads_security_sandbox_20261104`.
+
+## This PR
+
+1. `scripts/cafe_sandbox_rails.py --check`: read-only checks of original app files (checksums), sandbox media, patched QA uploader SHA, CarrierWave 2.2.7 bundle, exact QA source mounts, unchanged live/QA containers, all **three** distinct PostgreSQL system identifiers, private network, no DB port, and HTTP 200 on 3001/3002.
+2. `--create`: derive **only known-safe read-only mounts** from verified patched QA container and change the **single uploads bind** to the restored sandbox media directory; omit the live PostgreSQL password secret mount altogether. Copy non-secret environment keys from QA, set `DATABASE_URL=postgresql://postgres@cafe-app-db:5432/cafe` on the **isolated sandbox network only**, with bundle configured from patched read-only staged Gemfile/lock. Create a new Rails web container `cafe-upload-security-sandbox-rails-20261104` with `--read-only`, user 1000, cap-drop ALL, no-new-privileges, and **no published host ports**. Container starts only via `--smoke`; no migrations, seeds, reset or SQL modifications.
+3. `--smoke`: verify new web container has no external ports or networks, run Rails against a **pinned sandbox PostgreSQL system identifier**, load actual CarrierWave 2.2.7 and strict AvatarUploader, check 20 products, GET private `/users/sign_up` internally over real HTTP, and recheck production 3001 + QA 3002.
+4. `scripts/cafe_sandbox_upload_tests.py --check` / `--run`: after successful Rails smoke only, verify exact private network and media bind, pin the reviewed Ruby fixture `qa/security/cafe_sandbox_multipart_probe.rb` by Git blob, and run it via `docker exec -i` inside **only** the sandbox Rails. This does not connect to the host-published live/QA ports.
+
+The Ruby probe performs **real Net::HTTP multipart POST** against the private sandbox Rails on `127.0.0.1:3001` **inside its own container**, with a fresh GET registration form, actual CSRF authenticity token and session cookie for each case. Fresh synthetic users only; all emails are `@example.test`, never personal accounts, and passwords are randomly generated in memory, never output. Fixtures are tiny synthetic 9×9 JPEG, PNG and GIF generated via ImageMagick. Negative cases: HTML named JPEG; SVG upload; PNG bytes with JPG filename; length over 2 MiB; empty PNG; corrupt/truncated JPEG; and valid PNG with misleading `text/plain` multipart MIME. Each negative must give HTTP 200/400/415/422, with **no new user row**. Positive cases: valid JPG/PNG/GIF, authenticated account page, stored original and MiniMagick thumbnail strictly within sandbox uploads. At end, only synthetic probe users are removed, and SHA256 snapshot of the original ten files must match. Unexpected leftover cache files or persistent bad users make the test fail. A test failure is a finding; **do not interpret a green GitHub CI as passing real uploads**.
+
+## Safety / no public release
+
+- `--check` operations are read-only. `--create` only creates a sandbox Rails container. `--smoke` only starts it. `--run` writes synthetic accounts and media only into restored **sandbox** database + sandbox media, never production/QA.
+- Never attach internal sandbox PostgreSQL `POSTGRES_HOST_AUTH_METHOD=trust` to public networks or publish host ports. Existing QA and production have independent PostgreSQL clusters. If any inspection fails, stop and investigate. **Do not delete or retry over existing sandbox Docker objects.**
+- Does not merge any Draft PR into `master`, publish the app, send email, migrate DB, touch source or overwrite original media.
+- These actual multipart tests are necessary but not sufficient: inspect upload rejection behavior, ImageMagick resource policy, image decompression bombs, SVG/HTML header handling on file serving, Content-Type + `nosniff` and CSP, authentication, CSRF and rate limits, supported runtime. Ruby 2.5/Rails 6 EOL means no public release without modernization plan.
+- All private DB dumps and media snapshots stay **only on owner Linux**; never put them into GitHub/Google Drive/Gmail. Only non-sensitive status/CI evidence goes to GitHub and Drive.
+
+## Owner acceptance sequence
+
+After verified Draft PR CI: fetch exact GitHub commit + the **three** reviewed scripts into private host `~/.local/share/cafe_app/` (not project working tree), verify each blob SHA, then run `cafe_sandbox_rails.py --check`, `--create`, `--smoke`, followed by `cafe_sandbox_upload_tests.py --check`, `--run`. Stop on any non-zero. **Do not register anyone or manually upload media into ports 3001 or 3002 during this gate.**
