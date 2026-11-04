@@ -33,7 +33,7 @@ jobs:
           assert "Syntax OK" in compiled.stdout
           assert "default_transaction_read_only" in ruby
           assert "EXPECTED_E2E_CLUSTER" in ruby
-          assert "PRIVATE" not in ruby.split("puts 'E2E_FOURTH_DB_",1)[0] or True
+          assert "E2E_FOURTH_DB_SMOKE_BLOCKED:" in ruby
           assert 'POST was not rejected' in ruby
           assert "response.code == '405'" in ruby
           assert "ImageMagick resource env missing" in ruby
