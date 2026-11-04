@@ -1,0 +1,76 @@
+name: Cafe ephemeral sandbox real HTTP headers probe (CI syntax only)
+on:
+  push:
+    branches: [feature/cafe-loopback-http-headers-audit-20261104]
+  pull_request:
+    branches: [feature/cafe-sandbox-http-headers-csp-report-only-20261104]
+permissions:
+  contents: read
+jobs:
+  audit-helper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sanity check pure Rack header candidate
+        run: |
+          ruby -c qa/security/cafe_headers_candidate.rb
+          ruby -c qa/security/cafe_headers_candidate_test.rb
+          ruby qa/security/cafe_headers_candidate_test.rb
+      - name: Python and embedded Ruby syntax (no sandbox in CI)
+        run: |
+          python3 -m py_compile scripts/cafe_sandbox_loopback_http_headers_audit.py
+          python3 scripts/cafe_sandbox_loopback_http_headers_audit.py --help
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          import subprocess
+
+          path = Path("scripts/cafe_sandbox_loopback_http_headers_audit.py")
+          syntax = ast.parse(path.read_text())
+          extracted = [
+              ast.literal_eval(node.value)
+              for node in syntax.body
+              if isinstance(node, ast.Assign)
+              for target in node.targets
+              if isinstance(target, ast.Name) and target.id == "RUBY_LOOPBACK"
+          ]
+          assert len(extracted) == 1
+          ruby = extracted[0]
+          candidate = Path("qa/security/cafe_headers_candidate.rb").read_text()
+          verified = subprocess.run(["ruby", "-c"], input=candidate + "\n" + ruby,
+                                    text=True, capture_output=True, check=True)
+          assert "Syntax OK" in verified.stdout
+          for needle in (
+              "BindAddress: '127.0.0.1'", "Port: 0",
+              "server.shutdown", "worker.join(3)", "WEBrick::HTTPServer",
+              "Net::HTTP", "LOOPBACK_HTTP_JPEG_GET_SHA_PASS",
+              "EXPECTED_SANDBOX_CLUSTER", "Digest::SHA256",
+              "Content-Security-Policy-Report-Only", "Rack::Handler::WEBrick",
+          ):
+              assert needle in ruby, needle
+          for needle in (
+              "PREFLIGHT_BLOB = \"0f1da472340e94a6216941bd5165cc11f2627f18\"",
+              "CANDIDATE_BLOB = \"5e708c8a84675bf30ef94f8c0583469c92304c4f\"",
+              "previous.required_runtime()",
+              "raw details suppressed",
+          ):
+              assert needle in path.read_text(), needle
+          print("EPHEMERAL LOOPBACK RUBY/PYTHON SYNTAX AND SAFETY MARKERS PASS")
+          PY
+      - name: No persistent live mutations/static isolation gate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("scripts/cafe_sandbox_loopback_http_headers_audit.py").read_text()
+          for prohibited in (
+              "docker start", "docker restart", "docker run", "docker create",
+              "docker stop", "docker rm", "docker network connect",
+              "db:drop", "db:reset", "rails db:migrate", "UPDATE products",
+              "DELETE FROM", "git reset --hard", "docker cp",
+              "File.write(", "File.delete(", ".write_bytes(", ".unlink(",
+              "bind '0.0.0.0'", "BindAddress: '0.0.0.0'",
+          ):
+              assert prohibited not in source, prohibited
+          print("LOOPBACK-ONLY / NO PERSISTENT MUTATION STATIC GATE PASS")
+          PY
