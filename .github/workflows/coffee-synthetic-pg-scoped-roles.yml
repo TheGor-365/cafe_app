@@ -70,7 +70,7 @@ jobs:
             local got
             got="$(psql -XAt -v ON_ERROR_STOP=1 -c "$1")"
             if [ "$got" != "$2" ]; then
-              echo "CI PG ACL invariant failed" >&2
+              echo "CI PG ACL invariant failed; query=$1; got=$got; expected=$2" >&2
               exit 1
             fi
           }
