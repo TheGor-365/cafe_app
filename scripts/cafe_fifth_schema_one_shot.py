@@ -161,6 +161,8 @@ def check():
     probe,mounts=runtime()
     secret_audit()
     ip,ident=target()
+    require(ident not in protected_four(),
+            "fifth PG ID overlaps original four or postflight baseline unavailable")
     require(sql("SELECT COUNT(*) FROM pg_tables WHERE schemaname='public';")=="0",
             "fifth public schema not empty")
     require(sql("SELECT COUNT(*) FROM pg_sequences WHERE schemaname='public';")=="0",
