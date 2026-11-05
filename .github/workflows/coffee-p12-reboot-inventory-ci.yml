@@ -1,0 +1,102 @@
+name: Cafe P1.2 post-reboot read-only inventory security checks
+
+on:
+  push:
+    branches: [feature/cafe-p12-reboot-isolated-recovery-20261106]
+  pull_request:
+    branches: [feature/cafe-qa-persistent-pg-recovery-20261106]
+
+permissions:
+  contents: read
+
+jobs:
+  p12-reboot-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax / arguments / safe static contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p12_reboot_inventory_20261106.py
+          python3 scripts/cafe_p12_reboot_inventory_20261106.py --help | grep -F -- '--check'
+          if python3 scripts/cafe_p12_reboot_inventory_20261106.py --create >/dev/null 2>&1; then
+            echo "Write-mode unexpectedly accepted" >&2; exit 1
+          fi
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path("scripts/cafe_p12_reboot_inventory_20261106.py").read_text()
+          nodes=ast.parse(s)
+          funcs={n.name for n in ast.walk(nodes) if isinstance(n,ast.FunctionDef)}
+          assert {"check","tmpfs_audit","web_audit","protected_pair","qa_backup_audit"}<=funcs
+          required=[
+            'cafe-app-db', 'cafe-upload-qa-pg-20261103',
+            'cafe-upload-security-sandbox-pg-20261104',
+            'cafe-upload-security-e2e-pg-20261105',
+            'cafe-upload-security-synthetic-pg-20261105',
+            'cafe-upload-security-headers-mountfix-20261104',
+            'cafe-upload-security-e2e-web-readonly-20261105',
+            'cafe_p12_schema_loader_v2_20261105.py',
+            '204070f6bdb5a4fb16ed1c04036ba42d84a593c8',
+            'cafe_p12_fifth_schema_attempt_20261105.json',
+            'cafe-qa-pgdata-persistent-20261106',
+            '"/var/lib/postgresql/data"',
+            'hmac.compare_digest',
+          ]
+          for w in required:
+            if w == 'cafe-qa-pgdata-persistent-20261106':
+              continue
+            assert w in s,w
+          # The only docker mutations allowed by this script are NONE.
+          prohibited=['"start"', '"create"', '"stop"', '"restart"',
+                      '"volume","rm"', '"exec","-i"', 'pg_restore',
+                      'db:reset', 'db:schema:load','"git","checkout"',
+                      '"docker","run"']
+          for phrase in prohibited: assert phrase not in s,phrase
+          print("P1.2 REBOOT INVENTORY READ-ONLY SOURCE GUARDS PASS")
+          PY
+      - name: Mocked all-stopped tmpfs inventory and wrong-network failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          from unittest.mock import patch
+          p=Path('scripts/cafe_p12_reboot_inventory_20261106.py')
+          spec=importlib.util.spec_from_file_location('cafe_p12_inventory',p)
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          mapping={name:network for _,name,network in m.TMPFS_TARGETS}
+          def pg(name,network):
+            return {"Name":"/"+name,"Config":{"Image":"postgres:16"},
+                    "State":{"Status":"exited"},
+                    "HostConfig":{"PortBindings":None,"RestartPolicy":{"Name":"no"},
+                                  "Tmpfs":{"/var/lib/postgresql/data":"rw",
+                                           "/var/run/postgresql":"rw"},
+                                  "ReadonlyRootfs":True},
+                    "NetworkSettings":{"Networks":{network:{}}},
+                    "Mounts":([{"Type":"bind","RW":False,
+                                "Destination":"/run/secrets/cafe_synthetic_postgres"}]
+                              if name==m.TMPFS_TARGETS[2][1] else [])}
+          objects={name:pg(name,network) for name,network in mapping.items()}
+          networks={network:{"Internal":True,"Containers":{}}
+                    for network in mapping.values()}
+          def fake_inspect(kind,name):
+            if kind=='container': return objects[name]
+            if kind=='network': return networks[name]
+            raise AssertionError('unexpected inspection')
+          with patch.object(m,'inspect',side_effect=fake_inspect):
+            result=m.tmpfs_audit()
+            assert result=={"sandbox":"exited","fourth":"exited","fifth":"exited"}
+            objects[m.TMPFS_TARGETS[2][1]]["NetworkSettings"]["Networks"]={"cafe-app-private":{}}
+            try:
+              m.tmpfs_audit()
+            except RuntimeError:
+              pass
+            else:
+              raise AssertionError('fifth PostgreSQL production-network violation accepted')
+          print("P1.2 MOCKED TEST-ONLY TMPFS INVENTORY / NEGATIVE NETWORK PASS")
+          PY
