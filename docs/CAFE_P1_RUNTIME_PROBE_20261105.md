@@ -95,3 +95,16 @@ Owner's nonmutating `docker inspect --format` of original `cafe-upload-security-
 P1.1 v5 updates **only** the disposable runner: it inspects the source QA metadata and requires exactly one read-only `/bundle` bind at its original destination; refuses writable, symlinked, unavailable or credential-like bundle paths; does not print the host source; forwards `BUNDLE_PATH=/bundle` and `BUNDLE_FROZEN=true` while retaining `--network=none`, `--read-only`, `--cap-drop=ALL`, and an immutable tracked Git source snapshot mounted read-only at `/app`. Still excludes nested `/app/node_modules`, private uploads, all other original application mounts and the fifth PG. The bundle path may contain untrusted code and must be used only in the constrained disposable test sandbox. GitHub CI tests allowlisted read-only metadata and negatives for writable mounts and secret paths; CI alone cannot prove runtime success.
 
 A Linux Ruby 2.5.8/Rails 6.0 compatibility failure may still occur because the canonical tracked `Gemfile.lock` lists only Windows platform. Do not replace the original lock or alter the source QA's override. Owner must confirm P1.1 v5 real stdout before further schema writer development.
+
+## Owner checkpoint: P1.1 v5 still misses QA Gemfile overlays
+
+Owner executed commit `d455d95dc97d43c15077227e1a2b904be428b4d6`, probe blob `6f788082d8c769bc8f9b0f23fac95979578cec17`:
+
+- All P1 target/five-cluster/media/HTTP isolation checks PASS, fifth DB still empty.
+- `P1.1 INCOMPATIBLE NESTED NODE_MODULES VOLUME EXCLUDED PASS`.
+- `P1.1 EXISTING QA /bundle READ-ONLY BIND VERIFIED PASS`.
+- `CAFE P1.1 RAILS PROBE STOP: isolated_rails_container failed [rails_boot / ruby_bundle_resolution]`.
+
+The prior PR #33/#34 reviewed build confirms the working QA uses a *coherent set* of three components: `/bundle` bound read-only from `~/.local/share/cafe_app/bundle_carrierwave_227_20261104`, **plus** read-only overlays `/app/Gemfile` and `/app/Gemfile.lock` from `~/.local/share/cafe_app/security_bundle_build_20261104`; the staged lock was given the Linux platform with Bundler 2.2.13 and CarrierWave 2.2.7 installed. The isolated P1.1 v5 runner reused only `/bundle` and accidentally retained the repo's Windows-only original Gemfile.lock. Therefore its bundle could not be considered equivalent to the already working QA dependency set.
+
+P1.1 v6 proposes to mount **only** those two reviewed QA dependency overlays, as read-only file bind mounts on *existing* `/app/Gemfile` and `/app/Gemfile.lock` targets in the exact SHA-pinned Git source archive, alongside already verified read-only `/bundle`. Path identity, mount type, access mode, owner, Linux platform, Bundler version and CarrierWave pin must match the previously reviewed stage; CI negative-tests writable/missing/mismatched originals. No other app overlays, uploaded media, real database, original QA container or host ports are attached. This is strictly an offline runtime compatibility probe, not a schema writer. Owner-local PASS is still required.
