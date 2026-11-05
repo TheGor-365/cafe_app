@@ -173,6 +173,7 @@ def check():
     require(git("cat-file","-t",RUBY_GUARD_BLOB)=="blob",
             "reviewed fifth-only Ruby guard Git blob missing")
     offline_runner_mount_probe(probe,mounts,ip)
+    live_sql_connection_preflight(probe,mounts,ip,ident)
     print("P1.2 PROTECTED FOUR PG / MEDIA / HTTP 3001-3002 PASS",flush=True)
     print("P1.2 FIFTH SCRAM POSTGRES / ISOLATED NETWORK / EMPTY SCHEMA PASS",flush=True)
     print("P1.2 REVIEWED RAILS / READONLY BUNDLE / SOURCE CONTRACT PASS",flush=True)
@@ -254,6 +255,43 @@ def offline_runner_mount_probe(probe,mounts,ip):
         require(result.returncode==0 and b"Rails 6.0." in result.stdout,
                 "offline Rails/secret-target/tmpfs mount compatibility failed")
     print("P1.2 ISOLATED NO-NETWORK / FAKE-SECRET / RAILS MOUNT PROBE PASS",
+          flush=True)
+
+def live_sql_connection_preflight(probe,mounts,ip,identifier):
+    """Run ONLY the fixed Ruby 'pre' SELECT audit against the fifth PG.
+
+    This is a read-only database connection test in an ephemeral Docker
+    container. It creates NO schema, data, attempt marker or Docker volume.
+    Password stays inside the disposable shell and is never printed.
+    """
+    os.umask(0o077)
+    with tempfile.TemporaryDirectory(prefix="cafe-p12-fifth-sql-readonly-") as stage:
+        source=build_source(probe,stage)
+        argv=docker_writer(source,mounts,ip)
+        fixed_marker="; bundle exec rails db:schema:load;"
+        require(argv[-1].count(fixed_marker)==1,
+                "canonical writer shell marker unexpectedly changed")
+        # Exact same connection/credentials/owner role as the later writer,
+        # stopping immediately after the independent target/pre-schema audit.
+        argv[-1]=argv[-1].split(fixed_marker,1)[0]
+        require(argv[-1].endswith(
+            "bundle exec ruby qa/security/cafe_fifth_schema_target_guard.rb pre"),
+            "readonly fifth SQL preflight command differs")
+        need=(b"P1.2 EXACT FIFTH DB/TCP IP/OWNER/APP ROLE CHECK PASS",
+              b"P1.2 FIFTH SCHEMA EMPTY PRE-WRITE PASS")
+        try:
+            result=subprocess.run(argv,stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE,check=False,
+                                  timeout=150)
+        except (OSError,subprocess.TimeoutExpired):
+            raise RuntimeError("P1.2 SCHEMA STOP: fifth readonly SQL probe timeout/unavailable")
+        require(result.returncode==0 and all(x in result.stdout for x in need),
+                "fifth-only TCP/role/SCRAM Ruby readonly SQL preflight failed")
+    require(target()==(ip,identifier),
+            "fifth PG target changed after read-only connection test")
+    require(sql("SELECT COUNT(*) FROM pg_tables WHERE schemaname='public';")=="0",
+            "fifth schema unexpectedly populated after SQL preflight")
+    print("P1.2 FIFTH-ONLY SCRAM TCP / OWNER ROLE / RUBY PRE-SCHEMA SQL PASS",
           flush=True)
 
 def create_schema(confirmation):
