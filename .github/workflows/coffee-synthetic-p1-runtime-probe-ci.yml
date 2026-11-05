@@ -84,7 +84,24 @@ jobs:
           assert module.failure_kind(b"Bundler::GemNotFound")=="ruby_bundle_missing"
           assert module.failure_kind(b"read-only file system")=="readonly_filesystem"
           assert module.failure_kind(b"permission denied")=="filesystem_permission"
-          print("P1.1 SANITIZED STAGE-ONLY FAILURE DIAGNOSTICS PASS")
+          assert module.runtime_phase(b"") == "before_shell_entry"
+          assert module.runtime_phase(b"CAFE_P11_CONTAINER_ENTERED") == "ruby_start"
+          assert module.runtime_phase(b"CAFE_P11_CONTAINER_ENTERED\\nCAFE_P11_RUBY_PASS") == "bundler_start"
+          assert module.runtime_phase(b"CAFE_P11_BUNDLER_PASS") == "rails_boot"
+          assert module.runtime_phase(b"CAFE_P11_RAILS_PASS") == "rails_completed"
+          with patch.object(module.subprocess, "run",
+              return_value=CompletedProcess(["docker"], 53,
+                  b"CAFE_P11_CONTAINER_ENTERED\\nCAFE_P11_RUBY_PASS\\nCAFE_P11_BUNDLER_PASS\\n",
+                  ("read-only file system " + secret).encode())):
+              try:
+                  module.run(["docker"], stage="isolated_rails_container")
+              except RuntimeError as err:
+                  message=str(err)
+                  assert "rails_boot / readonly_filesystem" in message
+                  assert secret not in message
+              else:
+                  raise AssertionError("Expected fail-closed runtime phase")
+          print("P1.1 SANITIZED STAGE + SHELL-PHASE DIAGNOSTICS PASS")
           PY
       - name: Validate no DB writer CLI entrypoint
         shell: bash
