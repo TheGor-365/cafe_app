@@ -1,0 +1,72 @@
+name: Cafe P1.1 isolated legacy Rails runtime probe source gate
+on:
+  push:
+    branches: [feature/cafe-synthetic-p1-rails-runtime-probe-20261105]
+  pull_request:
+    branches: [feature/cafe-synthetic-schema-local-target-preflight-20261105]
+permissions:
+  contents: read
+
+jobs:
+  static-no-db-write-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile the immutable-source isolated runtime probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_synthetic_schema_runtime_probe.py
+          python3 -B scripts/cafe_synthetic_schema_runtime_probe.py --help | grep -F -- '--probe'
+          python3 - <<'PY'
+          import ast
+          import pathlib
+          import subprocess
+          p = pathlib.Path("scripts/cafe_synthetic_schema_runtime_probe.py")
+          s = p.read_text()
+          ast.parse(s)
+          expected = {
+            "db/schema.rb": "2506954d1ea3e6368eb219956863b2acb91441c8",
+            "db/seeds.rb": "dae2eed43c78ff79a14e3bf3e83d59a649803cd4",
+            "Gemfile.lock": "06f3924bf211e56d0845bca1f6508bb81bf8a324",
+          }
+          for path, blob in expected.items():
+            value = subprocess.check_output(["git", "hash-object", path], text=True).strip()
+            assert value == blob, (path, value)
+            assert blob in s
+          checks = [
+            "090b9d37419fcd9f393d8b686ac0f4563ef7b613",
+            "501914861518530bed0d18c8f1ca08550fe65e4d",
+            "module.check()",
+            "--network=none",
+            "--pull=never",
+            "--rm",
+            "--read-only",
+            "--cap-drop=ALL",
+            "no-new-privileges",
+            "archive_into(source)",
+            "P1.1 RAILS RUNTIME PROBE PASS",
+          ]
+          assert all(phrase in s for phrase in checks)
+          for forbidden in ["--create-schema", "--seed", "db:schema:load",
+                            "db:prepare", "db:migrate", "db:seed",
+                            "docker start", "docker exec", "PGPASSWORD",
+                            "POSTGRES_PASSWORD", "DATABASE_URL="]:
+            assert forbidden not in s, forbidden
+          assert "PGOPTIONS=" not in s
+          print("P1.1 EXACT GIT SOURCE / ISOLATED NETWORKLESS RAILS PROBE CONTRACT PASS")
+          PY
+      - name: Validate no DB writer CLI entrypoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 -B scripts/cafe_synthetic_schema_runtime_probe.py --create-schema >/dev/null 2>&1; then
+            echo "Unexpected fifth database writer CLI mode" >&2
+            exit 1
+          fi
+          if python3 -B scripts/cafe_synthetic_schema_runtime_probe.py --seed >/dev/null 2>&1; then
+            echo "Unexpected fixture writer CLI mode" >&2
+            exit 1
+          fi
+          echo "P1.1 NO DB WRITER OR SECRET SOURCE ENTRYPOINT PASS"
