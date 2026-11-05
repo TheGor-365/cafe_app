@@ -39,9 +39,13 @@ def target_guard(db)
   assert_equal(ENV.fetch('CAFE_P12_TARGET'), TARGET_DB, 'missing exact target pin')
   expected_ip = ENV.fetch('CAFE_P12_SERVER_IP')
   blocked('server IP pin format') unless /\A(?:\d{1,3}\.){3}\d{1,3}\z/.match?(expected_ip)
-  actual = db.exec(
-    "SELECT current_database(), current_user, session_user, "     "current_setting('server_version_num'), "     "inet_server_addr()::text, inet_server_port(), "     "current_setting('default_transaction_read_only')"
-  ).first
+  actual = db.exec(%q{
+    SELECT current_database(), current_user, session_user,
+           current_setting('server_version_num') AS pg_version,
+           inet_server_addr()::text AS server_ip,
+           inet_server_port() AS server_port,
+           current_setting('default_transaction_read_only') AS read_only
+  }).first
   assert_equal(actual['current_database'], TARGET_DB, 'wrong connected database')
   assert_equal(actual['current_user'], OWNER, 'current_user not constrained owner')
   assert_equal(actual['session_user'], 'postgres', 'unexpected session_user')
