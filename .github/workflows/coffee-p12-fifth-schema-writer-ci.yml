@@ -54,7 +54,9 @@ jobs:
             'db:schema:load', '--read-only', '--pull=never',
             '--cap-drop=ALL', 'no-new-privileges',
             'PRIVATE', 'one-shot writer failed', 'target()==(ip,ident)',
-            'schema:load, no seeds'):
+            'schema:load, no seeds',
+            'offline_runner_mount_probe(probe,mounts,ip)',
+            'fake_noncredential_file', '--network=none'):
               assert token in s,token
           for forbidden in (
             'db:prepare','db:reset','db:drop','db:migrate','db:seed',
@@ -120,6 +122,42 @@ jobs:
               else:
                   raise AssertionError('write without target acknowledgement accepted')
           print('P1.2 DOCKER NO-SECRET ARGV / NEGATIVE WRITE TARGET ACK PASS')
+          PY
+      - name: Validate offline pre-DDL probe with fake secret and no network
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          from unittest.mock import patch
+          p=Path('scripts/cafe_fifth_schema_one_shot.py')
+          spec=importlib.util.spec_from_file_location('p12_offline',p)
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          seen=[]
+          def fake_writer(source,mounts,ip):
+              return m.docker_writer(source,mounts,ip)
+          fake_mounts=[
+              'type=bind,source=/tmp/qa_bundle_test,target=/bundle,readonly',
+              'type=bind,source=/tmp/qa_gemfile_test,target=/app/Gemfile,readonly',
+              'type=bind,source=/tmp/qa_lock_test,target=/app/Gemfile.lock,readonly'
+          ]
+          def fake_run(argv,**kwargs):
+              seen.extend(argv)
+              assert '--network=none' in argv
+              assert '--network='+m.NETWORK not in argv
+              assert not any(str(m.SECRET) in a for a in argv)
+              assert argv[-1] == 'set -eu; test -r /tmp/cafe_p12_secret; bundle exec rails -v'
+              assert 'db:schema:load' not in argv[-1]
+              return CompletedProcess(argv,0,b'Rails 6.0.3.6',b'')
+          with patch.object(m,'build_source',return_value=Path('/tmp/fake_cafe_source')), \
+               patch.object(m,'docker_writer',side_effect=fake_writer), \
+               patch.object(m.subprocess,'run',side_effect=fake_run):
+              m.offline_runner_mount_probe(None,fake_mounts,'172.30.0.2')
+          assert seen
+          print('P1.2 FAKE SECRET / NETWORK NONE / NO DATABASE OFFLINE PROBE PASS')
           PY
       - name: Validate fail-closed public CLI; NEVER run DB commands in CI
         shell: bash
