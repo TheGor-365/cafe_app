@@ -103,6 +103,60 @@ jobs:
                   raise AssertionError("Expected fail-closed runtime phase")
           print("P1.1 SANITIZED STAGE + SHELL-PHASE DIAGNOSTICS PASS")
           PY
+      - name: Validate offline read-only OCI diagnostic boundaries and redaction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_synthetic_docker_ro_start_diagnostic.py
+          python3 -B scripts/cafe_synthetic_docker_ro_start_diagnostic.py --help | grep -F -- '--diagnose'
+          python3 - <<'PY'
+          from importlib.util import spec_from_file_location,module_from_spec
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          from unittest.mock import patch
+          path=Path("scripts/cafe_synthetic_docker_ro_start_diagnostic.py")
+          source=path.read_text()
+          required=(
+            "e41e9a6f20caa5b628073881d80e312ccac3ba8f",
+            "module.preflight()", "runner.archive_into(source)",
+            "--network=none", "--read-only", "--pull=never",
+            "--cap-drop=ALL", "--security-opt=no-new-privileges",
+            "--entrypoint=sh", "TMPFS", "CAFE_P11_OCI_SHELL_MARKER",
+            "P1.1 DIAG DOCKER START / READONLY MOUNTS PASS",
+          )
+          assert all(x in source for x in required)
+          for forbidden in ("db:prepare", "db:migrate", "db:schema:load",
+                            "db:seed", "--privileged", "--network=host",
+                            "docker exec", "docker start", "docker stop",
+                            "DATABASE_URL=", "PGPASSWORD=", "--restart=no"):
+              assert forbidden not in source, forbidden
+          spec=spec_from_file_location("cafe_diag",path)
+          module=module_from_spec(spec)
+          spec.loader.exec_module(module)
+          assert "--network=none" in module.BASE
+          assert "--read-only" in module.BASE
+          assert "--rm" in module.BASE
+          assert module.MARKER == b"CAFE_P11_OCI_SHELL_MARKER\\n"
+          assert "SHELL_MARK" not in module.BASE
+          class FakeRunner:
+              @staticmethod
+              def failure_kind(stderr):
+                  return "readonly_filesystem"
+          module.runner=FakeRunner()
+          secret="NEVER_PRINT_FAKE_TOKEN"
+          with patch.object(module.subprocess, "run",
+              return_value=CompletedProcess(["docker"], 125, b"",
+                  ("OCI error: read-only file system " + secret).encode())):
+              try:
+                  module.case("BASE", ["docker", "run"])
+              except RuntimeError as exc:
+                  msg=str(exc)
+                  assert "BASE [OCI_OR_SHELL_ERROR / readonly_filesystem]" in msg
+                  assert secret not in msg
+              else:
+                  raise AssertionError("Fail-closed diagnostic required")
+          print("P1.1 NO-NETWORK READONLY OCI DIAGNOSTIC REDACTION PASS")
+          PY
       - name: Validate no DB writer CLI entrypoint
         shell: bash
         run: |
