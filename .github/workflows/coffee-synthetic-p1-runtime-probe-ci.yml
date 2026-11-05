@@ -77,7 +77,7 @@ jobs:
                   module.run(["docker"], stage="isolated_rails_container")
               except RuntimeError as err:
                   message=str(err)
-                  assert "isolated_rails_container failed [unspecified_failure]" in message
+                  assert "isolated_rails_container failed [before_shell_entry / unspecified_failure]" in message
                   assert secret not in message
               else:
                   raise AssertionError("Expected to fail closed")
