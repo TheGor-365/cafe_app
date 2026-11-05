@@ -1,0 +1,126 @@
+name: Cafe QA persistent PostgreSQL recovery static security gates
+
+on:
+  push:
+    branches: [feature/cafe-qa-persistent-pg-recovery-20261106]
+  pull_request:
+    branches: [feature/cafe-p12-fifth-only-schema-loader-20261105]
+
+permissions:
+  contents: read
+
+jobs:
+  safe-qa-restore-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax and narrow entrypoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_qa_persistent_pg_recovery_20261106.py
+          python3 scripts/cafe_qa_persistent_pg_recovery_20261106.py --help | grep -F -- '--check'
+          python3 scripts/cafe_qa_persistent_pg_recovery_20261106.py --help | grep -F -- '--restore'
+      - name: Verify exact QA-only Docker and protected live identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path('scripts/cafe_qa_persistent_pg_recovery_20261106.py').read_text()
+          t=ast.parse(s)
+          required=(
+              'cafe-qa-pgdata-persistent-20261106',
+              'cafe-upload-qa-pg-20261103',
+              'cafe-upload-qa-net-20261103',
+              'cafe-app-patched-qa-candidate-20261104',
+              'cafe-upload-qa-proxy-patched-20261104',
+              'cafe-app-db',
+              'cafe-app-local-3001-web',
+              'qa_security_snapshot_20261104_sqwulocr',
+              'qa_cafe.dump',
+              '--network-alias',
+              '--network',
+              '--read-only',
+              '--memory',
+              '--pids-limit',
+              'pg_restore',
+              '--single-transaction',
+              '--exit-on-error',
+              '--no-owner',
+              '--no-acl',
+              'hmac.compare_digest',
+              'MARKER.open("x"',
+              'restore_private_qa_archive_once',
+          )
+          for value in required:
+              assert value in s,value
+          forbidden=(
+              'docker compose down',
+              'docker-compose down',
+              'db:reset',
+              'db:drop',
+              '--privileged',
+              '--network=host',
+              '--publish',
+              'docker rm ',
+              'docker volume rm',
+              'git checkout',
+              'POSTGRES_PASSWORD=',
+          )
+          for value in forbidden:
+              assert value not in s,value
+          funcs={node.name for node in ast.walk(t) if isinstance(node,ast.FunctionDef)}
+          for name in ('preflight','create','verify_created','restore','verify_running',
+                       'backup_audit','original_audit','pg_audit'):
+              assert name in funcs,name
+          print('PERSISTENT QA RECOVERY EXACT NETWORK/VOLUME/ARCHIVE CONTRACT PASS')
+          PY
+      - name: Exercise safe Docker command assembly with mocks; no Docker used
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          from unittest.mock import patch
+          p=Path('scripts/cafe_qa_persistent_pg_recovery_20261106.py')
+          spec=importlib.util.spec_from_file_location('qa_recovery',p)
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          seen=[]
+          def fake_docker(*args):
+              seen.append(args)
+              if args[0]=='volume' and args[1]=='create':
+                  return CompletedProcess(args,0,b'fake_volume',b'')
+              if args[0]=='create':
+                  assert '--name' in args and args[args.index('--name')+1]==m.PG
+                  assert '--network' in args and args[args.index('--network')+1]==m.QA_NET
+                  assert '--network-alias' in args and args[args.index('--network-alias')+1]==m.QA_ALIAS
+                  assert '--read-only' in args and '--restart' in args
+                  assert not any(x in args for x in ('-p','--publish','--privileged'))
+                  assert args[-1]=='postgres:16'
+                  assert 'type=volume,source={},target=/var/lib/postgresql/data'.format(m.VOLUME) in args
+                  return CompletedProcess(args,0,b'fake_pg',b'')
+              raise AssertionError('unapproved Docker command')
+          with patch.object(m,'preflight'),patch.object(m,'docker',side_effect=fake_docker), \
+               patch.object(m,'volume_audit'),patch.object(m,'pg_audit'):
+              m.create()
+          assert len(seen)==2
+          assert seen[0][:2]==('volume','create')
+          assert seen[1][0]=='create'
+          assert all(m.LIVE_PG not in x for x in (' '.join(args) for args in seen))
+          print('QA CREATE USES ONLY NEW PERSISTENT VOLUME AND MISSING QA PG PASS')
+          PY
+      - name: Validate no owner-local operations are invoked in CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 scripts/cafe_qa_persistent_pg_recovery_20261106.py --create --restore >/dev/null 2>&1; then
+            echo 'Multiple mutually exclusive modes unexpectedly accepted' >&2
+            exit 1
+          fi
+          echo 'CI DOES NOT START/CREATE/RESTORE OWNER POSTGRES'
