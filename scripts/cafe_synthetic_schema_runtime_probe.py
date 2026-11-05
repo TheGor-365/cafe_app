@@ -61,6 +61,21 @@ def failure_kind(stderr):
         return "network_or_dependency"
     return "unspecified_failure"
 
+# Fixed internal stdout markers identify how far the isolated shell progressed.
+# Never echo stdout/stderr originating from Docker to the operator on failure.
+RUNTIME_PHASES = (
+    (b"CAFE_P11_RAILS_PASS", "rails_completed"),
+    (b"CAFE_P11_BUNDLER_PASS", "rails_boot"),
+    (b"CAFE_P11_RUBY_PASS", "bundler_start"),
+    (b"CAFE_P11_CONTAINER_ENTERED", "ruby_start"),
+)
+
+def runtime_phase(stdout):
+    for marker, label in RUNTIME_PHASES:
+        if marker in stdout:
+            return label
+    return "before_shell_entry"
+
 def run(argv, timeout=35, max_stdout=MAX_ARCHIVE, stage="controlled"):
     # Each stage is a trusted internal literal, not command-derived text.
     require(stage in ("git_metadata", "docker_inspect", "git_archive",
@@ -71,8 +86,11 @@ def run(argv, timeout=35, max_stdout=MAX_ARCHIVE, stage="controlled"):
     except (OSError, subprocess.TimeoutExpired):
         raise RuntimeError("CAFE P1.1 RAILS PROBE STOP: " + stage +
                            " unavailable_or_timeout")
-    require(completed.returncode == 0,
-            stage + " failed [" + failure_kind(completed.stderr) + "]")
+    if completed.returncode != 0:
+        reason = failure_kind(completed.stderr)
+        if stage == "isolated_rails_container":
+            reason = runtime_phase(completed.stdout[:8192]) + " / " + reason
+        require(False, stage + " failed [" + reason + "]")
     require(len(completed.stdout) <= max_stdout,
             stage + " output_exceeds_limit")
     return completed.stdout
@@ -184,10 +202,20 @@ def probe():
         ]
         for mount in gem_mounts:
             args.append("--mount=" + mount)
-        args += ["--entrypoint=sh", IMAGE, "-lc",
-                 "ruby -v && bundle exec rails -v"]
+        command = (
+            "printf 'CAFE_P11_CONTAINER_ENTERED\\n'; "
+            "ruby -v || exit 51; "
+            "printf 'CAFE_P11_RUBY_PASS\\n'; "
+            "bundle --version >/dev/null || exit 52; "
+            "printf 'CAFE_P11_BUNDLER_PASS\\n'; "
+            "bundle exec rails -v || exit 53; "
+            "printf 'CAFE_P11_RAILS_PASS\\n'"
+        )
+        args += ["--entrypoint=sh", IMAGE, "-lc", command]
         output = run(args, timeout=150, max_stdout=8192,
                      stage="isolated_rails_container").decode(errors="replace")
+        require("CAFE_P11_RAILS_PASS" in output,
+                "isolated Rails shell did not complete reviewed phases")
         require(re.search(r"ruby 2\.5\.8(?:p[0-9]+)?\b", output) and
                 re.search(r"Rails 6\.0\.", output),
                 "legacy Ruby/Rails version mismatch")
