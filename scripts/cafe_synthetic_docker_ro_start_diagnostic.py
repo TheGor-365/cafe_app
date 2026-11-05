@@ -27,7 +27,7 @@ MARKER = b"CAFE_P11_OCI_SHELL_MARKER\n"
 BASE = [
     "docker", "run", "--rm", "--pull=never",
     "--network=none", "--read-only", "--user=1000:1000",
-    "--memory=1024m", "--pids-limit=256", "--restart=no",
+    "--memory=1024m", "--pids-limit=256",
     "--cap-drop=ALL", "--security-opt=no-new-privileges",
 ]
 TMPFS = "--tmpfs=/tmp:rw,nosuid,nodev,size=128m,uid=1000,gid=1000"
