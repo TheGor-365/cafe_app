@@ -69,3 +69,21 @@ Owner executed SHA-pinned P1.1 v4 probe from PR #56 commit `43a7120c59a3f41e5761
 The last marker denotes the failure at `bundle exec rails -v` **after** successful `ruby -v` and `bundle --version`. It does not prove Rails loaded. The pinned `Gemfile.lock` blob `06f3924bf211e56d0845bca1f6508bb81bf8a324` includes only `PLATFORMS: x64-mingw32` and `BUNDLED WITH: 2.2.13`; this is a concrete Linux compatibility concern but does not prove the exact local Bundler error. The proven P0 CI *did* add the Linux platform in an ephemeral checkout and install gems before running Rails 6.0.3.6.
 
 Next: inspect only gem metadata baked into the isolated immutable `cafe-legacy-full:node14` Docker image using disposable read-only networkless execution. Do not mount the dirty checkout, run `bundle install`, enable network access, copy a private bundle, or write PostgreSQL yet. If missing gems or cross-platform lock is confirmed, prepare a **separate** disposable Linux bundle/source normalization strategy with CI evidence; the canonical Git lock remains unchanged.
+
+## Owner checkpoint: container RubyGems inventory (2026-11-05)
+
+Owner ran a standalone `docker run --rm --pull=never --network none --read-only --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges --entrypoint ruby cafe-legacy-full:node14 -e 'require "rubygems"; ...'` against the isolated image **without any source or dependency mount**. Its default RubyGems search path returned:
+
+```text
+bundler: 2.2.13, 1.17.3
+rails: MISSING
+railties: MISSING
+activerecord: MISSING
+pg: MISSING
+devise: MISSING
+carrierwave: MISSING
+```
+
+This is conclusive only for the image's **unmounted default RubyGems lookup**, not every possible bundle directory and not the running QA source container. It explains the standalone P1.1 runtime failure more directly than the Windows-only canonical lockfile platform, which is an additional potential blocker. No `bundle install`, schema load or fifth PostgreSQL writes occurred.
+
+Next single nonmutating owner step: `docker inspect` the original **running** `cafe-upload-security-headers-mountfix-20261104` and show **destination/type/rw only**, especially `/app`. Do not print bind-mount host sources, volumes names, full environment or credentials. Then identify and verify any already-installed, separately mounted QA dependencies; if none exist, design a disposable CI-like `bundle install` into a distinct new temporary cache without touching protected source or legacy services.
