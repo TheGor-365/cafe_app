@@ -137,8 +137,9 @@ jobs:
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
           seen=[]
+          original_writer=m.docker_writer
           def fake_writer(source,mounts,ip):
-              return m.docker_writer(source,mounts,ip)
+              return original_writer(source,mounts,ip)
           fake_mounts=[
               'type=bind,source=/tmp/qa_bundle_test,target=/bundle,readonly',
               'type=bind,source=/tmp/qa_gemfile_test,target=/app/Gemfile,readonly',
