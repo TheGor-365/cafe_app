@@ -172,6 +172,7 @@ def check():
     canonical_versions()
     require(git("cat-file","-t",RUBY_GUARD_BLOB)=="blob",
             "reviewed fifth-only Ruby guard Git blob missing")
+    offline_runner_mount_probe(probe,mounts,ip)
     print("P1.2 PROTECTED FOUR PG / MEDIA / HTTP 3001-3002 PASS",flush=True)
     print("P1.2 FIFTH SCRAM POSTGRES / ISOLATED NETWORK / EMPTY SCHEMA PASS",flush=True)
     print("P1.2 REVIEWED RAILS / READONLY BUNDLE / SOURCE CONTRACT PASS",flush=True)
@@ -221,6 +222,39 @@ def docker_writer(source,mounts,ip):
            'bundle exec ruby qa/security/cafe_fifth_schema_target_guard.rb post')
     argv+=["--entrypoint=sh",IMAGE,"-c",shell]
     return argv
+
+def offline_runner_mount_probe(probe,mounts,ip):
+    """No-network disposable probe of the exact DDL runner mount hierarchy.
+
+    Uses a fixed FAKE placeholder instead of the private PostgreSQL secret.
+    There is no database address reachable and no SQL or Rails data task.
+    """
+    os.umask(0o077)
+    with tempfile.TemporaryDirectory(prefix="cafe-p12-offline-mount-") as stage:
+        source=build_source(probe,stage)
+        sentinel=Path(stage)/"fake_noncredential_file"
+        with sentinel.open("x",encoding="ascii") as out:
+            out.write("not-a-secret\n")
+        sentinel.chmod(0o600)
+        argv=docker_writer(source,mounts,ip)
+        expected_secret="--mount=type=bind,source={},target=/tmp/cafe_p12_secret,readonly".format(SECRET)
+        fake_secret="--mount=type=bind,source={},target=/tmp/cafe_p12_secret,readonly".format(sentinel)
+        require(argv.count(expected_secret)==1,"test secret mount contract differs")
+        argv[argv.index(expected_secret)]=fake_secret
+        exact_network="--network="+NETWORK
+        require(argv.count(exact_network)==1,"isolated network contract differs")
+        argv[argv.index(exact_network)]="--network=none"
+        argv[-1]="set -eu; test -r /tmp/cafe_p12_secret; bundle exec rails -v"
+        # The temporary process receives NO original database credential.
+        try:
+            result=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+                                  check=False,timeout=150)
+        except (OSError,subprocess.TimeoutExpired):
+            raise RuntimeError("P1.2 SCHEMA STOP: isolated offline mount test unavailable")
+        require(result.returncode==0 and b"Rails 6.0." in result.stdout,
+                "offline Rails/secret-target/tmpfs mount compatibility failed")
+    print("P1.2 ISOLATED NO-NETWORK / FAKE-SECRET / RAILS MOUNT PROBE PASS",
+          flush=True)
 
 def create_schema(confirmation):
     require(confirmation==DB,"explicit --confirm-target cafe_synthetic required")
