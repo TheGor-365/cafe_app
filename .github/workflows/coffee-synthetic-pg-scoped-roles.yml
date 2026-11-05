@@ -39,28 +39,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          sql = Path('qa/security/cafe_synthetic_roles_acl_ci.sql').read_text()
-          for expected in (
-              'CREATE ROLE cafe_synth_owner NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOLOGIN NOREPLICATION NOBYPASSRLS;',
-              'CREATE ROLE cafe_synth_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN NOREPLICATION NOBYPASSRLS PASSWORD',
-              'REVOKE ALL ON DATABASE cafe_synthetic FROM PUBLIC;',
-              'REVOKE CONNECT ON DATABASE postgres, template1 FROM PUBLIC;',
-              'ALTER SCHEMA public OWNER TO cafe_synth_owner;',
-              'GRANT CONNECT ON DATABASE cafe_synthetic TO cafe_synth_app;',
-              'GRANT USAGE ON SCHEMA public TO cafe_synth_app;',
-              'ALTER DEFAULT PRIVILEGES FOR ROLE cafe_synth_owner IN SCHEMA public',
-              'ALTER ROLE cafe_synth_app IN DATABASE cafe_synthetic SET search_path = public;',
-          ):
-              assert expected in sql, expected
-          for rejected in ('DROP ', 'TRUNCATE ', 'COPY ', 'CREATE EXTENSION',
-                           'GRANT ALL', 'SUPERUSER;', 'CREATEDB;', 'CREATEROLE;',
-                           'ALTER SYSTEM', 'pg_dump', 'pg_restore'):
-              assert rejected not in sql, rejected
-          assert sql.count('BEGIN;') == 1 and sql.count('COMMIT;') == 1
-          print('SCOPED ROLE DDL SOURCE CONTRACT PASS')
-          PY
+          SQL=qa/security/cafe_synthetic_roles_acl_ci.sql
+          test -s "$SQL"
+          grep -Fq 'CREATE ROLE cafe_synth_owner NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOLOGIN NOREPLICATION NOBYPASSRLS;' "$SQL"
+          grep -Fq 'CREATE ROLE cafe_synth_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN NOREPLICATION NOBYPASSRLS PASSWORD' "$SQL"
+          grep -Fq 'REVOKE ALL ON DATABASE cafe_synthetic FROM PUBLIC;' "$SQL"
+          grep -Fq 'REVOKE CONNECT ON DATABASE postgres, template1 FROM PUBLIC;' "$SQL"
+          grep -Fq 'ALTER SCHEMA public OWNER TO cafe_synth_owner;' "$SQL"
+          grep -Fq 'GRANT CONNECT ON DATABASE cafe_synthetic TO cafe_synth_app;' "$SQL"
+          grep -Fq 'GRANT USAGE ON SCHEMA public TO cafe_synth_app;' "$SQL"
+          grep -Fq 'ALTER DEFAULT PRIVILEGES FOR ROLE cafe_synth_owner IN SCHEMA public' "$SQL"
+          grep -Fq 'ALTER ROLE cafe_synth_app IN DATABASE cafe_synthetic SET search_path = public;' "$SQL"
+          if grep -Eiq '\b(DROP|TRUNCATE|COPY|ALTER SYSTEM|GRANT ALL|SUPERUSER|CREATEDB|CREATEROLE|pg_dump|pg_restore)\b' "$SQL"; then
+            echo "Disallowed SQL keyword in synthetic role DDL" >&2
+            exit 1
+          fi
+          test "$(grep -c '^BEGIN;' "$SQL")" = 1
+          test "$(grep -c '^COMMIT;' "$SQL")" = 1
+          echo "SCOPED ROLE DDL SOURCE CONTRACT PASS"
       - name: Provision roles ONLY inside throwaway GitHub Actions PostgreSQL
         shell: bash
         run: |
