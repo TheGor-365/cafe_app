@@ -1,0 +1,128 @@
+name: Cafe QA post-reboot one-shot empty-DB resume gate
+
+on:
+  push:
+    branches: [feature/cafe-qa-persistent-pg-recovery-20261106]
+  pull_request:
+    branches: [feature/cafe-p12-fifth-only-schema-loader-20261105]
+
+permissions:
+  contents: read
+
+jobs:
+  qa-only-resume-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Python syntax and exclusive CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_qa_persistent_pg_resume_20261106.py
+          python3 scripts/cafe_qa_persistent_pg_resume_20261106.py --help | grep -F -- '--check-resume'
+          python3 scripts/cafe_qa_persistent_pg_resume_20261106.py --help | grep -F -- '--resume-empty'
+          if python3 scripts/cafe_qa_persistent_pg_resume_20261106.py --check-resume --resume-empty >/dev/null 2>&1; then
+            echo 'Mutually exclusive resume modes not enforced' >&2
+            exit 1
+          fi
+      - name: CI-mocked QA-only resumed restore, nonempty rejection and retry-denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util, json, os, pathlib, tempfile
+          from unittest.mock import Mock, patch
+          from subprocess import CompletedProcess
+          script=pathlib.Path('scripts/cafe_qa_persistent_pg_resume_20261106.py')
+          spec=importlib.util.spec_from_file_location('cafe_qa_resume',script)
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          with tempfile.TemporaryDirectory() as folder:
+              path=pathlib.Path(folder)
+              manifest=path/'manifest.json'
+              digest='a'*64
+              manifest.write_text(json.dumps({'database':{'sha256':digest}}))
+              marker=path/'original_marker.json'
+              marker.write_text(json.dumps({
+                  'operation':'restore_private_qa_archive_once',
+                  'target':'cafe-upload-qa-pg-20261103',
+                  'volume':'cafe-qa-pgdata-persistent-20261106',
+                  'backup_sha256':digest,
+                  'started_unix':1000000000,
+              }))
+              os.chmod(marker,0o600)
+              archive=path/'qa_cafe.dump'
+              archive.write_bytes(b'CI DUMMY DATA ONLY - NEVER RESTORED')
+              fake=Mock()
+              fake.MARKER=marker
+              fake.MANIFEST=manifest
+              fake.PG='cafe-upload-qa-pg-20261103'
+              fake.LIVE_PG='cafe-app-db'
+              fake.DB='cafe'
+              fake.VOLUME='cafe-qa-pgdata-persistent-20261106'
+              fake.ARCHIVE=archive
+              def sql(_,statement):
+                  if 'system_identifier' in statement:
+                      return '100000000000001' if _==fake.LIVE_PG else '200000000000002'
+                  if 'current_database()' in statement:
+                      return 'cafe'
+                  return '0'
+              fake.sql.side_effect=sql
+              resumed=path/'resume_marker.json'
+              with patch.object(m,'load_original',return_value=fake), \
+                   patch.object(m,'RESUME_MARKER',resumed), \
+                   patch.object(m.os,'getuid',return_value=1000):
+                  m.audit()
+                  assert not resumed.exists()
+                  fake.sql.side_effect=lambda target,statement: ('1' if 'pg_class' in statement else sql(target,statement))
+                  try:
+                      m.audit()
+                  except RuntimeError as err:
+                      assert 'QA DB not strictly empty' in str(err)
+                  else:
+                      raise AssertionError('nonempty database accepted')
+                  fake.sql.side_effect=sql
+                  def no_real_docker(args,**kwargs):
+                      assert resumed.is_file(), 'one-shot marker must precede pg_restore'
+                      assert args[:6]==['docker','exec','-i','--user','postgres',fake.PG]
+                      assert args[6:8]==['pg_restore','--username=postgres']
+                      assert '--dbname=cafe' in args
+                      assert '--single-transaction' in args and '--exit-on-error' in args
+                      assert '--no-owner' in args and '--no-acl' in args
+                      assert fake.LIVE_PG not in args
+                      assert kwargs.get('stdin') is not None
+                      return CompletedProcess(args,0,b'',b'')
+                  with patch.object(m.subprocess,'run',side_effect=no_real_docker) as subprocess_mock:
+                      m.resume_empty()
+                      assert subprocess_mock.call_count==1
+                      try:
+                          m.resume_empty()
+                      except RuntimeError as err:
+                          assert 'already attempted' in str(err)
+                      else:
+                          raise AssertionError('second one-shot resume accepted')
+                      assert subprocess_mock.call_count==1
+                  m.verify()
+                  assert fake.verify_running.call_count>=2
+                  print('QA STRICT EMPTY AND ONE-SHOT MOCKED IMPORT PASS')
+                  print('QA FULL USER / DB / DOCKER DATA NEVER TOUCHED BY CI')
+          PY
+      - name: Deny unsafe branch/DB operations in recovery script
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text=Path('scripts/cafe_qa_persistent_pg_resume_20261106.py').read_text()
+          required=['ORIGINAL_BLOB','ORIGINAL.is_symlink()','original.pg_audit("running")',
+                    'empty_db_audit(original)','os.O_EXCL','pg_restore',
+                    '--single-transaction','--exit-on-error',
+                    'original.verify_running()','module.sql(module.PG,statement)=="0"']
+          for token in required:
+              assert token in text, token
+          forbidden=['docker compose down','docker volume rm','docker rm ','db:reset',
+                     'db:drop','--network host','git checkout','-p 5432','docker start']
+          for token in forbidden:
+              assert token not in text,token
+          print('QA RESUME-ONLY STATIC SAFETY GUARD PASS')
+          PY
