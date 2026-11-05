@@ -26,10 +26,13 @@ GATE_BLOB = "501914861518530bed0d18c8f1ca08550fe65e4d"
 IMAGE = "cafe-legacy-full:node14"
 SOURCE_WEB = "cafe-upload-security-headers-mountfix-20261104"
 MAX_ARCHIVE = 80 * 1024 * 1024
+# Only dependency volumes OUTSIDE the read-only /app Git snapshot are safe
+# to inherit. Mounting /app/node_modules beneath a read-only /app bind fails
+# in the owner's Docker before entrypoint (P1.1 OCI diagnostic 2026-11-05).
 CANDIDATE_GEM_MOUNTS = {
-    "/usr/local/bundle", "/app/vendor/bundle",
-    "/usr/local/lib/ruby/gems", "/app/node_modules",
+    "/usr/local/bundle", "/usr/local/lib/ruby/gems",
 }
+EXCLUDED_NESTED_NODE_MOUNT = "/app/node_modules"
 TRACKED = {
     "db/schema.rb": "2506954d1ea3e6368eb219956863b2acb91441c8",
     "db/seeds.rb": "dae2eed43c78ff79a14e3bf3e83d59a649803cd4",
@@ -130,15 +133,27 @@ def allowed_gem_mounts():
             obj[0]["Config"]["Image"] == IMAGE,
             "trusted Rails QA source container unavailable")
     found = []
+    excluded = 0
     for mount in obj[0]["Mounts"]:
         dest = mount["Destination"]
+        if dest == EXCLUDED_NESTED_NODE_MOUNT:
+            # Existing source QA container is untouched; the disposable
+            # Ruby/Rails CLI probe never mounts this JavaScript-only volume.
+            require(mount["Type"] == "volume" and mount["RW"] is False,
+                    "unexpected source node_modules mount")
+            excluded += 1
+            continue
         if dest not in CANDIDATE_GEM_MOUNTS:
             continue
+        require(not dest.startswith("/app/"), "nested read-only source mount forbidden")
         require(mount["Type"] == "volume" and mount["RW"] is False and
                 mount.get("Name"), "unexpected writable/private Ruby gem mount")
         found.append("type=volume,source={},target={},readonly".format(
             mount["Name"], dest))
+    require(excluded == 1, "expected single read-only source node_modules volume")
     require(len(found) == len(set(found)), "duplicate Ruby dependencies mount")
+    print("P1.1 INCOMPATIBLE NESTED NODE_MODULES VOLUME EXCLUDED PASS",
+          flush=True)
     return found
 
 def archive_into(dst):
