@@ -1,12 +1,85 @@
-name: Cafe P1.2 PG recovery
+name: Cafe P1.2 two temporary PostgreSQL recovery safety
+
 on:
   push:
     branches: [feature/cafe-p12-restore-existing-test-pg-20261106]
+
 permissions:
   contents: read
+
 jobs:
-  test:
+  scoped-restore:
     runs-on: ubuntu-latest
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
-      - run: python3 -m py_compile scripts/cafe_p12_existing_tmpfs_pg_restore_20261106.py
+      - name: Python syntax / isolated scope checks
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/cafe_p12_existing_tmpfs_pg_restore_20261106.py
+          python3 scripts/cafe_p12_existing_tmpfs_pg_restore_20261106.py --help | grep -- '--restore-clones'
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path('scripts/cafe_p12_existing_tmpfs_pg_restore_20261106.py').read_text()
+          t=ast.parse(s)
+          required=['cafe-upload-security-sandbox-pg-20261104',
+            'cafe-upload-security-e2e-pg-20261105',
+            'af125038530314febacd35a59d5d213a85f8f742',
+            'os.O_EXCL','--single-transaction','--no-acl',
+            '--no-owner','--exit-on-error',
+            'inv.protected_pair()','inv.qa_backup_audit()']
+          for x in required: assert x in s,x
+          forbidden=['docker compose','db:reset','db:drop',
+             '"docker","run"','"docker","create"','"docker","stop"',
+             '"docker","restart"','"docker","volume","rm"']
+          for x in forbidden: assert x not in s,x
+          funcs={n.name for n in ast.walk(t) if isinstance(n,ast.FunctionDef)}
+          assert {'restore','verify','original_source_check','empty','ready',
+             'inspect_source','unique_ids'} <= funcs
+          print('P1.2 RESTORE SCOPE / PRIVATE MARKER / NO PRODUCTION MUTATION PASS')
+          PY
+      - name: Mock exact two restores, marker first, and replay refusal
+        run: |
+          python3 - <<'PY'
+          import importlib.util,json
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          from subprocess import CompletedProcess
+          from unittest.mock import Mock,patch
+          path='scripts/cafe_p12_existing_tmpfs_pg_restore_20261106.py'
+          sp=importlib.util.spec_from_file_location('qa_pg_recovery',path)
+          m=importlib.util.module_from_spec(sp);sp.loader.exec_module(m)
+          with TemporaryDirectory() as td:
+            root=Path(td)
+            (root/'qa_cafe.dump').write_bytes(b'CI-FAKE-ARCHIVE')
+            (root/'manifest.json').write_text(json.dumps({'database':{'sha256':'f'*64}}))
+            inv=Mock();inv.QA_BACKUP=root
+            calls=[]
+            def fake_run(args,**kwargs):
+              assert (root/'marker').is_file()
+              assert args[0]=='docker' and args[1] in ('start','exec')
+              if args[1]=='start':
+                assert args[2] in [x[1] for x in m.PGS]
+              else:
+                assert args[5] in [x[1] for x in m.PGS]
+                assert args[6]=='pg_restore' and '--single-transaction' in args
+                assert kwargs.get('stdin') is not None
+              calls.append(args)
+              return CompletedProcess(args,0,b'',b'')
+            with patch.object(m,'MARKER',root/'marker'), \
+              patch.object(m,'inventory',return_value=inv), \
+              patch.object(m,'original_source_check',return_value=inv), \
+              patch.object(m,'empty'),patch.object(m,'verify_tables'), \
+              patch.object(m,'unique_ids'),patch.object(m,'verify'), \
+              patch.object(m,'run',side_effect=fake_run):
+              m.restore()
+              assert [x[2] for x in calls if x[1]=='start']==[x[1] for x in m.PGS]
+              assert [x[5] for x in calls if x[1]=='exec']==[x[1] for x in m.PGS]
+              assert len(calls)==4
+              try:m.restore()
+              except FileExistsError:pass
+              else:raise AssertionError('one-shot repeated write was accepted')
+              assert len(calls)==4
+              print('P1.2 TWO EXISTING PG MOCK RESTORE / MARKER-BEFORE-WRITE / NO-RETRY PASS')
+          PY
