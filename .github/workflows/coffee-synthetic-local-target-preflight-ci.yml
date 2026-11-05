@@ -1,0 +1,60 @@
+name: Cafe fifth local schema target P1 preflight source audit (CI-only)
+on:
+  push:
+    branches: [feature/cafe-synthetic-schema-local-target-preflight-20261105]
+  pull_request:
+    branches: [feature/cafe-synthetic-schema-readonly-gate-20261105]
+permissions:
+  contents: read
+
+jobs:
+  read-only-source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile read-only Python gate and inspect immutable source pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_synthetic_schema_local_target_preflight.py
+          python3 - <<'PY'
+          import ast
+          import pathlib
+          import subprocess
+          import sys
+          path = pathlib.Path("scripts/cafe_synthetic_schema_local_target_preflight.py")
+          source = path.read_text()
+          tree = ast.parse(source)
+          for name, expected in {
+              "db/schema.rb": "2506954d1ea3e6368eb219956863b2acb91441c8",
+              "db/seeds.rb": "dae2eed43c78ff79a14e3bf3e83d59a649803cd4",
+              "db/migrate/20261102000100_create_cafe_drink_options.rb":
+                  "1d0ebdd9f4d7b5d70fb13868da97f76dd722f65e"
+          }.items():
+              observed = subprocess.check_output(["git", "hash-object", name], text=True).strip()
+              assert observed == expected, (name, observed)
+              assert expected in source
+          assert "d16a2668ed71c6af3589425ad85178ab6f4be423" in source
+          assert "module.check()" in source
+          assert "CAFE P1 TARGET PREFLIGHT" in source
+          assert "P1 LOCAL TARGET PREFLIGHT READ-ONLY PASS" in source
+          assert "cafe-upload-security-synthetic-pg-20261105" in source
+          assert "cafe-upload-security-synthetic-net-20261105" in source
+          assert "cafe-legacy-full:node14" in source
+          assert "CREATE TABLE" not in source
+          assert not any(isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute)
+              and n.func.attr in ("write_text","write_bytes","unlink","mkdir","rename","replace")
+              for n in ast.walk(tree))
+          print("P1 READ-ONLY TARGET CHECK SOURCE / THREE SCHEMA BLOBS PASS")
+          PY
+      - name: Confirm a single check-only interface (no DDL path)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/cafe_synthetic_schema_local_target_preflight.py --help | grep -F -- '--check'
+          if python3 -B scripts/cafe_synthetic_schema_local_target_preflight.py --create-schema >/dev/null 2>&1; then
+            echo "Unexpected schema writer mode accepted by read-only gate" >&2
+            exit 1
+          fi
+          echo "P1 NO SCHEMA/SEED/DOCKER WRITE ENTRYPOINT PASS"
