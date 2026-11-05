@@ -45,10 +45,10 @@ def target_guard(db)
   assert_equal(actual['current_database'], TARGET_DB, 'wrong connected database')
   assert_equal(actual['current_user'], OWNER, 'current_user not constrained owner')
   assert_equal(actual['session_user'], 'postgres', 'unexpected session_user')
-  blocked('not PostgreSQL16') unless actual['current_setting'].to_i / 10_000 == 16
-  assert_equal(actual['inet_server_addr'], expected_ip, 'unexpected PG server IP')
-  assert_equal(actual['inet_server_port'].to_i, 5432, 'unexpected server port')
-  assert_equal(actual['current_setting_1'], 'off', 'unexpected read-only mode')
+  blocked('not PostgreSQL16') unless actual['pg_version'].to_i / 10_000 == 16
+  assert_equal(actual['server_ip'], expected_ip, 'unexpected PG server IP')
+  assert_equal(actual['server_port'].to_i, 5432, 'unexpected server port')
+  assert_equal(actual['read_only'], 'off', 'unexpected read-only mode')
   assert_equal(scalar(db, "SELECT has_schema_privilege('cafe_synth_app', 'public', 'CREATE')"),
                'f', 'app is unexpectedly permitted CREATE')
   assert_equal(scalar(db, "SELECT has_database_privilege('cafe_synth_app', 'cafe_synthetic', 'CREATE')"),
