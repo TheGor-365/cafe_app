@@ -55,7 +55,49 @@ jobs:
                             "POSTGRES_PASSWORD", "DATABASE_URL="]:
             assert forbidden not in s, forbidden
           assert "PGOPTIONS=" not in s
+          spec=__import__("importlib.util").util.spec_from_file_location("cafe_p11_nesting",p)
+          module=__import__("importlib.util").util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          assert module.EXCLUDED_NESTED_NODE_MOUNT == "/app/node_modules"
+          assert all(not x.startswith("/app/") for x in module.CANDIDATE_GEM_MOUNTS)
+          assert "expected single read-only source node_modules volume" in s
+          assert "P1.1 INCOMPATIBLE NESTED NODE_MODULES VOLUME EXCLUDED PASS" in s
           print("P1.1 EXACT GIT SOURCE / ISOLATED NETWORKLESS RAILS PROBE CONTRACT PASS")
+          PY
+      - name: Validate isolated probe excludes the observed nested source volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          from unittest.mock import patch
+          p=Path("scripts/cafe_synthetic_schema_runtime_probe.py")
+          spec=importlib.util.spec_from_file_location("cafe_p11_volume_acl",p)
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          container={
+            "State":{"Status":"running"},
+            "Config":{"Image":"cafe-legacy-full:node14"},
+            "Mounts":[
+              {"Destination":"/app/node_modules",
+               "Type":"volume","RW":False,"Name":"synthetic_fake_test_volume"}
+            ]
+          }
+          with patch.object(m,"run",return_value=json.dumps([container]).encode()):
+              result=m.allowed_gem_mounts()
+          assert result == [], result
+          container["Mounts"][0]["RW"]=True
+          with patch.object(m,"run",return_value=json.dumps([container]).encode()):
+              try:
+                  m.allowed_gem_mounts()
+              except RuntimeError as exc:
+                  assert "unexpected source node_modules mount" in str(exc)
+              else:
+                  raise AssertionError("Unexpected writable nested source mount accepted")
+          print("P1.1 NO NESTED NODE_MODULES / NEGATIVE MOUNT ACL CONTRACT PASS")
           PY
       - name: Validate sanitized diagnostics never display command stderr
         shell: bash
