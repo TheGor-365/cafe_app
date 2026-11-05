@@ -68,7 +68,7 @@ jobs:
           assert "P1.1 EXISTING QA /bundle READ-ONLY BIND VERIFIED PASS" in s
           print("P1.1 EXACT GIT SOURCE / ISOLATED NETWORKLESS RAILS PROBE CONTRACT PASS")
           PY
-      - name: Validate isolated probe excludes the observed nested source volume
+      - name: Validate isolated reviewed QA gem overlays and protected mounts
         shell: bash
         run: |
           set -euo pipefail
@@ -79,52 +79,76 @@ jobs:
           from pathlib import Path
           from unittest.mock import patch
           p=Path("scripts/cafe_synthetic_schema_runtime_probe.py")
-          spec=importlib.util.spec_from_file_location("cafe_p11_volume_acl",p)
+          spec=importlib.util.spec_from_file_location("cafe_p11_qa_overlay",p)
           m=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(m)
-          with tempfile.TemporaryDirectory() as fake_bundle:
-              container={
-                "State":{"Status":"running"},
-                "Config":{"Image":"cafe-legacy-full:node14"},
-                "Mounts":[
-                  {"Destination":"/app/node_modules",
-                   "Type":"volume","RW":False,"Name":"synthetic_fake_test_volume"},
-                  {"Destination":"/bundle",
-                   "Type":"bind","RW":False,"Source":fake_bundle}
-                ]
+          with tempfile.TemporaryDirectory() as tmp:
+              root=Path(tmp)
+              m.QA_BUNDLE=root/"bundle"
+              m.QA_STAGE=root/"build"
+              m.QA_BUNDLE.mkdir()
+              m.QA_STAGE.mkdir()
+              m.QA_OVERRIDES={
+                "/app/Gemfile":m.QA_STAGE/"Gemfile",
+                "/app/Gemfile.lock":m.QA_STAGE/"Gemfile.lock"
               }
-              with patch.object(m,"run",return_value=json.dumps([container]).encode()):
-                  result=m.allowed_gem_mounts()
-              assert result == [
-                "type=bind,source={},target=/bundle,readonly".format(fake_bundle)
-              ], result
-              container["Mounts"][0]["RW"]=True
-              with patch.object(m,"run",return_value=json.dumps([container]).encode()):
-                  try:
-                      m.allowed_gem_mounts()
-                  except RuntimeError as exc:
-                      assert "unexpected source node_modules mount" in str(exc)
-                  else:
-                      raise AssertionError("Unexpected writable nested source mount accepted")
-              container["Mounts"][0]["RW"]=False
-              container["Mounts"][1]["RW"]=True
-              with patch.object(m,"run",return_value=json.dumps([container]).encode()):
-                  try:
-                      m.allowed_gem_mounts()
-                  except RuntimeError as exc:
-                      assert "QA bundle mount type/access changed" in str(exc)
-                  else:
-                      raise AssertionError("Unexpected writable QA bundle accepted")
-              container["Mounts"][1]["RW"]=False
-              container["Mounts"][1]["Source"]="/run/secrets/qa-bundle"
-              with patch.object(m,"run",return_value=json.dumps([container]).encode()):
-                  try:
-                      m.allowed_gem_mounts()
-                  except RuntimeError as exc:
-                      assert "QA bundle source path not approved" in str(exc)
-                  else:
-                      raise AssertionError("Secret path accepted as QA bundle")
-          print("P1.1 READONLY /bundle / NO NESTED NODE_MODULES MOUNT ACL PASS")
+              (m.QA_STAGE/"Gemfile").write_text("gem 'carrierwave', '= 2.2.7'")
+              (m.QA_STAGE/"Gemfile.lock").write_text(
+                  "    carrierwave (2.2.7)\\n    rails (6.0.3.6)\\n"
+                  "PLATFORMS\\n  x86_64-linux\\nBUNDLED WITH\\n   2.2.13\\n")
+              bundle={"Destination":"/bundle","Type":"bind","RW":False,
+                      "Source":str(m.QA_BUNDLE)}
+              node={"Destination":"/app/node_modules","Type":"volume",
+                    "RW":False,"Name":"fake_test_volume"}
+              overrides=[
+                {"Destination":dest,"Type":"bind","RW":False,"Source":str(path)}
+                for dest,path in m.QA_OVERRIDES.items()
+              ]
+              obj={"State":{"Status":"running"},
+                   "Config":{"Image":"cafe-legacy-full:node14"},
+                   "Mounts":[node,bundle,*overrides]}
+              def check():
+                  with patch.object(m,"run",return_value=json.dumps([obj]).encode()):
+                      return m.allowed_gem_mounts()
+              expected={
+                "type=bind,source={},target=/bundle,readonly".format(m.QA_BUNDLE)
+              } | {
+                "type=bind,source={},target={},readonly".format(path,dest)
+                for dest,path in m.QA_OVERRIDES.items()
+              }
+              assert set(check())==expected
+              node["RW"]=True
+              try: check()
+              except RuntimeError as e:
+                  assert "unexpected source node_modules mount" in str(e)
+              else: raise AssertionError("Writable nested mount accepted")
+              node["RW"]=False
+              bundle["RW"]=True
+              try: check()
+              except RuntimeError as e:
+                  assert "QA bundle mount type/access changed" in str(e)
+              else: raise AssertionError("Writable bundle accepted")
+              bundle["RW"]=False
+              overrides[0]["RW"]=True
+              try: check()
+              except RuntimeError as e:
+                  assert "QA dependency override origin/type/access changed" in str(e)
+              else: raise AssertionError("Writable Gemfile accepted")
+              overrides[0]["RW"]=False
+              overrides[0]["Source"]="/run/secrets/unsafe"
+              try: check()
+              except RuntimeError as e:
+                  assert "QA dependency override origin/type/access changed" in str(e)
+              else: raise AssertionError("Wrong QA file accepted")
+              overrides[0]["Source"]=str(m.QA_OVERRIDES["/app/Gemfile"])
+              (m.QA_STAGE/"Gemfile.lock").write_text(
+                  "    carrierwave (2.2.7)\\n    rails (6.0.3.6)\\n"
+                  "PLATFORMS\\n  x64-mingw32\\nBUNDLED WITH\\n   2.2.13\\n")
+              try: check()
+              except RuntimeError as e:
+                  assert "reviewed Linux-patched dependency contracts missing" in str(e)
+              else: raise AssertionError("Windows-only lock accepted")
+          print("P1.1 PINNED QA LINUX GEMFILE+LOCK MOUNT ACL PASS")
           PY
       - name: Validate sanitized diagnostics never display command stderr
         shell: bash
