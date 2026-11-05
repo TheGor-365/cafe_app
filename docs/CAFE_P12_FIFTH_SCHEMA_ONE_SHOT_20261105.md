@@ -56,9 +56,14 @@ isolated runner must only execute exact reviewed source and gems.
 
 ## Three modes / explicit stage gate
 
-1. --check — READ ONLY. Re-runs pinned P1.1, verifies old four PG,
-   media, 3001/3002, fifth-only network/roles/empty DB/source,
-   credential file metadata and absence of one-shot attempt marker.
+1. --check — READ ONLY relative to protected services/databases.
+   Re-runs pinned P1.1, verifies old four PG, media, 3001/3002,
+   fifth-only network/roles/empty DB/source, credential file metadata
+   and absence of one-shot attempt marker. Also executes a disposable
+   networkless Docker dry-run with the same proposed schema runner
+   filesystem mounts, but substitutes a FAKE, temporary credential
+   placeholder; only checks Rails version, never connects to any DB.
+   Temporary Git source/files are automatically removed.
    This is the ONLY mode initially requested from the owner.
 
 2. --create-schema --confirm-target cafe_synthetic — separately
