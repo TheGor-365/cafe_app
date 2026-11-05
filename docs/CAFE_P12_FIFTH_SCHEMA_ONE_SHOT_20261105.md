@@ -95,3 +95,30 @@ but is NOT evidence of a fifth owner-local schema load.
 Owner-local P1.2 --check PASS is required before any one-shot DDL
 instruction. If the check fails, only inspect the blocker, do not alter
 original four databases, dirty project, Docker networks or media.
+
+## Owner P1.2 preflight v1 PASS; enhanced read-only TCP guard
+
+Owner executed PR #57 commit c6bbb62a3f20de11c8e78b7e3d6a70a185763558,
+script blob 71296c4dd7eec030d6114327130e3ad959eb079b.
+All local P1.2 no-network/fake-secret Docker mount and original four
+PG/media/HTTP 3001/3002 isolation gates passed. Fifth PostgreSQL
+public schema remains EMPTY; NO DDL or seeds were performed.
+
+Before an irreversible one-shot DDL, the improved preflight now adds a
+**read-only TCP SQL connection** in one disposable runner attached only
+to the fifth internal network. It uses the identical future writer's
+SCRAM credential handling and PGOPTIONS role but executes ONLY the
+pinned Ruby SELECT-only target audit in pre mode. Asserts the exact
+fifth DB name/IP, PostgreSQL16, current_user cafe_synth_owner,
+session_user postgres, app role DDL prohibition and empty schema.
+The runner exits and the fifth-only network member inventory is
+rechecked. No database table or role is changed.
+
+The improved preflight also checks availability and integrity of the
+separate pinned original-four PG postflight helper and fifth cluster
+distinctness before any schema attempt marker can be recorded.
+
+**Owner-local status: original v1 --check passed; enhanced live-role
+preflight has not yet been run.** Obtain new exact Git commit/blob and
+repeat only --check. Do NOT execute --create-schema until new local
+preflight PASS.
