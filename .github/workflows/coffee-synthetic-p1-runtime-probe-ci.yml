@@ -136,7 +136,7 @@ jobs:
           assert "--network=none" in module.BASE
           assert "--read-only" in module.BASE
           assert "--rm" in module.BASE
-          assert module.MARKER == b"CAFE_P11_OCI_SHELL_MARKER\\n"
+          assert module.MARKER == b"CAFE_P11_OCI_SHELL_MARKER\n"
           assert "SHELL_MARK" not in module.BASE
           class FakeRunner:
               @staticmethod
