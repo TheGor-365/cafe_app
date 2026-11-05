@@ -34,6 +34,12 @@ CANDIDATE_GEM_MOUNTS = {
 }
 REQUIRED_QA_BUNDLE_MOUNT = "/bundle"
 EXCLUDED_NESTED_NODE_MOUNT = "/app/node_modules"
+QA_STAGE = HOME / ".local/share/cafe_app/security_bundle_build_20261104"
+QA_BUNDLE = HOME / ".local/share/cafe_app/bundle_carrierwave_227_20261104"
+QA_OVERRIDES = {
+    "/app/Gemfile": QA_STAGE / "Gemfile",
+    "/app/Gemfile.lock": QA_STAGE / "Gemfile.lock",
+}
 TRACKED = {
     "db/schema.rb": "2506954d1ea3e6368eb219956863b2acb91441c8",
     "db/seeds.rb": "dae2eed43c78ff79a14e3bf3e83d59a649803cd4",
@@ -136,8 +142,23 @@ def allowed_gem_mounts():
     found = []
     excluded = 0
     qa_bundle = 0
+    seen_overrides = set()
     for mount in obj[0]["Mounts"]:
         dest = mount["Destination"]
+        if dest in QA_OVERRIDES:
+            expected = QA_OVERRIDES[dest]
+            require(mount["Type"] == "bind" and mount["RW"] is False and
+                    mount["Source"] == str(expected),
+                    "QA dependency override origin/type/access changed")
+            require(expected.is_file() and not expected.is_symlink() and
+                    expected.stat().st_uid == os.getuid(),
+                    "QA dependency override file unavailable/untrusted")
+            # /app/Gemfile* exist in canonical Git archive, so Docker does
+            # not create any missing nested mountpoints in readonly /app.
+            found.append("type=bind,source={},target={},readonly".format(
+                expected, dest))
+            seen_overrides.add(dest)
+            continue
         if dest == REQUIRED_QA_BUNDLE_MOUNT:
             # Owner confirmed /bundle is a read-only HOST BIND, not a
             # volume. Reuse only this existing dependency cache, never
@@ -150,8 +171,9 @@ def allowed_gem_mounts():
                             ("/secrets/", "/password", "/credentials/")),
                     "QA bundle source path not approved")
             bundle_path = Path(src)
-            require(bundle_path.is_dir() and not bundle_path.is_symlink(),
-                    "QA bundle bind source unavailable or symlinked")
+            require(bundle_path == QA_BUNDLE and bundle_path.is_dir() and
+                    not bundle_path.is_symlink(),
+                    "QA bundle source differs from reviewed patched-stage path")
             # Do not print src or any installed-gem paths in stdout.
             found.append("type=bind,source={},target=/bundle,readonly".format(src))
             qa_bundle += 1
@@ -172,10 +194,22 @@ def allowed_gem_mounts():
             mount["Name"], dest))
     require(excluded == 1, "expected single read-only source node_modules volume")
     require(qa_bundle == 1, "expected single read-only /bundle bind from QA")
+    require(seen_overrides == set(QA_OVERRIDES),
+            "reviewed QA Gemfile and lockfile overlays are absent")
+    gemfile = QA_OVERRIDES["/app/Gemfile"].read_text(encoding="utf-8")
+    lockfile = QA_OVERRIDES["/app/Gemfile.lock"].read_text(encoding="utf-8")
+    require("'= 2.2.7'" in gemfile and
+            "carrierwave (2.2.7)" in lockfile and
+            "  x86_64-linux" in lockfile and
+            "   2.2.13" in lockfile and
+            "rails (6.0." in lockfile,
+            "reviewed Linux-patched dependency contracts missing")
     require(len(found) == len(set(found)), "duplicate Ruby dependencies mount")
     print("P1.1 INCOMPATIBLE NESTED NODE_MODULES VOLUME EXCLUDED PASS",
           flush=True)
     print("P1.1 EXISTING QA /bundle READ-ONLY BIND VERIFIED PASS",
+          flush=True)
+    print("P1.1 REVIEWED QA GEMFILE + LINUX LOCK OVERLAYS READ-ONLY PASS",
           flush=True)
     return found
 
