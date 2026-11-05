@@ -57,6 +57,35 @@ jobs:
           assert "PGOPTIONS=" not in s
           print("P1.1 EXACT GIT SOURCE / ISOLATED NETWORKLESS RAILS PROBE CONTRACT PASS")
           PY
+      - name: Validate sanitized diagnostics never display command stderr
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from unittest.mock import patch
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          script=Path("scripts/cafe_synthetic_schema_runtime_probe.py")
+          spec=importlib.util.spec_from_file_location("cafe_probe_diagnostics", script)
+          module=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          secret="DO_NOT_ECHO_FICTITIOUS_SECRET_VALUE"
+          with patch.object(module.subprocess, "run",
+              return_value=CompletedProcess(["docker"], 1, b"", secret.encode())):
+              try:
+                  module.run(["docker"], stage="isolated_rails_container")
+              except RuntimeError as err:
+                  message=str(err)
+                  assert "isolated_rails_container failed [unspecified_failure]" in message
+                  assert secret not in message
+              else:
+                  raise AssertionError("Expected to fail closed")
+          assert module.failure_kind(b"Bundler::GemNotFound")=="ruby_bundle_missing"
+          assert module.failure_kind(b"read-only file system")=="readonly_filesystem"
+          assert module.failure_kind(b"permission denied")=="filesystem_permission"
+          print("P1.1 SANITIZED STAGE-ONLY FAILURE DIAGNOSTICS PASS")
+          PY
       - name: Validate no DB writer CLI entrypoint
         shell: bash
         run: |
