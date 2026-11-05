@@ -159,16 +159,7 @@ def tmpfs_audit():
         pg=inspect("container",name)
         net=inspect("network",network)
         host=pg["HostConfig"]
-        require(pg["Name"].lstrip("/")==name and
-                pg["Config"]["Image"]=="postgres:16" and
-                pg["State"]["Status"] in ("exited","created","running") and
-                set(pg["NetworkSettings"]["Networks"])=={network} and
-                net["Internal"] is True and
-                not host.get("PortBindings") and
-                host["RestartPolicy"]["Name"]=="no" and
-                host.get("ReadonlyRootfs") is True if label=="fifth" else True,
-                "unexpected isolated test PG metadata")
-        # Separate mandatory checks for all labels (avoid conditional shortcut).
+        # Check every test PG unconditionally.
         require(pg["Name"].lstrip("/")==name and
                 pg["Config"]["Image"]=="postgres:16" and
                 pg["State"]["Status"] in ("exited","created","running") and
