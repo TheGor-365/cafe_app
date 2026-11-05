@@ -70,9 +70,12 @@ jobs:
                   return '0'
               fake.sql.side_effect=sql
               resumed=path/'resume_marker.json'
+              # File permission validation uses actual CI runner UID.
+              assert m.validate_marker(fake)==digest
               with patch.object(m,'load_original',return_value=fake), \
                    patch.object(m,'RESUME_MARKER',resumed), \
-                   patch.object(m.os,'getuid',return_value=1000):
+                   patch.object(m.os,'getuid',return_value=1000), \
+                   patch.object(m,'validate_marker',return_value=digest):
                   m.audit()
                   assert not resumed.exists()
                   fake.sql.side_effect=lambda target,statement: ('1' if 'pg_class' in statement else sql(target,statement))
