@@ -158,7 +158,7 @@ def probe():
         args += ["--entrypoint=sh", IMAGE, "-lc",
                  "ruby -v && bundle exec rails -v"]
         output = run(args, timeout=150, max_stdout=8192).decode(errors="replace")
-        require(re.search(r"ruby 2\.5\.8\b", output) and
+        require(re.search(r"ruby 2\.5\.8(?:p[0-9]+)?\b", output) and
                 re.search(r"Rails 6\.0\.", output),
                 "legacy Ruby/Rails version mismatch")
         print("P1.1 IMMUTABLE GIT SOURCE / PRIVATE TEMP EXTRACTION PASS",
