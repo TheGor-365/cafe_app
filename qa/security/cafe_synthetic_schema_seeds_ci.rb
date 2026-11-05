@@ -46,12 +46,12 @@ def equal!(connection, sql, expected, label)
   puts "#{label} PASS"
 end
 
-def admin
-  connect(ENV.fetch('DATABASE_URL'))
+def admin(&block)
+  connect(ENV.fetch('DATABASE_URL'), &block)
 end
 
-def app
-  connect(ENV.fetch('APP_DATABASE_URL'))
+def app(&block)
+  connect(ENV.fetch('APP_DATABASE_URL'), &block)
 end
 
 def table_names(connection)
