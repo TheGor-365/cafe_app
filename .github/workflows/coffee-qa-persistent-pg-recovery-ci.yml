@@ -112,7 +112,7 @@ jobs:
           assert len(seen)==2
           assert seen[0][:2]==('volume','create')
           assert seen[1][0]=='create'
-          assert all(m.LIVE_PG not in x for x in (' '.join(args) for args in seen))
+          assert not any(m.LIVE_NET in ' '.join(args) for args in seen)
           print('QA CREATE USES ONLY NEW PERSISTENT VOLUME AND MISSING QA PG PASS')
           PY
       - name: Validate no owner-local operations are invoked in CI
