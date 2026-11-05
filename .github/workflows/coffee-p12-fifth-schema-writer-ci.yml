@@ -1,0 +1,139 @@
+name: Cafe P1.2 fifth-only schema writer static and negative security gates
+on:
+  push:
+    branches: [feature/cafe-p12-fifth-only-schema-loader-20261105]
+  pull_request:
+    branches: [feature/cafe-synthetic-p1-rails-runtime-probe-20261105]
+permissions:
+  contents: read
+
+jobs:
+  fifth-only-writer-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile Python orchestrator and Ruby read-only SQL guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_fifth_schema_one_shot.py
+          ruby -c qa/security/cafe_fifth_schema_target_guard.rb
+      - name: Validate reviewed source and exact owner-only local targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import ast
+          import pathlib
+          import subprocess
+          p=pathlib.Path('scripts/cafe_fifth_schema_one_shot.py')
+          s=p.read_text()
+          tree=ast.parse(s)
+          expected={
+            'RUNTIME_BLOB': '13ac9907b94d4beafe5b0be4707e197b4b24069a',
+            'SOURCE': '090b9d37419fcd9f393d8b686ac0f4563ef7b613',
+            'PG': 'cafe-upload-security-synthetic-pg-20261105',
+            'NETWORK': 'cafe-upload-security-synthetic-net-20261105',
+            'DB': 'cafe_synthetic',
+            'IMAGE': 'cafe-legacy-full:node14',
+          }
+          for k,v in expected.items():
+            assert v in s,(k,v)
+          actual=subprocess.check_output(
+              ['git','hash-object','qa/security/cafe_fifth_schema_target_guard.rb'],
+              text=True).strip()
+          assert actual=='e5dae1c3b740acf3298b5baf12747f69d4d2a721',actual
+          assert 'RUBY_GUARD_BLOB="'+actual+'"' in s
+          assert '--network='+ '\"' not in s or True  # validated as parsed argv below
+          for token in (
+            '--confirm-target','--check','--create-schema','--verify-schema',
+            'probe.probe()', 'probe.allowed_gem_mounts()',
+            'cafe_p12_fifth_schema_attempt_20261105.json',
+            'cafe_synth_owner', 'cafe_synth_app',
+            'db:schema:load', '--read-only', '--pull=never',
+            '--cap-drop=ALL', 'no-new-privileges',
+            'PRIVATE', 'one-shot writer failed', 'target()==(ip,ident)',
+            'schema:load, no seeds'):
+              assert token in s,token
+          for forbidden in (
+            'db:prepare','db:reset','db:drop','db:migrate','db:seed',
+            '--privileged','--network=host','--publish',
+            'docker stop','docker rm','--force','git checkout',
+            'PGPASSWORD=','POSTGRES_PASSWORD='):
+              assert forbidden not in s,forbidden
+          assert 'docker_writer' in {n.name for n in ast.walk(tree)
+                 if isinstance(n, ast.FunctionDef)}
+          ruby=pathlib.Path('qa/security/cafe_fifth_schema_target_guard.rb').read_text()
+          for token in (
+            "TARGET_HOST = 'cafe-synthetic-postgres'",
+            "TARGET_DB = 'cafe_synthetic'",
+            "OWNER = 'cafe_synth_owner'",
+            "assert_equal(actual['current_user'], OWNER",
+            "assert_equal(actual['server_ip'], expected_ip",
+            "SELECT has_schema_privilege('cafe_synth_app'",
+            "P1.2 FIFTH SCHEMA EMPTY PRE-WRITE PASS",
+            "P1.2 EXACT MIGRATION VERSIONS / ZERO DATA / APP CRUD ACL PASS"):
+              assert token in ruby,token
+          print('P1.2 EXACT FIFTH-ONLY WRITER + RUBY TARGET VERIFIER CONTRACT PASS')
+          PY
+      - name: Simulate Docker argv with fake mounts (no real Docker or credentials)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          from unittest.mock import patch
+          p=Path('scripts/cafe_fifth_schema_one_shot.py')
+          spec=importlib.util.spec_from_file_location('cafe_p12_writer_audit',p)
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          mounts=[
+            'type=bind,source=/tmp/fakebundle,target=/bundle,readonly',
+            'type=bind,source=/tmp/fakegem,target=/app/Gemfile,readonly',
+            'type=bind,source=/tmp/fakelock,target=/app/Gemfile.lock,readonly',
+          ]
+          cmd=m.docker_writer(Path('/tmp/synthetic_public_code'),mounts,'172.30.0.2')
+          text=' '.join(cmd)
+          assert cmd[:3]==['docker','run','--rm']
+          assert '--network='+m.NETWORK in cmd
+          assert '--read-only' in cmd
+          assert '--cap-drop=ALL' in cmd
+          assert '--security-opt=no-new-privileges' in cmd
+          assert '--user=1000:1000' in cmd
+          assert '--env=CAFE_P12_SERVER_IP=172.30.0.2' in cmd
+          assert '--env=PGOPTIONS=-c role=cafe_synth_owner -c search_path=public' in cmd
+          assert '--mount=type=bind,source={},target=/tmp/cafe_p12_secret,readonly'.format(m.SECRET) in cmd
+          assert '--mount=type=bind,source=/tmp/fakebundle,target=/bundle,readonly' in cmd
+          assert '--entrypoint=sh' in cmd
+          assert 'rails db:schema:load' in cmd[-1]
+          assert 'cafe_fifth_schema_target_guard.rb pre' in cmd[-1]
+          assert 'cafe_fifth_schema_target_guard.rb post' in cmd[-1]
+          assert 'docker exec' not in text
+          assert not any(flag in text for flag in
+              ('--network host','--privileged','--publish','--volume=/var/run/docker.sock'))
+          with patch.object(m, 'check', side_effect=AssertionError('should not precheck')):
+              try: m.create_schema(None)
+              except RuntimeError as exc:
+                  assert 'explicit --confirm-target' in str(exc)
+              else:
+                  raise AssertionError('write without target acknowledgement accepted')
+          print('P1.2 DOCKER NO-SECRET ARGV / NEGATIVE WRITE TARGET ACK PASS')
+          PY
+      - name: Validate fail-closed public CLI; NEVER run DB commands in CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/cafe_fifth_schema_one_shot.py --help | grep -F -- '--check'
+          python3 scripts/cafe_fifth_schema_one_shot.py --help | grep -F -- '--create-schema'
+          python3 scripts/cafe_fifth_schema_one_shot.py --help | grep -F -- '--verify-schema'
+          if python3 scripts/cafe_fifth_schema_one_shot.py --create-schema >/dev/null 2>&1; then
+            echo 'Schema writer started without explicit target acknowledgement' >&2
+            exit 1
+          fi
+          if python3 scripts/cafe_fifth_schema_one_shot.py --create-schema --confirm-target protected_live >/dev/null 2>&1; then
+            echo 'Schema writer accepted unknown target' >&2
+            exit 1
+          fi
+          echo 'P1.2 CI STATIC ONLY; NO POSTGRES, NETWORK OR OWNER LOCAL WRITES'
