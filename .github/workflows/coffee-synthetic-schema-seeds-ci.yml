@@ -23,7 +23,7 @@ jobs:
           POSTGRES_HOST_AUTH_METHOD: scram-sha-256
           POSTGRES_INITDB_ARGS: --auth-local=peer --auth-host=scram-sha-256
         options: >-
-          --health-cmd "pg_isready -U postgres -d cafe_synthetic"
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d cafe_synthetic"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 15
@@ -32,6 +32,7 @@ jobs:
       RUBYOPT: -rlogger
       DATABASE_URL: postgres://postgres:CIOnlyPostgresBootstrap_20261105@postgres:5432/cafe_synthetic
       BUNDLE_PATH: /tmp/cafe-bundle
+      APP_DATABASE_URL: postgres://cafe_synth_app:CIOnlySyntheticRolePass_20261105@postgres:5432/cafe_synthetic
     steps:
       - uses: actions/checkout@v4
       - name: Verify pinned schema and seed contracts
@@ -64,59 +65,34 @@ jobs:
           gem install bundler -v 2.2.13 --no-document
           bundle _2.2.13_ lock --add-platform x86_64-linux
           bundle _2.2.13_ install --jobs 2 --retry 2
-      - name: Create scoped roles in disposable fifth-model PG
+      - name: Provision scoped roles via bundled PostgreSQL driver (no psql dependency)
         shell: bash
         run: |
           set -euo pipefail
-          export PGHOST=postgres
-          export PGUSER=postgres
-          export PGPASSWORD=CIOnlyPostgresBootstrap_20261105
-          export PGDATABASE=cafe_synthetic
-          psql -X -v ON_ERROR_STOP=1 -f qa/security/cafe_synthetic_roles_acl_ci.sql
-          test "$(psql -XAt -c 'SELECT count(*) FROM pg_tables WHERE schemaname='\''public'\'';')" = 0
-          echo "EMPTY FIFTH-MODEL PG ROLES PASS"
-      - name: Load Rails schema as non-login schema owner through scoped SQL role
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb provision
+      - name: Independently verify empty schema, SCRAM auth and role restrictions
         shell: bash
         run: |
           set -euo pipefail
-          export PGHOST=postgres
-          export PGUSER=postgres
-          export PGPASSWORD=CIOnlyPostgresBootstrap_20261105
-          export PGDATABASE=cafe_synthetic
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb preload
+      - name: Load Rails schema via non-login owner SET ROLE in disposable database
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only the ephemeral GitHub Actions PostgreSQL can receive this DDL.
           export PGOPTIONS='-c role=cafe_synth_owner'
-          test "$(psql -XAt -c 'SELECT current_user;')" = cafe_synth_owner
-          # CI-only, disposable database: never run schema load on owner host.
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb owner
           bundle _2.2.13_ exec rails db:schema:load
           unset PGOPTIONS
-          test "$(psql -XAt -v ON_ERROR_STOP=1 -c \
-            "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('categories','products','product_variants','product_modifier_options','orders','order_items','order_item_modifiers','users');")" = 8
-          test "$(psql -XAt -v ON_ERROR_STOP=1 -c \
-            "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('categories','products','product_variants','product_modifier_options','orders','order_items','order_item_modifiers','users') AND tableowner='cafe_synth_owner';")" = 8
-          echo "RAILS EIGHT-TABLE SCHEMA OWNED BY NOLOGIN ROLE PASS"
-      - name: Load fictional catalogue as non-admin application role
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb schema
+      - name: Seed fictional catalog strictly as restricted application role
         shell: bash
         run: |
           set -euo pipefail
-          export DATABASE_URL=postgres://cafe_synth_app:CIOnlySyntheticRolePass_20261105@postgres:5432/cafe_synthetic
-          # NO use of existing customer/admin data or backup. These are only sample items.
+          export DATABASE_URL="$APP_DATABASE_URL"
           bundle _2.2.13_ exec rails db:seed
-          export PGHOST=postgres PGUSER=cafe_synth_app
-          export PGPASSWORD=CIOnlySyntheticRolePass_20261105 PGDATABASE=cafe_synthetic
-          test "$(psql -XAt -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM categories;')" = 8
-          test "$(psql -XAt -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM products;')" = 20
-          test "$(psql -XAt -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM product_variants;')" = 18
-          test "$(psql -XAt -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM product_modifier_options;')" = 30
-          test "$(psql -XAt -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM users;')" = 0
-          echo "EIGHT SYNTHETIC CATEGORIES / TWENTY PRODUCTS / SIX DRINKS / ZERO USERS PASS"
-      - name: Verify scoped application user still cannot CREATE TABLE
-        shell: bash
-        run: |
-          set -euo pipefail
-          export PGHOST=postgres PGUSER=cafe_synth_app
-          export PGPASSWORD=CIOnlySyntheticRolePass_20261105 PGDATABASE=cafe_synthetic
-          if psql -X -v ON_ERROR_STOP=1 \
-               -c 'CREATE TABLE public.unexpected_ddl(id integer);' >/dev/null 2>&1; then
-            echo "Application role bypassed schema CREATE prohibition" >&2
-            exit 1
-          fi
-          echo "SYNTHETIC APP ROLE DDL BLOCK PASS"
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb seeds
+          # Re-seed once in ephemeral CI to prove fixture idempotency.
+          bundle _2.2.13_ exec rails db:seed
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb seeds
+          echo "RAILS SCHEMA + IDEMPOTENT SYNTHETIC SEEDS / APP DDL DENIED PASS"
