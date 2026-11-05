@@ -31,3 +31,17 @@ GitHub Actions checks source and interface only: CI cannot prove the owner's Doc
 ## Subsequent P1 schema writer design requirements
 
 Separate PR, exact target Docker network/cluster identity and previously verified SCRAM roles; ephemeral Rails runner in the isolated fifth network with canonical read-only source; private credential transport without Docker env/argv leakage; NO superuser DDL until target preflight. DDL using `SET ROLE cafe_synth_owner` only; default app role must never receive DDL. Explicit `--create-schema` mode with stop-on-nonempty, no second invocation after failure, and independent `--verify-schema` mode that checks exactly eight app tables + two Rails metadata tables, eight FKs, owner/sequence ownership, all expected migration versions, app CRUD ACL, zero users and zero seeds. Verify old PGs/media/HTTP 3001/3002 unchanged. No PR merge, public deploy or paid resource.
+
+
+## Owner follow-up: read-only OCI mount isolation (2026-11-05)
+
+Owner ran SHA-pinned PR #56 P1.1 v3; P1 checks passed, fifth database was still empty, but Rails probe stopped **before shell entry** with `readonly_filesystem`. A separate SHA-pinned diagnostic at PR #56 commit `53a1cd64678a9c8a32053028d456f4650e3087c7`, script blob `95921a7b4f687a19feca625ebb7308d5fd522004`, produced:
+
+- `P1.1 DIAG PRECHECK — FIFTH DB EMPTY / FOUR ORIGINAL PG ISOLATED PASS`
+- `P1.1 DIAG PINNED GIT ARCHIVE VERIFIED PASS`
+- `P1.1 DIAG BASE PASS`
+- `P1.1 DIAG TMPFS PASS`
+- `P1.1 DIAG SOURCE_RO PASS`
+- `CAFE P1.1 DOCKER START DIAG STOP: BUNDLE_CACHE_RO [OCI_OR_SHELL_ERROR / readonly_filesystem]`.
+
+Thus read-only root, tmpfs and read-only canonical Git source mount **alone** all work. Adding existing read-only dependency volumes triggers the OCI error before shell. Potential nested mount under the read-only `/app` source is a hypothesis, not yet verified. Next read-only owner inspection: list **only** mount destination/type/read-only flag for whitelisted dependency paths on `cafe-upload-security-headers-mountfix-20261104`, withholding volume sources and environment. Do not change any existing volume, container, original project files, fifth DB schema, host ports or production services. Once destination is known, fix only the disposable runner's mountpoints and reverify through CI and owner Linux.
