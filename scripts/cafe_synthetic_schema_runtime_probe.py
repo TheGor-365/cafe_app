@@ -40,18 +40,46 @@ def require(value, reason):
     if not value:
         raise RuntimeError("CAFE P1.1 RAILS PROBE STOP: " + reason)
 
-def run(argv, timeout=35, max_stdout=MAX_ARCHIVE):
+def failure_kind(stderr):
+    """Only emit fixed labels, never Docker stderr, paths, env or credentials."""
+    value = stderr.decode(errors="replace").lower()
+    if "bundler::gemnotfound" in value or "could not find" in value:
+        return "ruby_bundle_missing"
+    if "gemfile.lock" in value or "bundle install" in value or "bundler" in value:
+        return "ruby_bundle_resolution"
+    if "permission denied" in value:
+        return "filesystem_permission"
+    if "read-only file system" in value:
+        return "readonly_filesystem"
+    if "executable file not found" in value or "not found in $path" in value:
+        return "runtime_binary_unavailable"
+    if "mount" in value or "volume" in value:
+        return "docker_mount_rejected"
+    if "no space left on device" in value:
+        return "host_space"
+    if "network is unreachable" in value or "connection refused" in value:
+        return "network_or_dependency"
+    return "unspecified_failure"
+
+def run(argv, timeout=35, max_stdout=MAX_ARCHIVE, stage="controlled"):
+    # Each stage is a trusted internal literal, not command-derived text.
+    require(stage in ("git_metadata", "docker_inspect", "git_archive",
+                      "isolated_rails_container"), "invalid internal stage")
     try:
         completed = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    timeout=timeout, check=False)
     except (OSError, subprocess.TimeoutExpired):
-        raise RuntimeError("CAFE P1.1 RAILS PROBE STOP: command unavailable/timeout")
-    require(completed.returncode == 0, "controlled command failed")
-    require(len(completed.stdout) <= max_stdout, "unexpectedly large command output")
+        raise RuntimeError("CAFE P1.1 RAILS PROBE STOP: " + stage +
+                           " unavailable_or_timeout")
+    require(completed.returncode == 0,
+            stage + " failed [" + failure_kind(completed.stderr) + "]")
+    require(len(completed.stdout) <= max_stdout,
+            stage + " output_exceeds_limit")
     return completed.stdout
 
 def git(*args):
-    return run(["git", "-C", str(REPO), *args], timeout=40).decode().strip()
+    return run(["git", "-C", str(REPO), *args], timeout=40,
+               stage="git_metadata").decode().strip()
 
 def preflight():
     require(os.getuid() == 1000 and REPO.is_dir() and
@@ -77,7 +105,8 @@ def preflight():
 
 def allowed_gem_mounts():
     import json
-    raw = run(["docker", "inspect", "--type=container", SOURCE_WEB], timeout=22)
+    raw = run(["docker", "inspect", "--type=container", SOURCE_WEB],
+              timeout=22, stage="docker_inspect")
     obj = json.loads(raw.decode())
     require(len(obj) == 1 and obj[0]["State"]["Status"] == "running" and
             obj[0]["Config"]["Image"] == IMAGE,
@@ -98,7 +127,7 @@ def archive_into(dst):
     # The only source is the fixed, publicly tracked Git tree, not a dirty
     # checkout. Reject tar symlinks, links, devices and path traversal.
     archive = run(["git", "-C", str(REPO), "archive",
-                   "--format=tar", HEAD], timeout=55)
+                   "--format=tar", HEAD], timeout=55, stage="git_archive")
     require(len(archive) < MAX_ARCHIVE, "Git source archive exceeds bound")
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tf:
         members = tf.getmembers()
@@ -157,7 +186,8 @@ def probe():
             args.append("--mount=" + mount)
         args += ["--entrypoint=sh", IMAGE, "-lc",
                  "ruby -v && bundle exec rails -v"]
-        output = run(args, timeout=150, max_stdout=8192).decode(errors="replace")
+        output = run(args, timeout=150, max_stdout=8192,
+                     stage="isolated_rails_container").decode(errors="replace")
         require(re.search(r"ruby 2\.5\.8(?:p[0-9]+)?\b", output) and
                 re.search(r"Rails 6\.0\.", output),
                 "legacy Ruby/Rails version mismatch")
