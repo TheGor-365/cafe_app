@@ -45,3 +45,15 @@ Owner ran SHA-pinned PR #56 P1.1 v3; P1 checks passed, fifth database was still 
 - `CAFE P1.1 DOCKER START DIAG STOP: BUNDLE_CACHE_RO [OCI_OR_SHELL_ERROR / readonly_filesystem]`.
 
 Thus read-only root, tmpfs and read-only canonical Git source mount **alone** all work. Adding existing read-only dependency volumes triggers the OCI error before shell. Potential nested mount under the read-only `/app` source is a hypothesis, not yet verified. Next read-only owner inspection: list **only** mount destination/type/read-only flag for whitelisted dependency paths on `cafe-upload-security-headers-mountfix-20261104`, withholding volume sources and environment. Do not change any existing volume, container, original project files, fifth DB schema, host ports or production services. Once destination is known, fix only the disposable runner's mountpoints and reverify through CI and owner Linux.
+
+## Follow-up: exact Docker mount identity and narrowly scoped fix
+
+Owner ran `docker inspect --type container` against the existing source QA web and confirmed its **only** whitelisted dependency mount:
+
+```text
+target=/app/node_modules type=volume rw=false
+```
+
+This proves the `BUNDLE_CACHE_RO` OCI failure appeared when the disposable process tried to add the nested read-only `/app/node_modules` volume under an already read-only `/app` Git snapshot. It does not establish a general Ruby gem or Rails compatibility failure.
+
+The P1.1 runtime probe now intentionally **skips** this single JavaScript-only mount, and whitelists only non-nested Ruby dependency volumes outside `/app` (if any). It additionally fails closed if the inspected existing node_modules mount is missing, writable or not a volume; nothing is remounted or changed on the original source QA container. GitHub CI validates a mocked inspect response and rejects a writable node_modules source. Owner must fetch the new exact PR SHA and rerun the SHA-pinned P1.1 probe only; this is not a fifth-DB schema writer. The fifth database remains empty until an independent verified one-shot schema stage.
