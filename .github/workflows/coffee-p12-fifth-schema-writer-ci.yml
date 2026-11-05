@@ -56,6 +56,8 @@ jobs:
             'PRIVATE', 'one-shot writer failed', 'target()==(ip,ident)',
             'schema:load, no seeds',
             'offline_runner_mount_probe(probe,mounts,ip)',
+            'live_sql_connection_preflight(probe,mounts,ip,ident)',
+            'fifth-only TCP/role/SCRAM Ruby readonly SQL preflight failed',
             'fake_noncredential_file', '--network=none'):
               assert token in s,token
           for forbidden in (
@@ -159,6 +161,48 @@ jobs:
               m.offline_runner_mount_probe(None,fake_mounts,'172.30.0.2')
           assert seen
           print('P1.2 FAKE SECRET / NETWORK NONE / NO DATABASE OFFLINE PROBE PASS')
+          PY
+      - name: Ensure fifth-network login/role smoke only issues Ruby SELECT precheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          from unittest.mock import patch
+          p=Path('scripts/cafe_fifth_schema_one_shot.py')
+          spec=importlib.util.spec_from_file_location('p12_select_only_test',p)
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          original=m.docker_writer
+          seen=[]
+          mounts=[
+              'type=bind,source=/tmp/fakebundle,target=/bundle,readonly',
+              'type=bind,source=/tmp/fakegem,target=/app/Gemfile,readonly',
+              'type=bind,source=/tmp/fakelock,target=/app/Gemfile.lock,readonly',
+          ]
+          def fake_run(argv,**kwargs):
+              seen.extend(argv)
+              assert '--network='+m.NETWORK in argv
+              assert '--network=none' not in argv
+              assert '--read-only' in argv
+              assert '--cap-drop=ALL' in argv
+              assert '--env=PGOPTIONS=-c role=cafe_synth_owner -c search_path=public' in argv
+              assert argv[-1].endswith('bundle exec ruby qa/security/cafe_fifth_schema_target_guard.rb pre')
+              assert 'db:schema:load' not in argv[-1]
+              assert 'db:seed' not in argv[-1]
+              return CompletedProcess(argv,0,
+                b'P1.2 EXACT FIFTH DB/TCP IP/OWNER/APP ROLE CHECK PASS\\n'
+                b'P1.2 FIFTH SCHEMA EMPTY PRE-WRITE PASS\\n',b'')
+          with patch.object(m,'build_source',return_value=Path('/tmp/fake_reviewed_source')), \
+               patch.object(m,'docker_writer',side_effect=original), \
+               patch.object(m.subprocess,'run',side_effect=fake_run), \
+               patch.object(m,'target',return_value=('172.30.0.2','12345678901234')), \
+               patch.object(m,'sql',return_value='0'):
+              m.live_sql_connection_preflight(None,mounts,'172.30.0.2','12345678901234')
+          assert seen
+          print('P1.2 LIVE FIFTH TCP SELECT ONLY / NO DDL / NO SEEDS CONTRACT PASS')
           PY
       - name: Validate fail-closed public CLI; NEVER run DB commands in CI
         shell: bash
