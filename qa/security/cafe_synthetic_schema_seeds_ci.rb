@@ -25,7 +25,15 @@ def connect(url)
   connection = PG.connect(url)
   raise 'Wrong PostgreSQL target' unless connection.exec('SELECT current_database()').getvalue(0, 0) == 'cafe_synthetic'
   raise 'Unexpected PostgreSQL server' unless connection.exec('SHOW server_version_num').getvalue(0, 0).to_i / 10000 == 16
-  connection
+  if block_given?
+    begin
+      yield connection
+    ensure
+      connection.close unless connection.finished?
+    end
+  else
+    connection
+  end
 end
 
 def scalar(connection, sql)
@@ -64,7 +72,10 @@ def rejected!(label)
   begin
     yield
   rescue PG::Error => error
-    raise "#{label}: unexpected error #{error.class}" unless error.is_a?(PG::InsufficientPrivilege) || error.is_a?(PG::InvalidPassword)
+    auth_refusal = error.is_a?(PG::ConnectionBad) &&
+      error.message.match?(/password authentication failed|permission denied for database/i)
+    raise "#{label}: unexpected error #{error.class}" unless
+      error.is_a?(PG::InsufficientPrivilege) || auth_refusal
     puts "#{label} PASS"
     return
   end
