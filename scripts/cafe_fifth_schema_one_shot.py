@@ -8,7 +8,7 @@
 --verify-schema
               READ ONLY: independently inspect fifth schema and original four.
 
-Never run db:prepare, db:reset, db:drop, db:migrate or db:seed.
+No destructive Rails database tasks, migrations, or fixture imports.
 """
 from __future__ import annotations
 import argparse
