@@ -127,7 +127,11 @@ when 'schema'
     equal!(connection, "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner='cafe_synth_owner'", 10, 'TEN OWNER-OWNED TABLES INCLUDING META')
     equal!(connection, "SELECT count(*) FROM pg_sequences WHERE schemaname='public' AND sequenceowner='cafe_synth_owner'", 8, 'EIGHT OWNER-OWNED SEQUENCES')
     equal!(connection, "SELECT count(*) FROM schema_migrations WHERE version='20261102000100'", 1, 'LATEST CANONICAL MIGRATION VERSION')
-    equal!(connection, "SELECT count(*) FROM schema_migrations", 1, 'EXACT SCHEMA MIGRATION COUNT')
+    expected_versions = Dir['db/migrate/[0-9]*_*.rb'].map { |f| File.basename(f).split('_', 2).first }.sort
+    actual_versions = connection.exec('SELECT version FROM schema_migrations ORDER BY version').column_values(0)
+    raise "Schema migration versions mismatch: expected #{expected_versions.size}, got #{actual_versions.size}" unless
+      actual_versions == expected_versions
+    puts "EXACT #{expected_versions.size} SCHEMA MIGRATION FILE VERSIONS PASS"
     EXPECTED_TABLES.each do |table|
       %w[SELECT INSERT UPDATE DELETE].each do |privilege|
         equal!(connection, "SELECT has_table_privilege('cafe_synth_app','public.#{table}','#{privilege}')", 't', "APP #{privilege} #{table}")
