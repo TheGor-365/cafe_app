@@ -1,0 +1,12 @@
+name: Cafe P1.2 PG recovery
+on:
+  push:
+    branches: [feature/cafe-p12-restore-existing-test-pg-20261106]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m py_compile scripts/cafe_p12_existing_tmpfs_pg_restore_20261106.py
