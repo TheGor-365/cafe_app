@@ -32,6 +32,7 @@ MAX_ARCHIVE = 80 * 1024 * 1024
 CANDIDATE_GEM_MOUNTS = {
     "/usr/local/bundle", "/usr/local/lib/ruby/gems",
 }
+REQUIRED_QA_BUNDLE_MOUNT = "/bundle"
 EXCLUDED_NESTED_NODE_MOUNT = "/app/node_modules"
 TRACKED = {
     "db/schema.rb": "2506954d1ea3e6368eb219956863b2acb91441c8",
@@ -134,8 +135,27 @@ def allowed_gem_mounts():
             "trusted Rails QA source container unavailable")
     found = []
     excluded = 0
+    qa_bundle = 0
     for mount in obj[0]["Mounts"]:
         dest = mount["Destination"]
+        if dest == REQUIRED_QA_BUNDLE_MOUNT:
+            # Owner confirmed /bundle is a read-only HOST BIND, not a
+            # volume. Reuse only this existing dependency cache, never
+            # upload media, private source, or a credentials mount.
+            require(mount["Type"] == "bind" and mount["RW"] is False,
+                    "QA bundle mount type/access changed")
+            src = mount.get("Source")
+            require(isinstance(src, str) and src.startswith("/") and
+                    not any(word in src.lower() for word in
+                            ("/secrets/", "/password", "/credentials/")),
+                    "QA bundle source path not approved")
+            bundle_path = Path(src)
+            require(bundle_path.is_dir() and not bundle_path.is_symlink(),
+                    "QA bundle bind source unavailable or symlinked")
+            # Do not print src or any installed-gem paths in stdout.
+            found.append("type=bind,source={},target=/bundle,readonly".format(src))
+            qa_bundle += 1
+            continue
         if dest == EXCLUDED_NESTED_NODE_MOUNT:
             # Existing source QA container is untouched; the disposable
             # Ruby/Rails CLI probe never mounts this JavaScript-only volume.
@@ -151,8 +171,11 @@ def allowed_gem_mounts():
         found.append("type=volume,source={},target={},readonly".format(
             mount["Name"], dest))
     require(excluded == 1, "expected single read-only source node_modules volume")
+    require(qa_bundle == 1, "expected single read-only /bundle bind from QA")
     require(len(found) == len(set(found)), "duplicate Ruby dependencies mount")
     print("P1.1 INCOMPATIBLE NESTED NODE_MODULES VOLUME EXCLUDED PASS",
+          flush=True)
+    print("P1.1 EXISTING QA /bundle READ-ONLY BIND VERIFIED PASS",
           flush=True)
     return found
 
@@ -212,6 +235,7 @@ def probe():
             "--cap-drop=ALL", "--security-opt=no-new-privileges",
             "--tmpfs=/tmp:rw,nosuid,nodev,size=128m,uid=1000,gid=1000",
             "--env=HOME=/tmp", "--env=BUNDLE_GEMFILE=/app/Gemfile",
+            "--env=BUNDLE_PATH=/bundle", "--env=BUNDLE_FROZEN=true",
             "--env=RAILS_ENV=test", "--env=RUBYOPT=-rlogger",
             "--mount=type=bind,source={},target=/app,readonly".format(source),
         ]
