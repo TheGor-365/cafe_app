@@ -1,0 +1,265 @@
+name: Cafe P1.1 isolated legacy Rails runtime probe source gate
+on:
+  push:
+    branches: [feature/cafe-synthetic-p1-rails-runtime-probe-20261105]
+  pull_request:
+    branches: [feature/cafe-synthetic-schema-local-target-preflight-20261105]
+permissions:
+  contents: read
+
+jobs:
+  static-no-db-write-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile the immutable-source isolated runtime probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_synthetic_schema_runtime_probe.py
+          python3 -B scripts/cafe_synthetic_schema_runtime_probe.py --help | grep -F -- '--probe'
+          python3 - <<'PY'
+          import ast
+          import pathlib
+          import subprocess
+          p = pathlib.Path("scripts/cafe_synthetic_schema_runtime_probe.py")
+          s = p.read_text()
+          ast.parse(s)
+          expected = {
+            "db/schema.rb": "2506954d1ea3e6368eb219956863b2acb91441c8",
+            "db/seeds.rb": "dae2eed43c78ff79a14e3bf3e83d59a649803cd4",
+            "Gemfile.lock": "06f3924bf211e56d0845bca1f6508bb81bf8a324",
+          }
+          for path, blob in expected.items():
+            value = subprocess.check_output(["git", "hash-object", path], text=True).strip()
+            assert value == blob, (path, value)
+            assert blob in s
+          checks = [
+            "090b9d37419fcd9f393d8b686ac0f4563ef7b613",
+            "501914861518530bed0d18c8f1ca08550fe65e4d",
+            "module.check()",
+            "--network=none",
+            "--pull=never",
+            "--rm",
+            "--read-only",
+            "--cap-drop=ALL",
+            "no-new-privileges",
+            "archive_into(source)",
+            "P1.1 RAILS RUNTIME PROBE PASS",
+          ]
+          assert all(phrase in s for phrase in checks)
+          for forbidden in ["--create-schema", "--seed", "db:schema:load",
+                            "db:prepare", "db:migrate", "db:seed",
+                            "docker start", "docker exec", "PGPASSWORD",
+                            "POSTGRES_PASSWORD", "DATABASE_URL="]:
+            assert forbidden not in s, forbidden
+          assert "PGOPTIONS=" not in s
+          spec=__import__("importlib.util").util.spec_from_file_location("cafe_p11_nesting",p)
+          module=__import__("importlib.util").util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          assert module.EXCLUDED_NESTED_NODE_MOUNT == "/app/node_modules"
+          assert all(not x.startswith("/app/") for x in module.CANDIDATE_GEM_MOUNTS)
+          assert "expected single read-only source node_modules volume" in s
+          assert "P1.1 INCOMPATIBLE NESTED NODE_MODULES VOLUME EXCLUDED PASS" in s
+          assert module.REQUIRED_QA_BUNDLE_MOUNT == "/bundle"
+          assert "--env=BUNDLE_PATH=/bundle" in s
+          assert "--env=BUNDLE_FROZEN=true" in s
+          assert "P1.1 EXISTING QA /bundle READ-ONLY BIND VERIFIED PASS" in s
+          print("P1.1 EXACT GIT SOURCE / ISOLATED NETWORKLESS RAILS PROBE CONTRACT PASS")
+          PY
+      - name: Validate isolated reviewed QA gem overlays and protected mounts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          import tempfile
+          from pathlib import Path
+          from unittest.mock import patch
+          p=Path("scripts/cafe_synthetic_schema_runtime_probe.py")
+          spec=importlib.util.spec_from_file_location("cafe_p11_qa_overlay",p)
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          with tempfile.TemporaryDirectory() as tmp:
+              root=Path(tmp)
+              m.QA_BUNDLE=root/"bundle"
+              m.QA_STAGE=root/"build"
+              m.QA_BUNDLE.mkdir()
+              m.QA_STAGE.mkdir()
+              m.QA_OVERRIDES={
+                "/app/Gemfile":m.QA_STAGE/"Gemfile",
+                "/app/Gemfile.lock":m.QA_STAGE/"Gemfile.lock"
+              }
+              (m.QA_STAGE/"Gemfile").write_text("gem 'carrierwave', '= 2.2.7'")
+              (m.QA_STAGE/"Gemfile.lock").write_text(
+                  "    carrierwave (2.2.7)\\n    rails (6.0.3.6)\\n"
+                  "PLATFORMS\\n  x86_64-linux\\nBUNDLED WITH\\n   2.2.13\\n")
+              bundle={"Destination":"/bundle","Type":"bind","RW":False,
+                      "Source":str(m.QA_BUNDLE)}
+              node={"Destination":"/app/node_modules","Type":"volume",
+                    "RW":False,"Name":"fake_test_volume"}
+              overrides=[
+                {"Destination":dest,"Type":"bind","RW":False,"Source":str(path)}
+                for dest,path in m.QA_OVERRIDES.items()
+              ]
+              obj={"State":{"Status":"running"},
+                   "Config":{"Image":"cafe-legacy-full:node14"},
+                   "Mounts":[node,bundle,*overrides]}
+              def check():
+                  with patch.object(m,"run",return_value=json.dumps([obj]).encode()):
+                      return m.allowed_gem_mounts()
+              expected={
+                "type=bind,source={},target=/bundle,readonly".format(m.QA_BUNDLE)
+              } | {
+                "type=bind,source={},target={},readonly".format(path,dest)
+                for dest,path in m.QA_OVERRIDES.items()
+              }
+              assert set(check())==expected
+              node["RW"]=True
+              try: check()
+              except RuntimeError as e:
+                  assert "unexpected source node_modules mount" in str(e)
+              else: raise AssertionError("Writable nested mount accepted")
+              node["RW"]=False
+              bundle["RW"]=True
+              try: check()
+              except RuntimeError as e:
+                  assert "QA bundle mount type/access changed" in str(e)
+              else: raise AssertionError("Writable bundle accepted")
+              bundle["RW"]=False
+              overrides[0]["RW"]=True
+              try: check()
+              except RuntimeError as e:
+                  assert "QA dependency override origin/type/access changed" in str(e)
+              else: raise AssertionError("Writable Gemfile accepted")
+              overrides[0]["RW"]=False
+              overrides[0]["Source"]="/run/secrets/unsafe"
+              try: check()
+              except RuntimeError as e:
+                  assert "QA dependency override origin/type/access changed" in str(e)
+              else: raise AssertionError("Wrong QA file accepted")
+              overrides[0]["Source"]=str(m.QA_OVERRIDES["/app/Gemfile"])
+              (m.QA_STAGE/"Gemfile.lock").write_text(
+                  "    carrierwave (2.2.7)\\n    rails (6.0.3.6)\\n"
+                  "PLATFORMS\\n  x64-mingw32\\nBUNDLED WITH\\n   2.2.13\\n")
+              try: check()
+              except RuntimeError as e:
+                  assert "reviewed Linux-patched dependency contracts missing" in str(e)
+              else: raise AssertionError("Windows-only lock accepted")
+          print("P1.1 PINNED QA LINUX GEMFILE+LOCK MOUNT ACL PASS")
+          PY
+      - name: Validate sanitized diagnostics never display command stderr
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from unittest.mock import patch
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          script=Path("scripts/cafe_synthetic_schema_runtime_probe.py")
+          spec=importlib.util.spec_from_file_location("cafe_probe_diagnostics", script)
+          module=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          secret="DO_NOT_ECHO_FICTITIOUS_SECRET_VALUE"
+          with patch.object(module.subprocess, "run",
+              return_value=CompletedProcess(["docker"], 1, b"", secret.encode())):
+              try:
+                  module.run(["docker"], stage="isolated_rails_container")
+              except RuntimeError as err:
+                  message=str(err)
+                  assert "isolated_rails_container failed [before_shell_entry / unspecified_failure]" in message
+                  assert secret not in message
+              else:
+                  raise AssertionError("Expected to fail closed")
+          assert module.failure_kind(b"Bundler::GemNotFound")=="ruby_bundle_missing"
+          assert module.failure_kind(b"read-only file system")=="readonly_filesystem"
+          assert module.failure_kind(b"permission denied")=="filesystem_permission"
+          assert module.runtime_phase(b"") == "before_shell_entry"
+          assert module.runtime_phase(b"CAFE_P11_CONTAINER_ENTERED") == "ruby_start"
+          assert module.runtime_phase(b"CAFE_P11_CONTAINER_ENTERED\\nCAFE_P11_RUBY_PASS") == "bundler_start"
+          assert module.runtime_phase(b"CAFE_P11_BUNDLER_PASS") == "rails_boot"
+          assert module.runtime_phase(b"CAFE_P11_RAILS_PASS") == "rails_completed"
+          with patch.object(module.subprocess, "run",
+              return_value=CompletedProcess(["docker"], 53,
+                  b"CAFE_P11_CONTAINER_ENTERED\\nCAFE_P11_RUBY_PASS\\nCAFE_P11_BUNDLER_PASS\\n",
+                  ("read-only file system " + secret).encode())):
+              try:
+                  module.run(["docker"], stage="isolated_rails_container")
+              except RuntimeError as err:
+                  message=str(err)
+                  assert "rails_boot / readonly_filesystem" in message
+                  assert secret not in message
+              else:
+                  raise AssertionError("Expected fail-closed runtime phase")
+          print("P1.1 SANITIZED STAGE + SHELL-PHASE DIAGNOSTICS PASS")
+          PY
+      - name: Validate offline read-only OCI diagnostic boundaries and redaction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_synthetic_docker_ro_start_diagnostic.py
+          python3 -B scripts/cafe_synthetic_docker_ro_start_diagnostic.py --help | grep -F -- '--diagnose'
+          python3 - <<'PY'
+          from importlib.util import spec_from_file_location,module_from_spec
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          from unittest.mock import patch
+          path=Path("scripts/cafe_synthetic_docker_ro_start_diagnostic.py")
+          source=path.read_text()
+          required=(
+            "e41e9a6f20caa5b628073881d80e312ccac3ba8f",
+            "module.preflight()", "runner.archive_into(source)",
+            "--network=none", "--read-only", "--pull=never",
+            "--cap-drop=ALL", "--security-opt=no-new-privileges",
+            "--entrypoint=sh", "TMPFS", "CAFE_P11_OCI_SHELL_MARKER",
+            "P1.1 DIAG DOCKER START / READONLY MOUNTS PASS",
+          )
+          assert all(x in source for x in required)
+          for forbidden in ("db:prepare", "db:migrate", "db:schema:load",
+                            "db:seed", "--privileged", "--network=host",
+                            "docker exec", "docker start", "docker stop",
+                            "DATABASE_URL=", "PGPASSWORD=", "--restart=no"):
+              assert forbidden not in source, forbidden
+          spec=spec_from_file_location("cafe_diag",path)
+          module=module_from_spec(spec)
+          spec.loader.exec_module(module)
+          assert "--network=none" in module.BASE
+          assert "--read-only" in module.BASE
+          assert "--rm" in module.BASE
+          assert module.MARKER == b"CAFE_P11_OCI_SHELL_MARKER\n"
+          assert "SHELL_MARK" not in module.BASE
+          class FakeRunner:
+              @staticmethod
+              def failure_kind(stderr):
+                  return "readonly_filesystem"
+          module.runner=FakeRunner()
+          secret="NEVER_PRINT_FAKE_TOKEN"
+          with patch.object(module.subprocess, "run",
+              return_value=CompletedProcess(["docker"], 125, b"",
+                  ("OCI error: read-only file system " + secret).encode())):
+              try:
+                  module.case("BASE", ["docker", "run"])
+              except RuntimeError as exc:
+                  msg=str(exc)
+                  assert "BASE [OCI_OR_SHELL_ERROR / readonly_filesystem]" in msg
+                  assert secret not in msg
+              else:
+                  raise AssertionError("Fail-closed diagnostic required")
+          print("P1.1 NO-NETWORK READONLY OCI DIAGNOSTIC REDACTION PASS")
+          PY
+      - name: Validate no DB writer CLI entrypoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 -B scripts/cafe_synthetic_schema_runtime_probe.py --create-schema >/dev/null 2>&1; then
+            echo "Unexpected fifth database writer CLI mode" >&2
+            exit 1
+          fi
+          if python3 -B scripts/cafe_synthetic_schema_runtime_probe.py --seed >/dev/null 2>&1; then
+            echo "Unexpected fixture writer CLI mode" >&2
+            exit 1
+          fi
+          echo "P1.1 NO DB WRITER OR SECRET SOURCE ENTRYPOINT PASS"
