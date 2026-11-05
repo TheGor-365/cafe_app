@@ -1,0 +1,142 @@
+name: Cafe fifth synthetic PG scoped roles CI (ephemeral only)
+on:
+  push:
+    branches: [feature/cafe-synthetic-db-scoped-roles-gate-20261105]
+  pull_request:
+    branches: [feature/cafe-synthetic-pg-scram-gate-20261105]
+permissions:
+  contents: read
+
+jobs:
+  postgres-scoped-roles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: postgres:16
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: cafe_synthetic
+          POSTGRES_PASSWORD: CIOnlyPostgresBootstrap_20261105
+          POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+          POSTGRES_INITDB_ARGS: --auth-local=peer --auth-host=scram-sha-256
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_synthetic"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGDATABASE: cafe_synthetic
+      PGPASSWORD: CIOnlyPostgresBootstrap_20261105
+      APP_PASSWORD: CIOnlySyntheticRolePass_20261105
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert only synthetic, scope-verified DDL
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          sql = Path('qa/security/cafe_synthetic_roles_acl_ci.sql').read_text()
+          for expected in (
+              'CREATE ROLE cafe_synth_owner NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOLOGIN NOREPLICATION NOBYPASSRLS;',
+              'CREATE ROLE cafe_synth_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN NOREPLICATION NOBYPASSRLS PASSWORD',
+              'REVOKE ALL ON DATABASE cafe_synthetic FROM PUBLIC;',
+              'REVOKE CONNECT ON DATABASE postgres, template1 FROM PUBLIC;',
+              'ALTER SCHEMA public OWNER TO cafe_synth_owner;',
+              'GRANT CONNECT ON DATABASE cafe_synthetic TO cafe_synth_app;',
+              'GRANT USAGE ON SCHEMA public TO cafe_synth_app;',
+              'ALTER DEFAULT PRIVILEGES FOR ROLE cafe_synth_owner IN SCHEMA public',
+              'ALTER ROLE cafe_synth_app IN DATABASE cafe_synthetic SET search_path = public;',
+          ):
+              assert expected in sql, expected
+          for rejected in ('DROP ', 'TRUNCATE ', 'COPY ', 'CREATE EXTENSION',
+                           'GRANT ALL', 'SUPERUSER;', 'CREATEDB;', 'CREATEROLE;',
+                           'ALTER SYSTEM', 'pg_dump', 'pg_restore'):
+              assert rejected not in sql, rejected
+          assert sql.count('BEGIN;') == 1 and sql.count('COMMIT;') == 1
+          print('SCOPED ROLE DDL SOURCE CONTRACT PASS')
+          PY
+      - name: Provision roles ONLY inside throwaway GitHub Actions PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f qa/security/cafe_synthetic_roles_acl_ci.sql
+      - name: Verify SCRAM auth, roles and database permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          eq() {
+            local got
+            got="$(psql -XAt -v ON_ERROR_STOP=1 -c "$1")"
+            if [ "$got" != "$2" ]; then
+              echo "CI PG ACL invariant failed" >&2
+              exit 1
+            fi
+          }
+          eq "SHOW password_encryption;" "scram-sha-256"
+          eq "SELECT count(*) FROM pg_roles WHERE rolname='cafe_synth_owner' AND NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls;" "1"
+          eq "SELECT count(*) FROM pg_roles WHERE rolname='cafe_synth_app' AND rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls;" "1"
+          eq "SELECT count(*) FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname='cafe_synth_app');" "0"
+          eq "SELECT has_database_privilege('cafe_synth_app','cafe_synthetic','CONNECT')::text;" "t"
+          eq "SELECT has_database_privilege('cafe_synth_app','cafe_synthetic','CREATE')::text;" "f"
+          eq "SELECT has_database_privilege('cafe_synth_app','cafe_synthetic','TEMPORARY')::text;" "f"
+          eq "SELECT has_schema_privilege('cafe_synth_app','public','USAGE')::text;" "t"
+          eq "SELECT has_schema_privilege('cafe_synth_app','public','CREATE')::text;" "f"
+          eq "SELECT has_database_privilege('cafe_synth_app','postgres','CONNECT')::text;" "f"
+          eq "SELECT has_database_privilege('cafe_synth_app','template1','CONNECT')::text;" "f"
+          eq "SELECT count(DISTINCT a.privilege_type) FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a WHERE d.defaclrole=(SELECT oid FROM pg_roles WHERE rolname='cafe_synth_owner') AND d.defaclnamespace='public'::regnamespace AND d.defaclobjtype='r' AND a.grantee=(SELECT oid FROM pg_roles WHERE rolname='cafe_synth_app') AND a.privilege_type IN ('SELECT','INSERT','UPDATE','DELETE');" "4"
+          eq "SELECT count(DISTINCT a.privilege_type) FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a WHERE d.defaclrole=(SELECT oid FROM pg_roles WHERE rolname='cafe_synth_owner') AND d.defaclnamespace='public'::regnamespace AND d.defaclobjtype='S' AND a.grantee=(SELECT oid FROM pg_roles WHERE rolname='cafe_synth_app') AND a.privilege_type IN ('USAGE','SELECT');" "2"
+          eq "SELECT count(*) FROM pg_tables WHERE schemaname='public';" "0"
+          test "$(PGPASSWORD="$APP_PASSWORD" PGUSER=cafe_synth_app psql -XAt -v ON_ERROR_STOP=1 -c 'SELECT 1;')" = 1
+          if PGPASSWORD=DefinitelyInvalidSyntheticPassword PGUSER=cafe_synth_app \
+              psql -XAt -v ON_ERROR_STOP=1 -c 'SELECT 1;' >/dev/null 2>&1; then
+            echo "Incorrect password unexpectedly authenticated" >&2
+            exit 1
+          fi
+          echo "POSTGRES16 SCRAM / SCOPED ROLE ACL / WRONG-PASSWORD REJECTION PASS"
+      - name: Verify app cannot create schema or tables; schema owner defaults permit CRUD
+        shell: bash
+        run: |
+          set -euo pipefail
+          if PGPASSWORD="$APP_PASSWORD" PGUSER=cafe_synth_app \
+              psql -X -v ON_ERROR_STOP=1 -c \
+              "CREATE TABLE public.forbidden_synthetic_table(id bigint);" >/dev/null 2>&1; then
+            echo "App can unexpectedly CREATE TABLE" >&2
+            exit 1
+          fi
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          SET ROLE cafe_synth_owner;
+          CREATE TABLE public.synthetic_permission_fixture (
+            id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            title text NOT NULL
+          );
+          RESET ROLE;
+          COMMIT;
+          SQL
+          PGPASSWORD="$APP_PASSWORD" PGUSER=cafe_synth_app \
+            psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO public.synthetic_permission_fixture(title)
+            VALUES ('test synthetic row');
+          SELECT count(*) FROM public.synthetic_permission_fixture;
+          UPDATE public.synthetic_permission_fixture SET title='test edited row'
+            WHERE title='test synthetic row';
+          DELETE FROM public.synthetic_permission_fixture WHERE title='test edited row';
+          SQL
+          test "$(psql -XAt -v ON_ERROR_STOP=1 -c \
+            "SELECT count(*) FROM public.synthetic_permission_fixture;")" = 0
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          SET ROLE cafe_synth_owner;
+          DROP TABLE public.synthetic_permission_fixture;
+          RESET ROLE;
+          COMMIT;
+          SQL
+          test "$(psql -XAt -v ON_ERROR_STOP=1 -c \
+            "SELECT count(*) FROM pg_tables WHERE schemaname='public';")" = 0
+          echo "APP DDL BLOCKED / OWNER-CREATED TABLE CRUD / EMPTY AFTER TEST PASS"
