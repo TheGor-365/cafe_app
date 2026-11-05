@@ -3,6 +3,8 @@ name: Cafe P1.2 two temporary PostgreSQL recovery safety
 on:
   push:
     branches: [feature/cafe-p12-restore-existing-test-pg-20261106]
+  pull_request:
+    branches: [feature/cafe-p12-reboot-isolated-recovery-20261106]
 
 permissions:
   contents: read
