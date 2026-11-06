@@ -169,3 +169,75 @@ jobs:
               assert bad not in s,bad
           print('DIAGNOSTIC READONLY / SECRET REDACTION / NO WRITER GATES PASS')
           PY
+
+
+  fifth-server-ip-consistency-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check owner IP diagnostic Python and embedded Ruby syntax
+        run: |
+          python3 -B -m py_compile scripts/cafe_p12_fifth_ip_consistency_probe_20261107.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import importlib.util
+          import subprocess
+          path=Path('scripts/cafe_p12_fifth_ip_consistency_probe_20261107.py')
+          spec=importlib.util.spec_from_file_location('p12_ip_probe_ci',path)
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          p=subprocess.run(['ruby','-c'],input=mod.RUBY_PROBE.encode(),
+                           stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False)
+          assert p.returncode==0,'embedded Ruby parser failed'
+          assert mod.SCHEMA_BLOB=='d146f135e3ce964d20b46a5c65bfe5026e72fc34'
+          b=subprocess.check_output(['git','hash-object','scripts/cafe_fifth_schema_one_shot.py'],text=True).strip()
+          assert b==mod.SCHEMA_BLOB,'reviewed existing helper must remain unchanged'
+          assert mod.RUBY_PROBE.count('db.exec(')==1
+          assert 'SELECT current_database()' in mod.RUBY_PROBE
+          for forbidden in ('db.exec("INSERT','db.exec("UPDATE','db.exec("DELETE',
+                            'db.exec("CREATE','db.exec("ALTER','db.exec("DROP',
+                            'db:schema:load','db:migrate','db:seed'):
+              assert forbidden not in mod.RUBY_PROBE,forbidden
+          print('EMBEDDED PG READONLY RUBY SYNTAX / PINNED SCRIPT PASS')
+          PY
+      - name: Verify exact no-DDL runner assembly and fixed output guard
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import importlib.util
+          path=Path('scripts/cafe_p12_fifth_ip_consistency_probe_20261107.py')
+          spec=importlib.util.spec_from_file_location('p12_ip_probe_ci',path)
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          class MockSchema:
+              def docker_writer(self, source, mounts, ip):
+                  return ['docker','run','--rm','--pull=never','--read-only',
+                          '--network='+mod.NETWORK,'--cap-drop=ALL',
+                          '--security-opt=no-new-privileges','--user=1000:1000',
+                          '--entrypoint=sh','cafe-legacy-full:node14','-c',
+                          'set -eu; password="$(cat /tmp/cafe_p12_secret)"; '
+                          'export DATABASE_URL="postgresql://postgres:$password@cafe-synthetic-postgres:5432/cafe_synthetic"; '
+                          'unset password; '
+                          'bundle exec ruby qa/security/cafe_fifth_schema_target_guard.rb pre; '
+                          'bundle exec rails db:schema:load; '
+                          'bundle exec ruby qa/security/cafe_fifth_schema_target_guard.rb post']
+          args=mod.readonly_command(MockSchema(),Path('/tmp/synthetic-source'),[],'172.31.0.8')
+          assert args[-1].endswith('bundle exec ruby qa/security/cafe_fifth_ip_consistency_probe_20261107.rb')
+          for forbidden in ('db:schema:load','db:migrate','db:seed','db:drop',
+                            'cafe_fifth_schema_target_guard.rb'):
+              assert forbidden not in args[-1],forbidden
+          assert '--read-only' in args and '--rm' in args
+          approved=[
+            'P1.2 IP PROBE PG16/FIFTH DB/SCOPED ROLE/TCP PASS',
+            'P1.2 IP PROBE SOCKET_KIND=DIFFERENT_IPV4',
+            'P1.2 IP PROBE DNS_KIND=EXPECTED_ONLY',
+            'P1.2 IP PROBE SOCKET_IN_DNS=NO',
+            'P1.2 IP PROBE RESULT=READ_ONLY']
+          assert mod.safe_output(('\n'.join(approved)+'\n').encode())==approved
+          try:mod.safe_output(('\n'.join(approved)+'\npassword=secret\n').encode())
+          except RuntimeError:pass
+          else:raise AssertionError('raw, unapproved output accepted')
+          assert '--create-schema' not in path.read_text()
+          print('ONLY FIFTH PG SELECT / NO SCHEMA DDL / FIXED CATEGORY GATES PASS')
+          PY
