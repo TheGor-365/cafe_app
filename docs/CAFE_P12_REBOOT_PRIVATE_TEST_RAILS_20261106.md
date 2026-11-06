@@ -26,3 +26,13 @@ The two older sandbox Rails may have writable **only private sandbox media** mou
 ## Limits
 
 CI runs static + mocked contract only; **no owner Docker is reachable from GitHub**. The original fourth read-only helper's preflight is run on the owner host, not CI. All steps are fail closed. This restores only previously created QA infrastructure — **NOT** fifth SCRAM PG roles, synthetic Rails schema, seeds, migrations, or app changes. Must execute owner `--verify-clones` before moving to a new test Rails gate. No branch checkout/reset/merge or cleanup.
+
+## Owner-local preflight failure and fix (2026-11-06)
+
+Owner fetched PR #61 exact head `a284c5b3d6b128e4441395d59fd3eb6168297e4b`, helper blob `00ea6dde28da2f1670d7ba2555a142de59802d25`, installed into a private 0600 owner path and ran `--check` only. Protected two-temp-PG `--verify-clones` passed with 20 products/2 historical QA users and 3001/3002 isolation. Rails boot preflight stopped on **`sandbox-original source/media mount scope changed`**. No boot marker was written, no test Rails was started by this preflight.
+
+**Root cause found in original reviewed code:** `scripts/cafe_sandbox_rails.py` `mount_specs()` explicitly inherits pre-existing **read-only named Docker volumes** from patched Rails dependency mounts, while original PR #61 new preflight blanket-rejected every volume. The newer rule was stricter than the historical verified construction. `scripts/cafe_precache_sandbox_acceptance.py`, `scripts/cafe_private_headers_qa_mountfix.py`, and `scripts/cafe_private_e2e_web_readonly.py` also explicitly inherit read-only named volumes. This discrepancy is a source-contract bug; **not** evidence of Docker media or data damage.
+
+PR #61 now accepts `Type=volume` only when `RW=false` and the volume name is nonempty. It continues to require read-only `/app`, exact original private-media source per candidate with only that media bind writable, SHA-pinned readonly Ruby `/bundle`, no host port, dedicated internal network, exact sandbox/fourth DB URL, expected UID/image, and no original QA secret mount. New `test/security/cafe_p12_test_rails_mount_contract_test.py` exercises a legitimate read-only named volume plus negative mount, network, secret, media and public-port cases in CI.
+
+**Owner must NOT run the old installed v1 helper again.** After exact new PR head GitHub CI passes, fetch new script by commit+blob into a **new filename** and run `--check` only. `--start` is separately gated. Production/QA, restored test PG, original private media and user worktree remain unchanged.
