@@ -11,7 +11,7 @@
                  zero non-postgres login roles and original protected state.
 --verify-empty:  READ ONLY after boot, until scoped roles provisioning starts.
 
-No Docker creation/removal/volume/network change, git checkout, production
+No Docker creation/removal/volume/network change, local branch switch, production
 SQL, QA snapshot import, new roles or Rails schema/seed/migration is permitted.
 """
 from __future__ import annotations
