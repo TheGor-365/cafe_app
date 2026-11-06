@@ -320,3 +320,111 @@ jobs:
         run: |
           python3 scripts/cafe_p12_fifth_tcp_cluster_identity_20261107.py --help | grep -F -- '--verify-cluster'
           echo 'NO OWNER DOCKER, NO ROLE OR SCHEMA WRITES, NO PRIVATE CREDENTIALS'
+
+
+  fifth-cluster-pinned-loader-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check new Ruby cluster guard and independent Python schema loader
+        shell: bash
+        run: |
+          python3 -B -m py_compile scripts/cafe_fifth_schema_cluster_scoped_20261107.py
+          ruby -c qa/security/cafe_fifth_schema_cluster_guard_20261107.rb
+      - name: Confirm immutable fifth-only target and non-retry marker
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          import subprocess
+          a=Path('scripts/cafe_fifth_schema_cluster_scoped_20261107.py')
+          spec=importlib.util.spec_from_file_location('p12_new_cluster_scoped',a)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          assert m.PG=='cafe-upload-security-synthetic-pg-20261105'
+          assert m.NETWORK=='cafe-upload-security-synthetic-net-20261105'
+          assert m.DB=='cafe_synthetic'
+          assert m.SOURCE=='090b9d37419fcd9f393d8b686ac0f4563ef7b613'
+          assert m.MARKER.name=='cafe_p12_fifth_schema_attempt_20261106.json'
+          assert m.OLD_SCHEMA_MARKER.name=='cafe_p12_fifth_schema_attempt_20261105.json'
+          assert m.ROLES_BLOB=='a02f23a9cd2c982309a1649ea0b314618f9da94a'
+          assert m.RUBY_GUARD_FILE.name=='cafe_fifth_schema_cluster_guard_20261107.rb'
+          ruby_sha=subprocess.check_output(['git','hash-object',
+            'qa/security/cafe_fifth_schema_cluster_guard_20261107.rb'],text=True).strip()
+          assert ruby_sha=='a95f8d95a9a4af9853f418756ffa517f99f6efe4'
+          assert m.RUBY_GUARD_BLOB==ruby_sha
+          for false in ('', 'not-a-cluster-id','123456789abc', '1'):
+            try:m.docker_writer(Path('/tmp/a'),[], '172.30.0.2',false)
+            except RuntimeError:pass
+            else:raise AssertionError('invalid cluster pin accepted')
+          atext=a.read_text()
+          assert 'role_recovery_verified()' in atext
+          assert 'ruby_guard_audit()' in atext
+          assert 'RUBY_GUARD_FILE.read_bytes()' in atext
+          assert 'fd=os.open(str(MARKER)' in atext
+          assert atext.index('fd=os.open(str(MARKER)')<atext.index('result=subprocess.run(argv')
+          assert 'require(confirmation==DB' in atext
+          print('EXACT FIFTH / ORIGINAL MARKER / PRIVATE RUBY BLOB / NO REPEAT PASS')
+          PY
+      - name: Mock live preflight and one-shot runner without owner PG or credentials
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p=Path('scripts/cafe_fifth_schema_cluster_scoped_20261107.py')
+          spec=importlib.util.spec_from_file_location('p12_new_cluster_scoped',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          mounts=['type=bind,source=/tmp/fake-bundle,target=/bundle,readonly',
+                  'type=bind,source=/tmp/fake-gem,target=/app/Gemfile,readonly',
+                  'type=bind,source=/tmp/fake-lock,target=/app/Gemfile.lock,readonly']
+          cmd=m.docker_writer(Path('/tmp/fake-reviewed-source'),mounts,
+                              '172.30.0.2','7532669441155230666')
+          assert cmd[:3]==['docker','run','--rm']
+          for token in ('--network='+m.NETWORK,'--user=1000:1000',
+                        '--read-only','--cap-drop=ALL',
+                        '--env=CAFE_P12_SERVER_IP=172.30.0.2',
+                        '--env=CAFE_P12_EXPECTED_CLUSTER_ID=7532669441155230666',
+                        '--env=PGOPTIONS=-c role=cafe_synth_owner -c search_path=public'):
+              assert token in cmd,token
+          assert 'cafe_fifth_schema_cluster_guard_20261107.rb pre' in cmd[-1]
+          assert 'cafe_fifth_schema_cluster_guard_20261107.rb post' in cmd[-1]
+          assert cmd[-1].count('rails db:schema:load')==1
+          assert not any(t in cmd for t in ('--network=host','--privileged','--publish'))
+          print('PINNED IP + FIFTH TCP CLUSTER + SCOPED ROLE DOCKER ARGV PASS')
+          PY
+      - name: Verify Ruby guard checks DNS and same cluster and restores owner
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('qa/security/cafe_fifth_schema_cluster_guard_20261107.rb').read_text()
+          for required in (
+              "ENV.fetch('CAFE_P12_SERVER_IP')",
+              "ENV.fetch('CAFE_P12_EXPECTED_CLUSTER_ID')",
+              "Socket.getaddrinfo(TARGET_HOST, 5432, nil, Socket::SOCK_STREAM)",
+              "resolved == [expected_ip]",
+              "IPAddr.new(actual['server_ip']).ipv4?",
+              "db.exec('SET ROLE NONE')",
+              "'SELECT system_identifier::text FROM pg_control_system()'",
+              "db.exec('SET ROLE cafe_synth_owner')",
+              "assert_equal(actual_cluster, expected_cluster",
+              "assert_equal(scalar(db, 'SELECT current_user'), OWNER",
+              "assert_equal(actual['session_user'], 'postgres'",
+              "assert_equal(actual['current_user'], OWNER",
+              "assert_equal(actual['server_port'].to_i, 5432",
+              "P1.2 EXACT MIGRATION VERSIONS / ZERO DATA / APP CRUD ACL PASS"):
+              assert required in s,required
+          assert "assert_equal(actual['server_ip'], expected_ip" not in s
+          pos=s.index("begin\n    db.exec('SET ROLE NONE')")
+          assert pos<s.index("ensure\n    db.exec('SET ROLE cafe_synth_owner')")<s.index("assert_equal(actual_cluster, expected_cluster")
+          assert "db.exec('ALTER ROLE" not in s
+          assert "db.exec('CREATE" not in s and "db.exec('DROP" not in s
+          print('TCP SAME CLUSTER / STRICT DNS / ROLE RESTORE / NO DDL IN GUARD PASS')
+          PY
+      - name: Explicitly ensure CI performs no database operations
+        run: |
+          python3 scripts/cafe_fifth_schema_cluster_scoped_20261107.py --help | grep -F -- '--check'
+          python3 scripts/cafe_fifth_schema_cluster_scoped_20261107.py --help | grep -F -- '--verify-schema'
+          echo 'STATIC/MOCK ONLY; NO DOCKER, NO OWNER FIFTH PG, NO DDL'
