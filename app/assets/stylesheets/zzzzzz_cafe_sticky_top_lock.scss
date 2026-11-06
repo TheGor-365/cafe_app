@@ -1,0 +1,32 @@
+/*
+ * Cafe UI follow-up: eliminate the initial vertical travel of the sticky
+ * Gor's Coffee header. The legacy reflow gives main 0.85rem top padding,
+ * while the sticky title has top:0; the two positions disagree by ~14px.
+ *
+ * This file sorts after zzzzz_cafe_unified_shell.scss in require_tree.
+ * No changes to content width, navigation, auth, scrolling or JS.
+ */
+html body .page-container.row > .col-8#cafe-main-content {
+  padding-top: 0;
+}
+@media (min-width: 761px) {
+  html body .page-container.row > .col-8#cafe-main-content > .cafe-brandbar.title-card {
+    position: sticky;
+    top: 0;
+    margin-top: 0;
+    z-index: 22;
+  }
+  html body .page-container.row > nav.cafe-account-widget {
+    top: 0;
+    margin-top: 0;
+  }
+}
+@media (max-width: 760px) {
+  /* The mobile strip and account row already occupy 60px each. */
+  html body .page-container.row > .col-8#cafe-main-content > .cafe-brandbar.title-card {
+    position: sticky;
+    top: 120px;
+    margin-top: 0;
+    z-index: 30;
+  }
+}

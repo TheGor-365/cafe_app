@@ -1,0 +1,190 @@
+name: Coffee unified account and fixed backdrop PR acceptance
+
+on:
+  pull_request:
+    branches: [feature/cafe-p12-fifth-scoped-roles-recovery-20261106]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coffee-unified-shell-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rails:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ruby:2.5.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install legacy Bundler
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Add Linux platform to disposable checkout
+        run: bundle _2.2.13_ lock --add-platform x86_64-linux
+      - name: Install locked Ruby dependencies
+        run: bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Load disposable CI database schema
+        run: bundle _2.2.13_ exec rails db:schema:load
+      - name: Create test-only Webpacker manifest
+        run: |
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Run account layout, auth, cart and SassC regressions
+        run: |
+          bundle _2.2.13_ exec rails test \
+            test/integration/coffee_unified_shell_test.rb \
+            test/integration/coffee_layout_reflow_test.rb \
+            test/integration/coffee_account_corner_style_test.rb \
+            test/integration/coffee_auth_account_test.rb \
+            test/integration/coffee_mobile_shell_test.rb \
+            test/integration/session_layout_isolation_test.rb
+
+  ui-installer-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check private local installer syntax without executing UI writes
+        run: |
+          python3 -B -m py_compile scripts/cafe_ui_reviewed_local_install_20261106.py
+          python3 -B scripts/cafe_ui_reviewed_local_install_20261106.py --help
+      - name: Verify SHA pins and negative default mode
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path('scripts/cafe_ui_reviewed_local_install_20261106.py').read_text()
+          ast.parse(s)
+          assert 'PINNED_UI_COMMIT = "10cf64a63c51c146a0389ebc99376e20f659d10c"' in s
+          assert 'EXPECTED_LOCAL_LAYOUT = "c8921be1b02d06b3f30f7ab4b0166e13d20b3be8"' in s
+          assert 'EXPECTED_REMOTE_LAYOUT = "cfab73051bd1ddd5f8f6824ea69ece3be7fccc52"' in s
+          assert 'EXPECTED_REMOTE_STYLE = "ffe52c0f1cba6a1dd19bd20f91bd7a7435322fba"' in s
+          assert 'os.replace(tmp_layout, original)' in s
+          assert 'if opts.check:' in s and 'preflight()' in s
+          assert 'ROOT / LAYOUT' in s and 'ROOT / STYLE' in s
+          assert 'git("checkout"' not in s and 'git("reset"' not in s
+          print('PINNED LOCAL UI INSTALLER / FAIL CLOSED / NO CI HOST WRITES PASS')
+          PY
+
+  owner-layout-adapter-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check for owner-local minimal ERB adapter
+        run: |
+          python3 -B -m py_compile scripts/cafe_ui_local_layout_adapter_20261107.py
+          python3 -B scripts/cafe_ui_local_layout_adapter_20261107.py --help
+      - name: Test targeted transformations and fail-closed mode without owner files
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p = Path('scripts/cafe_ui_local_layout_adapter_20261107.py')
+          spec = importlib.util.spec_from_file_location('cafe_local_ui_adapter', p)
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          assert m.EXPECTED_LOCAL_LAYOUT == '1c5550e55e653cf204f0f6910b1251b2dc0e4320'
+          assert m.EXPECTED_PATCHED_LAYOUT == '85ab9031ec6fd13bdefb735588cf46f570daea11'
+          assert m.EXPECTED_STYLE_BLOB == 'e3c73d446bfc0126a58a644e5afb96fe5a36c173'
+          assert m.STYLE_COMMIT == '28e4c145d09e44cb34377fae0c36b60f9d563bcf'
+          source = '\n'.join((
+              'jquery@3.5.1 bootstrap@4.6.2 stylesheet_pack_tag javascript_pack_tag',
+              "render 'layouts/footer'",
+              *[part[0] for part in m.REPLACEMENTS],
+          )).encode()
+          expected = source.decode()
+          for old,new in m.REPLACEMENTS:
+              assert expected.count(old) == 1
+              expected = expected.replace(old,new,1)
+          output = expected.encode()
+          m.EXPECTED_LOCAL_LAYOUT = m.blob(source)
+          m.EXPECTED_PATCHED_LAYOUT = m.blob(output)
+          assert m.adapt(source) == output
+          for token in ('avatar&.url(:thumb)', "button_to 'Sign out'",
+                        'cafe-account-widget', 'role="main"', 'cafe-page'):
+              assert token in expected,token
+          try: m.adapt(source+b'x')
+          except RuntimeError as e: assert 'hash changed' in str(e)
+          else: raise AssertionError('unreviewed local edit was accepted')
+          try: m.adapt(source.replace(b'col-1',b'guest-hidden'))
+          except RuntimeError: pass
+          else: raise AssertionError('missing anchors were accepted')
+          print('OWNER-SHA GUARDED PATCH / BOOTSTRAP+AVATAR+DELETE / NEGATIVE PASS')
+          PY
+      - name: Enforce local side-effect boundary
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/cafe_ui_local_layout_adapter_20261107.py').read_text()
+          assert 'os.replace(temp, path)' in p
+          assert 'original_backup.open("xb")' in p
+          assert 'target.open("xb")' in p
+          assert 'git("checkout"' not in p and 'git("reset"' not in p
+          assert 'docker' not in p.split('def apply():')[1].split('def verify():')[0].lower()
+          assert 'database' not in p.split('def apply():')[1].split('def verify():')[0].lower()
+          print('NO LOCAL GIT SWITCH / DOCKER / DATABASE / UPLOAD WRITES PASS')
+          PY
+
+  header-top-lock-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile guarded header installer syntax and CLI contract
+        run: |
+          python3 -B -m py_compile scripts/cafe_sticky_header_top_lock_20261107.py
+          python3 -B scripts/cafe_sticky_header_top_lock_20261107.py --help
+      - name: Check exact pins, negative source gates and write boundary
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import importlib.util
+          from unittest.mock import patch
+          p=Path("scripts/cafe_sticky_header_top_lock_20261107.py")
+          spec=importlib.util.spec_from_file_location("cafe_header_pin",p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          assert m.EXPECTED_LAYOUT == "85ab9031ec6fd13bdefb735588cf46f570daea11"
+          assert m.EXPECTED_BASE_CSS == "e3c73d446bfc0126a58a644e5afb96fe5a36c173"
+          assert m.EXPECTED_NEW_CSS == "64fcaa6462b3e60580f4548df9448d04ca9e493f"
+          assert m.SOURCE_COMMIT == "dd31cd7244fd786ba654bcf1e037454b81f37873"
+          for bad in (b"",b"unexpected"):
+            assert m.sha(bad)!=m.EXPECTED_LAYOUT
+          with patch.object(m,"state_check",side_effect=RuntimeError("source mismatch")):
+            try:m.check()
+            except RuntimeError as e:assert "source mismatch" in str(e)
+            else:raise AssertionError("failed-closed read-only gate missing")
+          src=p.read_text()
+          stage=src.split("def apply():",1)[1].split("def verify():",1)[0]
+          for flag in ("os.O_EXCL","os.O_NOFOLLOW","sha(data) == EXPECTED_NEW_CSS",
+                       "state_check()"):
+            assert flag in src,flag
+          assert "NEW_STYLE" in stage
+          assert "os.open(str(NEW_STYLE)" in stage
+          assert "os.replace(" not in stage
+          assert 'subprocess.run(' not in stage
+          assert 'git("checkout"' not in stage and 'git("reset"' not in stage
+          print("TOP LOCK EXACT SHA / FAIL-CLOSED / EXCLUSIVE SINGLE SCSS PASS")
+          PY

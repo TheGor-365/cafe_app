@@ -7,7 +7,8 @@ class CoffeeLayoutReflowTest < ActionDispatch::IntegrationTest
     assert_select 'div.page-container.row', count: 1
     assert_select 'div.page-container > nav.cafe-sidebar', count: 1
     assert_select 'div.page-container > div.col-8', count: 1
-    assert_select 'div.page-container > div.col-1.p-2', count: 1
+    assert_select 'div.page-container > nav.cafe-account-widget', count: 1
+    assert_select 'div.page-container > div.col-1', count: 0
     assert_select 'h1#cafe-cart-title', count: 1
 
     post order_items_path, params: { order_item: { product_id: -1, quantity: 1 } }
