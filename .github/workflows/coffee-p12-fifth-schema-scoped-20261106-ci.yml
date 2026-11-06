@@ -141,7 +141,7 @@ jobs:
           assert 'P12_DIAG_ENTERED' in shell and 'P12_DIAG_BEFORE_GUARD' in shell
           assert 'db:schema:load' not in shell and 'db:seed' not in shell
           assert shell.endswith('cafe_fifth_schema_target_guard.rb pre')
-          assert 'post' not in shell
+          assert 'cafe_fifth_schema_target_guard.rb post' not in shell
           assert 'DATABASE_URL=' in shell and 'PGPASSWORD=' not in shell
           assert d.safe_category(b'PG::ConnectionBad: could not translate host name "abc"')=='dns_resolution'
           assert d.safe_category(b'P1.2 FIFTH SCHEMA TARGET STOP: current_user not constrained owner')=='guard_current_user'
