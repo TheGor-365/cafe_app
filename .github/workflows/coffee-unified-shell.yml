@@ -84,3 +84,65 @@ jobs:
           assert 'git("checkout"' not in s and 'git("reset"' not in s
           print('PINNED LOCAL UI INSTALLER / FAIL CLOSED / NO CI HOST WRITES PASS')
           PY
+
+  owner-layout-adapter-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check for owner-local minimal ERB adapter
+        run: |
+          python3 -B -m py_compile scripts/cafe_ui_local_layout_adapter_20261107.py
+          python3 -B scripts/cafe_ui_local_layout_adapter_20261107.py --help
+      - name: Test targeted transformations and fail-closed mode without owner files
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p = Path('scripts/cafe_ui_local_layout_adapter_20261107.py')
+          spec = importlib.util.spec_from_file_location('cafe_local_ui_adapter', p)
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          assert m.EXPECTED_LOCAL_LAYOUT == '1c5550e55e653cf204f0f6910b1251b2dc0e4320'
+          assert m.EXPECTED_PATCHED_LAYOUT == '85ab9031ec6fd13bdefb735588cf46f570daea11'
+          assert m.EXPECTED_STYLE_BLOB == 'e3c73d446bfc0126a58a644e5afb96fe5a36c173'
+          assert m.STYLE_COMMIT == '28e4c145d09e44cb34377fae0c36b60f9d563bcf'
+          source = '\n'.join((
+              'jquery@3.5.1 bootstrap@4.6.2 stylesheet_pack_tag javascript_pack_tag',
+              "render 'layouts/footer'",
+              *[part[0] for part in m.REPLACEMENTS],
+          )).encode()
+          expected = source.decode()
+          for old,new in m.REPLACEMENTS:
+              assert expected.count(old) == 1
+              expected = expected.replace(old,new,1)
+          output = expected.encode()
+          m.EXPECTED_LOCAL_LAYOUT = m.blob(source)
+          m.EXPECTED_PATCHED_LAYOUT = m.blob(output)
+          assert m.adapt(source) == output
+          for token in ('avatar&.url(:thumb)', "button_to 'Sign out'",
+                        'cafe-account-widget', 'role="main"', 'cafe-page'):
+              assert token in expected,token
+          try: m.adapt(source+b'x')
+          except RuntimeError as e: assert 'hash changed' in str(e)
+          else: raise AssertionError('unreviewed local edit was accepted')
+          try: m.adapt(source.replace(b'col-1',b'guest-hidden'))
+          except RuntimeError: pass
+          else: raise AssertionError('missing anchors were accepted')
+          print('OWNER-SHA GUARDED PATCH / BOOTSTRAP+AVATAR+DELETE / NEGATIVE PASS')
+          PY
+      - name: Enforce local side-effect boundary
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/cafe_ui_local_layout_adapter_20261107.py').read_text()
+          assert 'os.replace(temp, path)' in p
+          assert 'original_backup.open("xb")' in p
+          assert 'target.open("xb")' in p
+          assert 'git("checkout"' not in p and 'git("reset"' not in p
+          assert 'docker' not in p.split('def apply():')[1].split('def verify():')[0].lower()
+          assert 'database' not in p.split('def apply():')[1].split('def verify():')[0].lower()
+          print('NO LOCAL GIT SWITCH / DOCKER / DATABASE / UPLOAD WRITES PASS')
+          PY
