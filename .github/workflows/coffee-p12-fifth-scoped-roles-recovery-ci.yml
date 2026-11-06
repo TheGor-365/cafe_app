@@ -50,7 +50,7 @@ jobs:
              '"docker","volume"','git reset','git checkout',
              'shutil.rmtree'):
              assert forbidden not in s,forbidden
-          assert s.count('"docker","exec"')==2
+          assert s.count('"docker","exec"')==3
           funcs={n.name for n in ast.walk(t) if isinstance(n,ast.FunctionDef)}
           assert {"before","provision","verify","login_test","reviewed_sql",
                   "secret_audit","old_marker","original"}<=funcs
