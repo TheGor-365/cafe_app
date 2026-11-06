@@ -88,12 +88,23 @@ def inspect_web(inv,label,name,network,url,readonly):
             not host.get("PortBindings") and
             set(obj["NetworkSettings"]["Networks"])=={network},
             label+" preexisting private QA runtime differs")
-    mounts={m["Destination"]:m for m in obj["Mounts"]}
-    require(mounts.get("/app",{}).get("RW") is False and
-            mounts.get("/app/public/uploads",{}).get("RW") is True and
-            all((dest=="/app/public/uploads" or not m["RW"])
+    original_mounts=obj["Mounts"]
+    mounts={m["Destination"]:m for m in original_mounts}
+    require(len(mounts)==len(original_mounts),
+            label+" duplicate Docker mount destinations")
+    # Existing reviewed sandbox sources expressly inherit read-only named
+    # volumes (e.g. the legacy Ruby dependencies), not just host binds.
+    # Reject only unrecognized/writable mounts; do not mutate Docker.
+    require(mounts.get("/app",{}).get("Type")=="bind" and
+            mounts["/app"]["RW"] is False and
+            mounts.get("/app/public/uploads",{}).get("Type")=="bind" and
+            mounts["/app/public/uploads"]["RW"] is True and
+            all((dest=="/app/public/uploads" or m["RW"] is False) and
+                m["Type"] in ("bind","volume") and
+                (m["Type"]!="volume" or
+                 (isinstance(m.get("Name"),str) and bool(m["Name"])))
                 for dest,m in mounts.items()) and
-            not any(x["Type"]=="volume" for x in obj["Mounts"]),
+            "/run/secrets/cafe_pg_password" not in mounts,
             label+" source/media mount scope changed")
     envlist=conf["Env"]
     env=dict(x.split("=",1) for x in envlist)
