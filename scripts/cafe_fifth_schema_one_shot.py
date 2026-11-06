@@ -39,7 +39,10 @@ NETWORK="cafe-upload-security-synthetic-net-20261105"
 DB="cafe_synthetic"
 IMAGE="cafe-legacy-full:node14"
 SECRET=PRIVATE/"synthetic_pg_scram_20261105/password"
-MARKER=PRIVATE/"cafe_p12_fifth_schema_attempt_20261105.json"
+MARKER=PRIVATE/"cafe_p12_fifth_schema_attempt_20261106.json"
+OLD_SCHEMA_MARKER=PRIVATE/"cafe_p12_fifth_schema_attempt_20261105.json"
+ROLES_HELPER=PRIVATE/"cafe_p12_fifth_scoped_roles_v1_20261106.py"
+ROLES_BLOB="a02f23a9cd2c982309a1649ea0b314618f9da94a"
 TABLES=("ar_internal_metadata","categories","order_item_modifiers",
         "order_items","orders","product_modifier_options","product_variants",
         "products","schema_migrations","users")
@@ -145,8 +148,9 @@ def runtime():
             (REPO/".git").exists(),"wrong user/repository")
     require(git("cat-file","-t",SOURCE)=="commit","original reviewed source not fetched")
     probe=load_pin(RUNTIME_HELPER,RUNTIME_BLOB,"p12_reviewed_runtime")
-    with redirect_stdout(io.StringIO()):
-        probe.probe()
+    # The original probe.probe() calls a gate that expects ZERO login roles.
+    # After PR63, the pinned role helper verifies the recovered role state.
+    # Genuine Rails boot and mounts are checked by offline_runner_mount_probe.
     mounts=probe.allowed_gem_mounts()
     require(len(mounts)==3 and
             any("target=/bundle,readonly" in m for m in mounts) and
@@ -155,9 +159,19 @@ def runtime():
             "reviewed Linux Ruby dependency mounts differ")
     return probe,mounts
 
+def role_recovery_verified():
+    roles=load_pin(ROLES_HELPER,ROLES_BLOB,"p12_scoped_roles_recovered")
+    require(roles.PG==PG and roles.DB==DB and roles.NETWORK==NETWORK and
+            roles.MARKER.is_file(),"recovered role source or marker differs")
+    with redirect_stdout(io.StringIO()):
+        roles.verify()  # READ ONLY, includes SCRAM and original four protection
+    return roles
+
 def check():
-    require(not MARKER.exists() and not MARKER.is_symlink(),
-            "one-shot attempt marker exists; never retry")
+    require(not MARKER.exists() and not MARKER.is_symlink() and
+            not OLD_SCHEMA_MARKER.exists() and not OLD_SCHEMA_MARKER.is_symlink(),
+            "old/new one-shot schema attempt marker exists; never retry")
+    role_recovery_verified()
     probe,mounts=runtime()
     secret_audit()
     ip,ident=target()
@@ -308,11 +322,13 @@ def create_schema(confirmation):
                 "fifth schema became occupied before writer")
         record={"pg":PG,"database":DB,"cluster":ident,"source":SOURCE,
                 "ruby_guard_blob":RUBY_GUARD_BLOB,"started":int(time.time()),
-                "operation":"fifth-only schema:load, no seeds"}
-        with MARKER.open("x",encoding="utf-8") as output:
+                "operation":"fifth-only schema:load after scoped roles, no seeds"}
+        flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL
+        if hasattr(os,"O_NOFOLLOW"): flags|=os.O_NOFOLLOW
+        fd=os.open(str(MARKER),flags,0o600)
+        with os.fdopen(fd,"w",encoding="utf-8") as output:
             json.dump(record,output,sort_keys=True)
             output.write("\n")
-        MARKER.chmod(0o600)
         print("P1.2 ONE-SHOT FIFTH-ONLY ATTEMPT RECORDED",flush=True)
         print("P1.2 EXECUTING CANONICAL SCHEMA LOAD — NO SEEDS",flush=True)
         # Docker stdout/stderr may contain confidential DSN/stack details.
@@ -345,12 +361,25 @@ def verify_schema():
     record=json.loads(MARKER.read_text(encoding="utf-8"))
     require(record.get("pg")==PG and record.get("database")==DB and
             record.get("source")==SOURCE and
+            record.get("operation")=="fifth-only schema:load after scoped roles, no seeds" and
             record.get("ruby_guard_blob")==RUBY_GUARD_BLOB,
             "attempt record identity differs")
     previous=protected_four()
     _ip,ident=target()
     require(ident==record["cluster"] and ident not in previous,
             "fifth PG cluster changed / overlaps protected cluster")
+    roles=load_pin(ROLES_HELPER,ROLES_BLOB,"p12_roles_post_schema")
+    require(roles.MARKER.is_file() and not roles.MARKER.is_symlink(),
+            "scoped role recovery marker missing after schema load")
+    role_record=json.loads(roles.MARKER.read_text(encoding="utf-8"))
+    require(role_record.get("fifth_cluster")==ident and
+            role_record.get("operation")=="restore_fifth_scoped_roles_once" and
+            role_record.get("sql_blob")==roles.SQL_BLOB,
+            "scoped role recovery marker differs after schema load")
+    require(sql("SELECT count(*) FROM pg_roles WHERE rolname='cafe_synth_owner' AND NOT rolcanlogin AND NOT rolsuper;")=="1",
+            "scoped schema owner role changed")
+    require(sql("SELECT count(*) FROM pg_roles WHERE rolname='cafe_synth_app' AND rolcanlogin AND NOT rolsuper;")=="1",
+            "scoped application role changed")
     tables=sql("SELECT string_agg(tablename,',' ORDER BY tablename) "
                "FROM pg_tables WHERE schemaname='public';")
     require(tables==",".join(TABLES),"fifth expected table list differs")
