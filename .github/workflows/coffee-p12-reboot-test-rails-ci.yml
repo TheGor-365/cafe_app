@@ -95,3 +95,8 @@ jobs:
               assert len(starts)==4
               print('P1.2 MOCK FOUR PRIVATE RAILS START / MARKER FIRST / NO PROTECTED START PASS')
           PY
+
+      - name: Regression tests for readonly named dependency volumes and dangerous mounts
+        run: |
+          set -euo pipefail
+          python3 -B test/security/cafe_p12_test_rails_mount_contract_test.py -v
