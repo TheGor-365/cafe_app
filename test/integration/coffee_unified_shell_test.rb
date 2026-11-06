@@ -74,4 +74,23 @@ class CoffeeUnifiedShellTest < ActionDispatch::IntegrationTest
     assert_includes css, 'top: 60px'
     assert_includes css, 'top: 120px'
   end
+  test 'top lock removes initial title jump while preserving responsive sticky offsets' do
+    [info_path, new_user_session_path, menu_path].each do |path|
+      get path
+      assert_response :success
+      assert_select '#cafe-main-content > .cafe-brandbar.title-card', count: 1
+      assert_select 'nav.cafe-sidebar', count: 1
+      assert_select 'nav.cafe-account-widget', count: 1
+    end
+    source = Rails.root.join('app/assets/stylesheets/zzzzzz_cafe_sticky_top_lock.scss').read
+    css = SassC::Engine.new(source, syntax: :scss).render
+    assert_includes css, '#cafe-main-content'
+    assert_includes css, 'padding-top: 0'
+    assert_includes css, 'position: sticky'
+    assert_includes css, 'top: 0'
+    assert_includes css, 'top: 120px'
+    assert_includes css, 'margin-top: 0'
+    assert_includes css, 'nav.cafe-account-widget'
+  end
+
 end
