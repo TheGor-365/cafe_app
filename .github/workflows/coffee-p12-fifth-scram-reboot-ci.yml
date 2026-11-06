@@ -1,0 +1,118 @@
+name: Cafe P1.2 fifth SCRAM reboot (existing stopped PostgreSQL only)
+
+on:
+  push:
+    branches: [feature/cafe-p12-reboot-fifth-scram-20261106]
+  pull_request:
+    branches: [feature/cafe-p12-reboot-test-rails-20261106]
+
+permissions:
+  contents: read
+
+jobs:
+  fifth-scram-one-shot-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax / read-only and one-shot CLI separation
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/cafe_p12_fifth_scram_reboot_20261106.py
+          python3 scripts/cafe_p12_fifth_scram_reboot_20261106.py --help | grep -F -- '--start-empty'
+          if python3 scripts/cafe_p12_fifth_scram_reboot_20261106.py --start-empty --verify-empty >/dev/null 2>&1; then
+            echo "Mutually exclusive modes accepted" >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path("scripts/cafe_p12_fifth_scram_reboot_20261106.py").read_text()
+          tree=ast.parse(s)
+          for key in (
+              "153ffca0535e0c42921d18ea39943bb4a92795fd",
+              "c6e037a97218b084560ccdba183dab4ad0aee1b4",
+              "cafe_p12_private_test_rails_boot_v2_20261106.py",
+              "cafe-upload-security-synthetic-pg-20261105",
+              "cafe-upload-security-synthetic-net-20261105",
+              "cafe_synthetic","old.source_baseline()","old.secret_audit()",
+              'old.check_new("exited")','old.check_new("running")',
+              "old.verify_running()","boot.verify()",
+              'os.O_EXCL','"docker","start",PG',
+              '"pg_isready","-h","127.0.0.1"',
+              'no_schema_marker()',
+          ):
+              assert key in s,key
+          for forbidden in (
+             "db:reset","db:drop","db:migrate","db:schema:load",
+             "db:prepare","pg_restore","pg_dump",
+             '"docker","restart"','"docker","run"','"docker","create"',
+             '"docker","rm"','"docker","stop"','"docker","volume"',
+             "git checkout","shutil.rmtree","os.remove("
+          ):
+              assert forbidden not in s,forbidden
+          funcs={n.name for n in ast.walk(tree) if isinstance(n,ast.FunctionDef)}
+          assert {"preflight","postflight","wait_final_tcp","start_empty",
+                  "owner_module","no_schema_marker"}<=funcs
+          starts=[n for n in ast.walk(tree) if isinstance(n,ast.List) and
+                  len(n.elts)>=2 and isinstance(n.elts[0],ast.Constant) and
+                  isinstance(n.elts[1],ast.Constant) and
+                  n.elts[0].value=="docker" and n.elts[1].value=="start"]
+          assert len(starts)==1
+          print("P1.2 FIFTH ONLY / NO PROD-ROLE-SCHEMA-DOCKER DESTRUCTIVE COMMANDS PASS")
+          PY
+      - name: Mock exclusive marker before sole fifth start; reject replay
+        run: |
+          python3 - <<'PY'
+          import importlib.util,json
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          from tempfile import TemporaryDirectory
+          from unittest.mock import patch,Mock
+          spec=importlib.util.spec_from_file_location("r","scripts/cafe_p12_fifth_scram_reboot_20261106.py")
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          commands=[]
+          def only_fifth(args,**kwargs):
+              assert m.MARKER.is_file(), "marker was not written before start"
+              assert args == ["docker","start",m.PG], "unexpected Docker target"
+              commands.append(args)
+              return CompletedProcess(args,0,b"",b"")
+          with TemporaryDirectory() as td:
+              with patch.object(m,"MARKER",Path(td)/"one_shot"), \
+                   patch.object(m,"preflight",return_value=Mock()), \
+                   patch.object(m,"run",side_effect=only_fifth), \
+                   patch.object(m,"wait_final_tcp"), \
+                   patch.object(m,"postflight"):
+                  m.start_empty()
+                  assert len(commands)==1
+                  d=json.loads(m.MARKER.read_text())
+                  assert d["operation"]=="reboot_existing_fifth_empty_scram_once"
+                  assert d["pg"]==m.PG
+                  try:m.start_empty()
+                  except FileExistsError:pass
+                  else:raise AssertionError("second fifth bootstrap was allowed")
+                  assert len(commands)==1
+                  print("P1.2 FIFTH EXCLUSIVE MARKER BEFORE START / NO REPLAY PASS")
+          PY
+      - name: Mock readiness waits for final TCP server (not init Unix socket)
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from subprocess import CompletedProcess
+          from unittest.mock import patch
+          spec=importlib.util.spec_from_file_location("r","scripts/cafe_p12_fifth_scram_reboot_20261106.py")
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          calls=[]
+          def mock_run(args,**kwargs):
+              assert args[:4]==["docker","exec","--user","postgres"]
+              calls.append(args)
+              if "pg_isready" in args:
+                  assert "-h" in args and "127.0.0.1" in args
+                  return CompletedProcess(args,0,b"",b"")
+              assert "psql" in args
+              return CompletedProcess(args,0,b"cafe_synthetic\n",b"")
+          with patch.object(m,"run",side_effect=mock_run),patch.object(m.time,"sleep"):
+              m.wait_final_tcp()
+          assert len(calls)==2
+          print("P1.2 FIFTH POSTGRES FINAL TCP + EXACT DB SQL READY PASS")
+          PY
