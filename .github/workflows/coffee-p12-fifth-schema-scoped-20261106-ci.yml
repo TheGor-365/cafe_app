@@ -92,3 +92,80 @@ jobs:
           python3 scripts/cafe_fifth_schema_one_shot.py --help | grep -F -- '--check'
           python3 scripts/cafe_fifth_schema_one_shot.py --help | grep -F -- '--verify-schema'
           echo 'STATIC ONLY - no owner fifth PG, no Docker operations, no DB/seed writes'
+
+
+  fifth-tcp-diagnostic-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check read-only diagnostic without executing it
+        run: |
+          python3 -B -m py_compile scripts/cafe_p12_fifth_tcp_diagnostic_20261107.py
+          python3 -B scripts/cafe_p12_fifth_tcp_diagnostic_20261107.py --help
+      - name: No DDL in diagnostic runner and fixed-only failure categories
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import subprocess
+          from pathlib import Path
+          p=Path('scripts/cafe_p12_fifth_tcp_diagnostic_20261107.py')
+          spec=importlib.util.spec_from_file_location('p12_tcp_diag_test',p)
+          d=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(d)
+          assert d.SCHEMA_BLOB=='d146f135e3ce964d20b46a5c65bfe5026e72fc34'
+          assert d.PG=='cafe-upload-security-synthetic-pg-20261105'
+          assert d.DB=='cafe_synthetic'
+          assert d.NETWORK=='cafe-upload-security-synthetic-net-20261105'
+          assert d.MARKER.name=='cafe_p12_fifth_schema_attempt_20261106.json'
+          actual=subprocess.check_output(['git','hash-object','scripts/cafe_fifth_schema_one_shot.py'],text=True).strip()
+          assert actual==d.SCHEMA_BLOB,actual
+          class MockSchema:
+              def docker_writer(self, source, mounts, ip):
+                  return [
+                     'docker','run','--rm','--network='+d.NETWORK,
+                     '--user=1000:1000','--read-only','--cap-drop=ALL',
+                     "--entrypoint=sh","cafe-legacy-full:node14","-c",
+                     'set -eu; password="$(cat /tmp/cafe_p12_secret)"; '
+                     'export DATABASE_URL="postgresql://postgres:$password@cafe-synthetic-postgres:5432/cafe_synthetic"; '
+                     'unset password; '
+                     'bundle exec ruby qa/security/cafe_fifth_schema_target_guard.rb pre; '
+                     'bundle exec rails db:schema:load; '
+                     'bundle exec ruby qa/security/cafe_fifth_schema_target_guard.rb post'
+                  ]
+          args=d.command(MockSchema(),Path('/tmp/fake'),[], '172.25.0.2')
+          shell=args[-1]
+          assert '--read-only' in args and '--rm' in args
+          assert '--network='+d.NETWORK in args
+          assert 'P12_DIAG_ENTERED' in shell and 'P12_DIAG_BEFORE_GUARD' in shell
+          assert 'db:schema:load' not in shell and 'db:seed' not in shell
+          assert shell.endswith('cafe_fifth_schema_target_guard.rb pre')
+          assert 'post' not in shell
+          assert 'DATABASE_URL=' in shell and 'PGPASSWORD=' not in shell
+          assert d.safe_category(b'PG::ConnectionBad: could not translate host name "abc"')=='dns_resolution'
+          assert d.safe_category(b'P1.2 FIFTH SCHEMA TARGET STOP: current_user not constrained owner')=='guard_current_user'
+          assert d.safe_category(b'PG::InsufficientPrivilege: permission denied for relation pg_auth_members')=='pg_read_privilege'
+          assert d.safe_category(b'FATAL: password authentication failed for user postgres')=='scram_login_rejected'
+          assert d.safe_category(b'password=hiddensecret')=='unclassified_runner_or_guard_failure'
+          print('FIFTH TCP READONLY RUNNER / FIXED-ONLY DIAGNOSTIC CLASSIFICATION PASS')
+          PY
+      - name: Refuse any unapproved diagnostic execution or credential printing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/cafe_p12_fifth_tcp_diagnostic_20261107.py').read_text()
+          assert 'parser.add_argument("--diagnose"' in s
+          assert 'schema.role_recovery_verified()' in s
+          assert 'schema.sql("SELECT COUNT(*) FROM pg_tables' in s
+          assert 'schema.build_source(probe,stage)' in s
+          assert 'schema.docker_writer(source,mounts,ip)' in s
+          assert 'source=schema.build_source(probe,stage)' in s
+          assert 'p.stderr' in s and 'safe_category(p.stderr)' in s
+          assert 'print(p.stderr)' not in s and 'print(p.stdout)' not in s
+          for bad in ('--create-schema','--provision','docker stop','docker rm ',
+                      'db:schema:load";','db:seed";','db:drop";',
+                      'secret_audit()  # PRINT'):
+              assert bad not in s,bad
+          print('DIAGNOSTIC READONLY / SECRET REDACTION / NO WRITER GATES PASS')
+          PY
