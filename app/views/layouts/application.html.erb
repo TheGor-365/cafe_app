@@ -8,47 +8,39 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-
     <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track': 'reload' %>
     <%= stylesheet_pack_tag 'application', media: 'all', 'data-turbolinks-track': 'reload' %>
     <%= javascript_pack_tag 'application', 'data-turbolinks-track': 'reload' %>
-
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300&display=swap" rel="stylesheet">
   </head>
 
   <body>
-
-      <div class="<%= @page %>-page">
-        <div class="row page-container">
-          <%= toastr_flash %>
-
-          <%= render 'layouts/links' %>
-
-          <div class="col-8">
-            <%= render 'layouts/title' %>
-
-            <%= yield %>
-            <%= render 'layouts/footer' %>
-          </div>
-
-          <div class="col-1"></div>
-
-          <div class="col-1 p-2">
-            <% if user_signed_in? %>
-              <h6><%= link_to 'Sign out', destroy_user_session_path, method: :delete %></h6>
-              <%= link_to edit_user_registration_path do %>
-                <h6 class="text-white text-decoration-none">
-                  <%= current_user.username %>
-                </h6>
-              <% end %>
-            <% else %>
-              <h6><%= link_to 'Sign in', new_user_session_path %></h6>
-              <h6><%= link_to 'Sign up', new_user_registration_path %></h6>
-            <% end %>
-          </div>
+    <div class="cafe-page <%= @page %>-page">
+      <div class="row page-container">
+        <%= toastr_flash %>
+        <%= render 'layouts/links' %>
+        <div class="col-8" role="main" id="cafe-main-content">
+          <%= render 'layouts/title' %>
+          <%= yield %>
+          <%= render 'layouts/footer' %>
         </div>
+        <%# One connected account card, no empty guest avatar segment. %>
+        <nav class="cafe-account-widget" aria-label="Account">
+          <% if user_signed_in? %>
+            <%= link_to edit_user_registration_path, class: 'cafe-account-widget__identity' do %>
+              <% if current_user.respond_to?(:avatar) && current_user.avatar.present? && current_user.avatar.respond_to?(:url) && current_user.avatar.url.present? %>
+                <%= image_tag current_user.avatar.url, alt: '', class: 'cafe-account-widget__avatar', width: 40, height: 40 %>
+              <% end %>
+              <span class="cafe-account-widget__username"><%= current_user.username.presence || 'My account' %></span>
+            <% end %>
+            <%= link_to 'Sign out', destroy_user_session_path, method: :delete, class: 'cafe-account-widget__link cafe-account-widget__link--signout' %>
+          <% else %>
+            <%= link_to 'Sign in', new_user_session_path, class: 'cafe-account-widget__link' %>
+            <%= link_to 'Sign up', new_user_registration_path, class: 'cafe-account-widget__link cafe-account-widget__link--primary' %>
+          <% end %>
+        </nav>
       </div>
-
+    </div>
   </body>
 </html>
