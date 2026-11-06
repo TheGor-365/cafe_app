@@ -60,5 +60,14 @@ class CoffeeUnifiedShellTest < ActionDispatch::IntegrationTest
     assert_includes css, '@media (max-width: 360px)'
     assert_includes css, 'min-height: 44px'
     assert_includes css, ':focus-visible'
+    assert_includes css, 'nav.cafe-sidebar {'
+    assert_includes css, 'nav.cafe-account-widget {'
+    assert_includes css, '.cafe-brandbar.title-card {'
+    assert_includes css, 'position: sticky'
+    assert_includes css, 'height: 100vh'
+    assert_includes css, 'max-height: 100vh'
+    assert_includes css, 'overflow-y: auto'
+    assert_includes css, 'top: 60px'
+    assert_includes css, 'top: 120px'
   end
 end
