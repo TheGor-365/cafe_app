@@ -92,6 +92,18 @@ def inspect_web(inv,label,name,network,url,readonly):
     mounts={m["Destination"]:m for m in original_mounts}
     require(len(mounts)==len(original_mounts),
             label+" duplicate Docker mount destinations")
+    private_media={
+        "sandbox-original": PRIVATE/"uploads_security_sandbox_20261104",
+        "sandbox-precache": PRIVATE/"uploads_security_sandbox_20261104",
+        "headers-reportonly": PRIVATE/"headers_private_web_mountfix_20261104/uploads",
+        "fourth-readonly": PRIVATE/"e2e_web_readonly_20261105/uploads",
+    }
+    require(label in private_media and
+            mounts.get("/app/public/uploads",{}).get("Source")==str(private_media[label]) and
+            mounts.get("/bundle",{}).get("Type")=="bind" and
+            mounts["/bundle"]["Source"]==str(PRIVATE/"bundle_carrierwave_227_20261104") and
+            mounts["/bundle"]["RW"] is False,
+            label+" original private media / frozen Ruby bundle differs")
     # Existing reviewed sandbox sources expressly inherit read-only named
     # volumes (e.g. the legacy Ruby dependencies), not just host binds.
     # Reject only unrecognized/writable mounts; do not mutate Docker.
