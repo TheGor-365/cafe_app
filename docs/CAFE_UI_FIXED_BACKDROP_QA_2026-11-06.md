@@ -14,3 +14,14 @@ Guest, signed-in and admin: Home, Menu, Cart, Product detail, Info, Catering, Si
 
 ## Restrictions
 Draft only. No PR merge, production/QA restart, original uploads/volumes modification or one-shot command replay. Separate fifth-only scoped-role --verify and P1.2 schema gate from UI. Private owner screenshots must not be copied to public GitHub.
+
+## Sticky shell follow-up — owner screenshot 06.11
+
+User's real localhost:3001/info still shows the old split account panel because prior PR #65 existed **only on GitHub**. Nothing had been applied to the local dirty checkout. The screen is not evidence of failure of the new CI-only UI code.
+
+New acceptance requirement: while central document content scrolls, left `nav.cafe-sidebar`, the central `.cafe-brandbar.title-card` and right `nav.cafe-account-widget` stay visible. Desktop: each rail uses `position:sticky` within the grid, sidebar capped at viewport height with independent overflow-y if links exceed screen; brand bar sticks at top within main. Mobile <=760px: existing horizontally scrollable nav, account row and brand header use cumulative sticky top 0/60/120px. Do not transform/clip their grid ancestor or hide links in narrow layouts; real 320/360/390px visual/zoom verification is mandatory. Fixed backdrop remains non-interactive.
+
+### Guarded owner local handoff (not yet executed)
+Script: `scripts/cafe_ui_reviewed_local_install_20261106.py` within this PR. First `--check` is **read-only** (exact owner local branch/paths, current layout Git blob, absent new style, common nav/title/Sprockets source). If the user's ERB differs, STOP rather than overwriting owner edits. Later `--apply`, only after reviewing `--check` result, retrieves exact files from immutable commit `10cf64a63c51c146a0389ebc99376e20f659d10c`, checks Git SHA-1 blobs and makes a private 0700 backup before changing *only* the legacy layout and new CSS. No checkout/merge/rebase, Docker restart, SQL/volumes/uploads/one-shot marker change.
+
+UI check does not validate old owner-upload avatar integration when the local layout hash mismatches. Browser/phone screenshots are private; no public PR screenshots, fake app views or claims of verified local behavior.
