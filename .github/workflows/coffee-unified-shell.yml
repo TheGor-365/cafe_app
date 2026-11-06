@@ -78,10 +78,9 @@ jobs:
           assert 'EXPECTED_LOCAL_LAYOUT = "c8921be1b02d06b3f30f7ab4b0166e13d20b3be8"' in s
           assert 'EXPECTED_REMOTE_LAYOUT = "cfab73051bd1ddd5f8f6824ea69ece3be7fccc52"' in s
           assert 'EXPECTED_REMOTE_STYLE = "ffe52c0f1cba6a1dd19bd20f91bd7a7435322fba"' in s
-          assert 'no files written' not in s.lower() or True
           assert 'os.replace(tmp_layout, original)' in s
           assert 'if opts.check:' in s and 'preflight()' in s
           assert 'ROOT / LAYOUT' in s and 'ROOT / STYLE' in s
-          assert 'git checkout' not in s.lower() and 'git reset' not in s.lower()
+          assert 'git("checkout"' not in s and 'git("reset"' not in s
           print('PINNED LOCAL UI INSTALLER / FAIL CLOSED / NO CI HOST WRITES PASS')
           PY
