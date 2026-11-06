@@ -1,0 +1,94 @@
+name: Cafe P1.2 scoped schema reboot compatibility guard
+
+on:
+  push:
+    branches: [feature/cafe-p12-fifth-schema-scoped-20261106]
+  pull_request:
+    branches: [feature/cafe-p12-fifth-scoped-roles-recovery-20261106]
+
+permissions:
+  contents: read
+
+jobs:
+  static-no-owner-writes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate syntax for fifth-only Python orchestrator and Ruby SQL guard
+        run: |
+          python3 -B -m py_compile scripts/cafe_fifth_schema_one_shot.py
+          ruby -c qa/security/cafe_fifth_schema_target_guard.rb
+      - name: Verify scoped-role pin and fresh marker without any database access
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import ast, pathlib, subprocess
+          s=pathlib.Path('scripts/cafe_fifth_schema_one_shot.py').read_text()
+          m=ast.parse(s)
+          assert 'ROLES_HELPER=PRIVATE/"cafe_p12_fifth_scoped_roles_v1_20261106.py"' in s
+          assert 'ROLES_BLOB="a02f23a9cd2c982309a1649ea0b314618f9da94a"' in s
+          assert 'MARKER=PRIVATE/"cafe_p12_fifth_schema_attempt_20261106.json"' in s
+          assert 'OLD_SCHEMA_MARKER=PRIVATE/"cafe_p12_fifth_schema_attempt_20261105.json"' in s
+          assert '"operation":"fifth-only schema:load after scoped roles, no seeds"' in s
+          assert 'roles.verify()' in s and 'def role_recovery_verified()' in s
+          assert '        probe.probe()' not in s
+          for target in ('cafe-upload-security-synthetic-pg-20261105',
+                         'cafe-upload-security-synthetic-net-20261105',
+                         'cafe_synthetic','cafe-legacy-full:node14',
+                         '090b9d37419fcd9f393d8b686ac0f4563ef7b613',
+                         'db:schema:load','--network=none','--read-only',
+                         '--cap-drop=ALL','--pull=never','os.O_EXCL',
+                         'offline_runner_mount_probe','live_sql_connection_preflight'):
+              assert target in s,target
+          x=subprocess.check_output(['git','hash-object',
+              'scripts/cafe_p12_fifth_scoped_roles_recovery_20261106.py'],
+              text=True).strip()
+          assert x=='a02f23a9cd2c982309a1649ea0b314618f9da94a',x
+          g=subprocess.check_output(['git','hash-object',
+              'qa/security/cafe_fifth_schema_target_guard.rb'],
+              text=True).strip()
+          assert g=='e5dae1c3b740acf3298b5baf12747f69d4d2a721',g
+          writer=s.split('def create_schema(confirmation):',1)[1].split('def protected_four():',1)[0]
+          assert writer.index('fd=os.open(str(MARKER)')<writer.index('result=subprocess.run(argv')
+          assert writer.index('require(confirmation==DB')<writer.index('probe,mounts,ip,ident=check()')
+          for forbidden in ('db:drop','db:reset','db:prepare','db:seed',
+                            '--privileged','--network=host','--publish',
+                            'docker stop','docker rm','git checkout'):
+              assert forbidden not in writer,forbidden
+          print('P1.2 REBOOT ROLE PIN / NEW MARKER / FIFTH-ONLY WRITER ORDER PASS')
+          PY
+      - name: Refuse invalid schema-write acknowledgment using mocked local context
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          from unittest.mock import patch
+          p=Path('scripts/cafe_fifth_schema_one_shot.py')
+          spec=importlib.util.spec_from_file_location('p12_reboot_schema',p)
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          assert m.MARKER.name=='cafe_p12_fifth_schema_attempt_20261106.json'
+          assert m.OLD_SCHEMA_MARKER.name=='cafe_p12_fifth_schema_attempt_20261105.json'
+          with patch.object(m,'check',side_effect=AssertionError('unsafe preflight started')):
+            for bad in (None,'cafe-app-db','cafe-upload-qa-pg-20261103'):
+              try: m.create_schema(bad)
+              except RuntimeError as e:
+                assert 'explicit --confirm-target' in str(e)
+              else: raise AssertionError('unsupported DB target accepted')
+          args=m.docker_writer(Path('/tmp/disposable-git-tree'),
+              ['type=bind,source=/tmp/fakebundle,target=/bundle,readonly'],
+              '172.30.0.2')
+          assert '--network='+m.NETWORK in args
+          assert '--cap-drop=ALL' in args and '--read-only' in args
+          assert '--env=PGOPTIONS=-c role=cafe_synth_owner -c search_path=public' in args
+          assert 'rails db:schema:load' in args[-1]
+          print('P1.2 NEGATIVE TARGET ACK / MOCKED FIFTH-ONLY DOCKER ARGV PASS')
+          PY
+      - name: Validate no owner-local execution in CI
+        run: |
+          python3 scripts/cafe_fifth_schema_one_shot.py --help | grep -F -- '--check'
+          python3 scripts/cafe_fifth_schema_one_shot.py --help | grep -F -- '--verify-schema'
+          echo 'STATIC ONLY - no owner fifth PG, no Docker operations, no DB/seed writes'
