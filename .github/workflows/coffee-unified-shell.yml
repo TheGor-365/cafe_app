@@ -1,0 +1,59 @@
+name: Coffee unified account and fixed backdrop PR acceptance
+
+on:
+  pull_request:
+    branches: [feature/cafe-p12-fifth-scoped-roles-recovery-20261106]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coffee-unified-shell-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rails:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ruby:2.5.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install legacy Bundler
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Add Linux platform to disposable checkout
+        run: bundle _2.2.13_ lock --add-platform x86_64-linux
+      - name: Install locked Ruby dependencies
+        run: bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Load disposable CI database schema
+        run: bundle _2.2.13_ exec rails db:schema:load
+      - name: Create test-only Webpacker manifest
+        run: |
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Run account layout, auth, cart and SassC regressions
+        run: |
+          bundle _2.2.13_ exec rails test \
+            test/integration/coffee_unified_shell_test.rb \
+            test/integration/coffee_layout_reflow_test.rb \
+            test/integration/coffee_account_corner_style_test.rb \
+            test/integration/coffee_auth_account_test.rb \
+            test/integration/coffee_mobile_shell_test.rb \
+            test/integration/session_layout_isolation_test.rb
