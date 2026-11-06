@@ -27,7 +27,10 @@ class CoffeeUnifiedShellTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select 'nav.cafe-account-widget' do
       assert_select "a[href='#{edit_user_registration_path}']", text: /coffee_shell_qa/, count: 1
-      assert_select "a[href='#{destroy_user_session_path}'][data-method=delete]", text: 'Sign out', count: 1
+      assert_select "form.button_to[action='#{destroy_user_session_path}'][method=post]", count: 1 do
+        assert_select "input[name='_method'][value=delete]", count: 1
+        assert_select "input.cafe-account-widget__signout[type=submit][value='Sign out']", count: 1
+      end
       assert_select "a[href='#{new_user_session_path}']", count: 0
     end
     assert_select 'nav.cafe-sidebar' do
@@ -62,6 +65,7 @@ class CoffeeUnifiedShellTest < ActionDispatch::IntegrationTest
     assert_includes css, ':focus-visible'
     assert_includes css, 'nav.cafe-sidebar {'
     assert_includes css, 'nav.cafe-account-widget {'
+    assert_includes css, 'form.button_to input.cafe-account-widget__signout'
     assert_includes css, '.cafe-brandbar.title-card {'
     assert_includes css, 'position: sticky'
     assert_includes css, 'height: 100vh'
