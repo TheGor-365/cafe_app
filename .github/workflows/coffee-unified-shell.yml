@@ -184,7 +184,7 @@ jobs:
           assert "NEW_STYLE" in stage
           assert "os.open(str(NEW_STYLE)" in stage
           assert "os.replace(" not in stage
-          assert "docker" not in stage.lower()
-          assert "git checkout" not in stage.lower()
+          assert 'subprocess.run(' not in stage
+          assert 'git("checkout"' not in stage and 'git("reset"' not in stage
           print("TOP LOCK EXACT SHA / FAIL-CLOSED / EXCLUSIVE SINGLE SCSS PASS")
           PY
