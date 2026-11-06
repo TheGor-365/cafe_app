@@ -1,0 +1,156 @@
+name: Cafe P1.3 fifth-only synthetic catalog static and negative gates
+
+on:
+  push:
+    branches: [feature/cafe-p13-fifth-synthetic-fixtures-20261107]
+  pull_request:
+    branches: [feature/cafe-p12-fifth-schema-scoped-20261106]
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-python-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Python owner-only catalog orchestrator
+        run: |
+          python3 -B -m py_compile scripts/cafe_p13_fifth_catalog_20261107.py
+          python3 -B scripts/cafe_p13_fifth_catalog_20261107.py --help
+      - name: Validate immutable source, original one-shot scheme and denied default imports
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import importlib.util,subprocess
+          from unittest.mock import patch
+          path=Path("scripts/cafe_p13_fifth_catalog_20261107.py")
+          spec=importlib.util.spec_from_file_location('cafe_p13_static',path)
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          assert mod.DB=='cafe_synthetic'
+          assert mod.SOURCE=='090b9d37419fcd9f393d8b686ac0f4563ef7b613'
+          assert mod.SCHEMA_BLOB=='a0d2ac4546f19ab8d6c92b5b0f465269fbd4e08f'
+          assert mod.MARKER.name=='cafe_p13_fifth_catalog_attempt_20261107.json'
+          assert mod.COUNTS=={
+              "categories":8,"products":20,"product_variants":18,
+              "product_modifier_options":30,"orders":0,"order_items":0,
+              "order_item_modifiers":0,"users":0}
+          s=subprocess.check_output(['git','hash-object','db/seeds.rb'],text=True).strip()
+          assert s==mod.SEEDS_BLOB=='dae2eed43c78ff79a14e3bf3e83d59a649803cd4'
+          source=path.read_text()
+          assert 'schema.verify_schema()' in source
+          assert 'schema.offline_runner_mount_probe(probe,mounts,ip,cluster)' in source
+          section=source.split('def import_once(ack):',1)[1].split('def verify():',1)[0]
+          assert section.index('fd=os.open(str(MARKER)')<section.index('result=subprocess.run') if 'result=subprocess.run' in section else section.index('fd=os.open(str(MARKER)')<section.index('run=subprocess.run')
+          assert 'flags=os.O_CREAT|os.O_EXCL|os.O_WRONLY' in section
+          for banned in ("db:drop","db:reset","db:migrate","docker stop","docker rm ","git checkout"):
+              assert banned not in section,banned
+          with patch.object(mod,'preflight',side_effect=AssertionError('preflight must not run')):
+              for wrong in (None,'postgres','cafe-app-db','cafe-upload-qa-pg-20261103'):
+                  try:mod.import_once(wrong)
+                  except RuntimeError as err:
+                      assert 'explicit --confirm-target' in str(err)
+                  else:raise AssertionError('invalid fixture target was allowed')
+          print("P1.3 PINNED FIFTH ONLY / NO RETRIES / MARKER BEFORE WRITE PASS")
+          PY
+      - name: Mock exact reviewed Docker guard and test-only Rails runner
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          path=Path("scripts/cafe_p13_fifth_catalog_20261107.py")
+          spec=importlib.util.spec_from_file_location('p13_runner_static',path)
+          mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+          class Reviewed:
+              NETWORK='cafe-upload-security-synthetic-net-20261105'
+              def docker_writer(self,source,mounts,ip,ident):
+                  return ['docker','run','--rm','--pull=never',
+                          '--read-only','--cap-drop=ALL',
+                          '--user=1000:1000','--network='+self.NETWORK,
+                          '--env=RAILS_ENV=test',
+                          '--env=CAFE_P12_EXPECTED_CLUSTER_ID='+ident,
+                          '--entrypoint=sh','cafe-legacy-full:node14','-c',
+                          'set -eu; password="$(cat /tmp/cafe_p12_secret)"; '
+                          'export DATABASE_URL="postgresql://postgres:$password@cafe-synthetic-postgres:5432/cafe_synthetic"; '
+                          'unset password; '
+                          'bundle exec ruby qa/security/cafe_fifth_schema_cluster_guard_20261107.rb pre; '
+                          'bundle exec rails db:schema:load; '
+                          'bundle exec ruby qa/security/cafe_fifth_schema_cluster_guard_20261107.rb post']
+          cmd=mod.fixture_command(Reviewed(),Path('/tmp/cafe-reviewed-src'),[],
+                                  '172.30.0.2','7532669441155230666')
+          assert cmd[:3]==['docker','run','--rm']
+          assert cmd[-1].endswith("bundle exec rails runner 'Rails.application.load_seed'")
+          assert "cafe_fifth_schema_cluster_guard_20261107.rb post" in cmd[-1]
+          assert "db:schema:load" not in cmd[-1]
+          assert "db:seed" not in cmd[-1]
+          assert '--network='+Reviewed.NETWORK in cmd
+          assert '--env=RAILS_ENV=test' in cmd
+          assert '--env=CAFE_P12_EXPECTED_CLUSTER_ID=7532669441155230666' in cmd
+          assert '--cap-drop=ALL' in cmd and '--read-only' in cmd
+          print("P1.3 READONLY SOURCE / POST-SCHEMA GUARD / ONE-SHOT SEED RUNNER PASS")
+          PY
+
+  catalog-inmemory-idempotence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check existing reviewed Rails seed syntax and repeatable natural keys in memory
+        shell: bash
+        run: |
+          ruby -c db/seeds.rb
+          ruby - <<'RUBY'
+          module Rails
+            def self.env
+              @env ||= Struct.new(:test?, :development?).new(true, false)
+            end
+          end
+          class FakeModel
+            def self.records
+              @records ||= []
+            end
+            def self.find_or_initialize_by(**where)
+              records.find {|o| where.all? {|key,val| o.public_send(key)==val }} || new(where)
+            end
+            def self.find_by!(**where)
+              records.find {|o| where.all? {|key,val| o.public_send(key)==val }} || raise('missing demo natural key')
+            end
+            def initialize(attrs={})
+              @values=attrs
+            end
+            def method_missing(name,*args)
+              if name.to_s.end_with?('=')
+                @values[name.to_s[0..-2].to_sym]=args.fetch(0)
+              elsif @values.key?(name)
+                @values[name]
+              else
+                super
+              end
+            end
+            def respond_to_missing?(name,private=false)
+              @values.key?(name) || name.to_s.end_with?('=') || super
+            end
+            def assign_attributes(values)
+              values.each {|k,v| public_send("#{k}=",v)}
+            end
+            def save!
+              self.class.records << self unless self.class.records.include?(self)
+            end
+          end
+          class Category < FakeModel;end
+          class Product < FakeModel;end
+          class ProductVariant < FakeModel;end
+          class ProductModifierOption < FakeModel;end
+          2.times {load 'db/seeds.rb'}
+          expected={Category=>8,Product=>20,ProductVariant=>18,ProductModifierOption=>30}
+          expected.each {|klass,n| raise("#{klass}: wrong count #{klass.records.length}") unless klass.records.length==n}
+          raise('duplicate category labels') unless Category.records.map(&:heading).uniq.length==8
+          raise('duplicate product names') unless Product.records.map(&:name).uniq.length==20
+          raise('variant natural keys duplicated') unless ProductVariant.records.map{|v|[v.product,v.code]}.uniq.length==18
+          raise('modifier natural keys duplicated') unless ProductModifierOption.records.map{|o|[o.product,o.group_code,o.code]}.uniq.length==30
+          raise('unexpected non-configurable product') unless ProductVariant.records.map(&:product).uniq.length==6
+          raise('option groups mismatch') unless ProductModifierOption.records.group_by(&:group_code).transform_values(&:length)=={'milk'=>12,'syrup'=>12,'shot'=>6}
+          puts 'P1.3 IMMUTABLE DEMO SEEDS MOCK 8/20/18/30 + SECOND RUN IDEMPOTENCE PASS'
+          RUBY
