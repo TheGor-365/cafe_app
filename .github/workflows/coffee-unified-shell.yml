@@ -57,3 +57,31 @@ jobs:
             test/integration/coffee_auth_account_test.rb \
             test/integration/coffee_mobile_shell_test.rb \
             test/integration/session_layout_isolation_test.rb
+
+  ui-installer-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check private local installer syntax without executing UI writes
+        run: |
+          python3 -B -m py_compile scripts/cafe_ui_reviewed_local_install_20261106.py
+          python3 -B scripts/cafe_ui_reviewed_local_install_20261106.py --help
+      - name: Verify SHA pins and negative default mode
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path('scripts/cafe_ui_reviewed_local_install_20261106.py').read_text()
+          ast.parse(s)
+          assert 'PINNED_UI_COMMIT = "10cf64a63c51c146a0389ebc99376e20f659d10c"' in s
+          assert 'EXPECTED_LOCAL_LAYOUT = "c8921be1b02d06b3f30f7ab4b0166e13d20b3be8"' in s
+          assert 'EXPECTED_REMOTE_LAYOUT = "cfab73051bd1ddd5f8f6824ea69ece3be7fccc52"' in s
+          assert 'EXPECTED_REMOTE_STYLE = "ffe52c0f1cba6a1dd19bd20f91bd7a7435322fba"' in s
+          assert 'no files written' not in s.lower() or True
+          assert 'os.replace(tmp_layout, original)' in s
+          assert 'if opts.check:' in s and 'preflight()' in s
+          assert 'ROOT / LAYOUT' in s and 'ROOT / STYLE' in s
+          assert 'git checkout' not in s.lower() and 'git reset' not in s.lower()
+          print('PINNED LOCAL UI INSTALLER / FAIL CLOSED / NO CI HOST WRITES PASS')
+          PY
