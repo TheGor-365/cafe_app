@@ -56,7 +56,7 @@ jobs:
                   "secret_audit","old_marker","original"}<=funcs
           print("P1.2 FIFTH SCOPED ROLES CODE/SHA/NO DESTRUCTIVE SQL/DOCKER PASS")
           PY
-      - name: Mock transaction: exclusive attempt marker before fifth-only SQL; credentials only on stdin
+      - name: "Mock transaction: exclusive marker before fifth-only SQL; credential only on stdin"
         shell: bash
         run: |
           python3 - <<'PY'
