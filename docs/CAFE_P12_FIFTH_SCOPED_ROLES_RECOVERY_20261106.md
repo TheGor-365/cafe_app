@@ -27,3 +27,7 @@ cafe_synth_app: LOGIN NOINHERIT, no CREATE privilege on schema or database, no T
 ## Evidence and next gates
 
 Original SQL in PR #53 ran against a disposable PostgreSQL; not proof of current local Docker. New CI asserts static scopes and mocks exclusive marker-first SQL, stdin-only secret and login. Owner independently runs --check, then separately approved --provision once, then --verify. Reboot empties fifth tmpfs again; old markers stay for forensics. The earlier 20261105 schema read-only helper imports old role helper/old role password and may be incompatible after recovery: create a new reviewed schema preflight before any fifth-only Rails schema DDL. No QA user/media import, no production/QA SQL writes, no branch checkout or merge.
+
+## Reviewer gate
+
+On the owner host, execute the existing fifth reboot --verify-empty before installing this new roles helper. That legacy empty-database verifier is *intentionally invalid after* the new application LOGIN role exists. Obtain and review the exact commit and Git blob of this new script, install to a separate owner-private 0600 filename without checkout or overwrite, and run only --check first. Only after owner preflight PASS and passing exact-head GitHub Actions may --provision be executed one time; --verify then replaces --verify-empty. Do not run old v2 roles --provision and do not call PR57 schema DDL without a new compatible fifth target gate.
