@@ -89,6 +89,45 @@ html body .cafe-account-widget a:focus-visible {
   outline: 3px solid #f6cc92;
   outline-offset: 2px;
 }
+/* Preserve Rails button_to's native POST + hidden DELETE semantics; do not
+ * replace sign-out with a JavaScript-dependent data-method link. */
+html body .cafe-account-widget form.button_to {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+html body .cafe-account-widget form.button_to input.cafe-account-widget__signout,
+html body .cafe-account-widget form.button_to button.cafe-account-widget__signout {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: .55rem .65rem;
+  border: 1px solid #aa7548;
+  border-radius: .55rem;
+  background: #714426;
+  color: #fff5e5;
+  font: inherit;
+  font-size: .88rem;
+  line-height: 1.35;
+  font-weight: 750;
+  cursor: pointer;
+}
+html body .cafe-account-widget form.button_to .cafe-account-widget__signout:hover {
+  background: #8a5631;
+  border-color: #e6b67e;
+}
+html body .cafe-account-widget form.button_to .cafe-account-widget__signout:focus-visible {
+  outline: 3px solid #f6cc92;
+  outline-offset: 2px;
+}
+
 html body .cafe-account-widget a.cafe-account-widget__link--primary {
   background: #f0c58f;
   color: #2c1c13;
@@ -139,6 +178,9 @@ html body .cafe-account-widget__avatar {
     margin: .55rem .6rem 0;
     padding: .4rem;
     border-radius: .7rem;
+  }
+  html body .cafe-account-widget form.button_to {
+    flex: 1 1 0;
   }
   html body .cafe-account-widget a {
     flex: 1 1 0;
