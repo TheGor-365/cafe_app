@@ -241,3 +241,82 @@ jobs:
           assert '--create-schema' not in path.read_text()
           print('ONLY FIFTH PG SELECT / NO SCHEMA DDL / FIXED CATEGORY GATES PASS')
           PY
+
+
+  fifth-tcp-cluster-identity-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check cluster proof Python and inlined Ruby
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p12_fifth_tcp_cluster_identity_20261107.py
+          python3 - <<'PY'
+          import importlib.util,subprocess
+          from pathlib import Path
+          p=Path('scripts/cafe_p12_fifth_tcp_cluster_identity_20261107.py')
+          spec=importlib.util.spec_from_file_location('p12_fifth_cluster_ci',p)
+          d=importlib.util.module_from_spec(spec);spec.loader.exec_module(d)
+          result=subprocess.run(['ruby','-c'],input=d.RUBY_CLUSTER_PROBE.encode(),
+                                capture_output=True,check=False)
+          assert result.returncode==0,'Embedded Ruby syntax invalid'
+          assert d.IP_PROBE_BLOB=='a46a0a1fa985a3f80140e30ac433423e794eb2d3'
+          assert d.SCHEMA_BLOB=='d146f135e3ce964d20b46a5c65bfe5026e72fc34'
+          sha=subprocess.check_output(['git','hash-object','scripts/cafe_p12_fifth_ip_consistency_probe_20261107.py'],text=True).strip()
+          assert sha==d.IP_PROBE_BLOB
+          assert 'SET ROLE NONE' in d.RUBY_CLUSTER_PROBE
+          assert 'SET ROLE cafe_synth_owner' in d.RUBY_CLUSTER_PROBE
+          assert 'SELECT system_identifier::text FROM pg_control_system()' in d.RUBY_CLUSTER_PROBE
+          assert "seen==cluster ? 'MATCH' : 'MISMATCH'" in d.RUBY_CLUSTER_PROBE
+          for forbidden in ('INSERT INTO','UPDATE public.','DELETE FROM','CREATE TABLE','DROP TABLE',
+                            'ALTER ROLE','CREATE ROLE','DROP ROLE','db:schema:load','db:seed','pg_terminate_backend'):
+              assert forbidden not in d.RUBY_CLUSTER_PROBE,forbidden
+          print('TCP CLUSTER IDENTITY SQL READ-ONLY / ROLE RESTORE / PIN PASS')
+          PY
+      - name: Mock exact fifth-only Docker command and output gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p=Path('scripts/cafe_p12_fifth_tcp_cluster_identity_20261107.py')
+          spec=importlib.util.spec_from_file_location('p12_fifth_cluster_ci',p)
+          d=importlib.util.module_from_spec(spec);spec.loader.exec_module(d)
+          class FakeIpProbe:
+              def readonly_command(self,schema,source,mounts,ip):
+                  return ['docker','run','--rm','--read-only',
+                          '--network='+d.NET,'--cap-drop=ALL','--user=1000:1000',
+                          '--entrypoint=sh','cafe-legacy-full:node14','-c',
+                          'set -eu; password="$(cat /tmp/cafe_p12_secret)"; '
+                          'export DATABASE_URL="postgresql://postgres:$password@cafe-synthetic-postgres:5432/cafe_synthetic"; '
+                          'unset password; '
+                          'bundle exec ruby qa/security/cafe_fifth_ip_consistency_probe_20261107.rb']
+          a=d.build_command(FakeIpProbe(),object(),Path('/tmp/host-readonly'),[], '172.30.0.2','7532669441155230666')
+          assert '--env=CAFE_P12_EXPECTED_CLUSTER_ID=7532669441155230666' in a
+          assert '--network='+d.NET in a and '--read-only' in a
+          assert a[-1].endswith('bundle exec ruby qa/security/cafe_fifth_ip_consistency_probe_20261107.rb')
+          for command in ('db:schema:load','db:seed','db:prepare','db:drop','db:migrate'):
+              assert command not in a[-1]
+          for invalid in ('','xyz','7532x69441155230666','0'):
+              try:d.build_command(FakeIpProbe(),object(),Path('/tmp/a'),[],'172.30.0.2',invalid)
+              except RuntimeError:pass
+              else:raise AssertionError('unreviewed cluster ID was accepted')
+          markers=[
+              'P1.2 CLUSTER PROBE ROLE RESTORED / PG16 / FIFTH DB PASS',
+              'P1.2 CLUSTER PROBE TCP_CLUSTER=MATCH',
+              'P1.2 CLUSTER PROBE SOCKET_KIND=DIFFERENT_IPV4',
+              'P1.2 CLUSTER PROBE DNS_KIND=EXPECTED_ONLY',
+              'P1.2 CLUSTER PROBE READ_ONLY SESSION COMPLETE']
+          assert d.parse_output(('\n'.join(markers)+'\n').encode())==markers
+          try:d.parse_output(('\n'.join(markers)+'\npassword=private\n').encode())
+          except RuntimeError:pass
+          else:raise AssertionError('unreviewed output leaked')
+          print('EXACT PINNED CLUSTER TARGET / NEGATIVE / STRICT OUTPUT PASS')
+          PY
+      - name: Document no owner side effects from CI run
+        run: |
+          python3 scripts/cafe_p12_fifth_tcp_cluster_identity_20261107.py --help | grep -F -- '--verify-cluster'
+          echo 'NO OWNER DOCKER, NO ROLE OR SCHEMA WRITES, NO PRIVATE CREDENTIALS'
