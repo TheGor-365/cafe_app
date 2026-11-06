@@ -1,0 +1,102 @@
+name: Cafe P1.2 existing private QA Rails reboot security checks
+
+on:
+  push:
+    branches: [feature/cafe-p12-reboot-test-rails-20261106]
+  pull_request:
+    branches: [feature/cafe-p12-restore-existing-test-pg-20261106]
+
+permissions:
+  contents: read
+
+jobs:
+  only-existing-private-test-rails:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and strict scoped shell contract
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/cafe_p12_reboot_private_test_rails_20261106.py
+          python3 scripts/cafe_p12_reboot_private_test_rails_20261106.py --help | grep -F -- '--check'
+          python3 scripts/cafe_p12_reboot_private_test_rails_20261106.py --help | grep -F -- '--verify'
+          if python3 scripts/cafe_p12_reboot_private_test_rails_20261106.py --start --verify >/dev/null 2>&1; then
+            exit 1
+          fi
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path('scripts/cafe_p12_reboot_private_test_rails_20261106.py').read_text()
+          ast.parse(s)
+          for key in (
+            '403609bc7710b88b109959caed49a850c7f068c8',
+            '62e52015dfe7dd5ca15b1c3eabe380a38e7eca0a',
+            'cafe-upload-security-sandbox-rails-20261104',
+            'cafe-upload-security-sandbox-precache-20261104',
+            'cafe-upload-security-headers-mountfix-20261104',
+            'cafe-upload-security-e2e-web-readonly-20261105',
+            'inv.verify()', 'os.O_EXCL',
+            'web.inspect_web(headers,launcher,manifest,"running")',
+            'default_transaction_read_only=on'
+          ):
+            assert key in s,key
+          for key in (
+            '"docker","run"','"docker","create"','"docker","stop"',
+            '"docker","restart"','"docker","volume","rm"',
+            'db:reset','db:drop','db:migrate','db:schema:load',
+            'docker compose','git checkout'
+          ):
+            assert key not in s,key
+          print('P1.2 EXACT FOUR EXISTING PRIVATE TEST RAILS START CONTRACT PASS')
+          PY
+      - name: Mock exclusive one-shot marker, exact start order, no repeated run
+        run: |
+          python3 - <<'PY'
+          import importlib.util,json
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          from unittest.mock import patch
+          spec=importlib.util.spec_from_file_location('r','scripts/cafe_p12_reboot_private_test_rails_20261106.py')
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          states={x[1]:'exited' for x in m.CANDIDATES}
+          starts=[]
+          def sources():
+            assert all(value in ('exited','running') for value in states.values())
+            return dict(states)
+          def check_mock():
+            assert not m.MARKER.exists()
+            sources()
+          def boot_mock(name):
+            assert m.MARKER.exists(),'exclusive marker must predate Docker start'
+            assert name in states and states[name]=='exited'
+            assert name not in ('cafe-app-db','cafe-upload-qa-pg-20261103')
+            states[name]='running';starts.append(name)
+          def inspect_mock(**kw):
+            assert kw['name'] in states
+            return states[kw['name']]
+          with TemporaryDirectory() as folder:
+            with patch.object(m,'MARKER',Path(folder)/'mark.json'), \
+                 patch.object(m,'check',side_effect=check_mock), \
+                 patch.object(m,'checked_sources',side_effect=sources), \
+                 patch.object(m,'docker_start',side_effect=boot_mock), \
+                 patch.object(m,'inspect_web',side_effect=inspect_mock), \
+                 patch.object(m,'load') as load_mock, \
+                 patch.object(m,'verify'):
+              load_mock.return_value.inventory.return_value=None
+              m.start()
+              assert starts==[x[1] for x in m.CANDIDATES]
+              assert m.MARKER.exists()
+              record=json.loads(m.MARKER.read_text())
+              assert record['operation']=='boot_four_existing_private_rails_once'
+              try:check_mock()
+              except AssertionError:pass
+              else:raise AssertionError('prior boot marker was not enforced')
+              assert len(starts)==4
+              print('P1.2 MOCK FOUR PRIVATE RAILS START / MARKER FIRST / NO PROTECTED START PASS')
+          PY
+
+      - name: Regression tests for readonly named dependency volumes and dangerous mounts
+        run: |
+          set -euo pipefail
+          python3 -B test/security/cafe_p12_test_rails_mount_contract_test.py -v
