@@ -363,7 +363,8 @@ jobs:
           assert 'ruby_guard_audit()' in atext
           assert 'RUBY_GUARD_FILE.read_bytes()' in atext
           assert 'fd=os.open(str(MARKER)' in atext
-          assert atext.index('fd=os.open(str(MARKER)')<atext.index('result=subprocess.run(argv')
+          writer=atext.split('def create_schema(confirmation):',1)[1].split('def protected_four():',1)[0]
+          assert writer.index('fd=os.open(str(MARKER)')<writer.index('result=subprocess.run(argv')
           assert 'require(confirmation==DB' in atext
           print('EXACT FIFTH / ORIGINAL MARKER / PRIVATE RUBY BLOB / NO REPEAT PASS')
           PY
