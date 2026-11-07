@@ -75,3 +75,5 @@ jobs:
             test/integration/coffee_mobile_bottom_dock_test.rb \
             test/integration/coffee_home_cart_flow_test.rb \
             test/integration/coffee_unified_shell_test.rb
+      - name: Run full Rails regression suite on disposable CI database
+        run: bundle _2.2.13_ exec rails test
