@@ -35,10 +35,13 @@ gem install bundler -v 2.2.13 --no-document
 # Bundler 2.2.13 has no --ruby switch on 'bundle lock'. Update the
 # exact pre-existing Ruby version line inside the disposable lockfile.
 sed -i 's/ruby 2\.5\.8p224/ruby 2.7.8p225/' Gemfile.lock
-bundle _2.2.13_ lock --add-platform x86_64-linux
 if [[ "$scenario" == "ruby27_rails61" ]]; then
+  # Rails 6.0 lock pins actionpack/railties to 6.0.3.6. A generic
+  # lock resolution would fail before dependency updates can run.
   bundle _2.2.13_ update rails
+  bundle _2.2.13_ lock --add-platform x86_64-linux
 else
+  bundle _2.2.13_ lock --add-platform x86_64-linux
   bundle _2.2.13_ install --jobs 2 --retry 2
 fi
 mkdir -p "bridge-artifacts/$scenario"
