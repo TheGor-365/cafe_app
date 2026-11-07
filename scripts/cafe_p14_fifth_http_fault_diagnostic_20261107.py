@@ -25,7 +25,7 @@ P14_BLOB="426414d64584231df380c9588c9e0b80e32589c7"
 ORIG_RUBY=PRIV/"cafe_p14_fifth_http_readonly_20261107.rb"
 ORIG_RUBY_BLOB="299de6d74f55fe04c222875ca424b6c2c7443b5f"
 DIAG_RUBY=PRIV/"cafe_p14_fifth_http_fault_diagnostic_20261107.rb"
-DIAG_RUBY_BLOB="PENDING_REVIEWED_BLOB"
+DIAG_RUBY_BLOB="e7738e20f8d8656a685d0084f31f19a5e04bed64"
 DB="cafe_synthetic"
 NETWORK="cafe-upload-security-synthetic-net-20261105"
 
