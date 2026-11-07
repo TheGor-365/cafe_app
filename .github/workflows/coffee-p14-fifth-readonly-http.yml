@@ -229,3 +229,111 @@ jobs:
           assert m.output_classification(ok,0,b'')==('PASSED','ALL_GETS_PASS','NONE',None)
           print('P1.4 DIAG FIFTH-ONLY NO-WRITE RUNNER / PRIVATE FAILURE CODES PASS')
           PY
+
+
+  fifth-only-view-cause-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check view-cause classifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p14_fifth_view_error_cause_20261107.py
+          ruby -c qa/security/cafe_p14_fifth_view_error_cause_20261107.rb
+          python3 scripts/cafe_p14_fifth_view_error_cause_20261107.py --help | grep -F -- --classify-view
+      - name: Review original immutable dependency chain and fixed cause categories
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import subprocess
+          from pathlib import Path
+          file=Path('scripts/cafe_p14_fifth_view_error_cause_20261107.py')
+          spec=importlib.util.spec_from_file_location('cafe_p14_view_ci',file)
+          mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+          originals=[
+            ('scripts/cafe_p14_fifth_http_fault_diagnostic_20261107.py',mod.OLD_DIAG_BLOB),
+            ('qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb',mod.OLD_RUBY_BLOB),
+            ('qa/security/cafe_p14_fifth_view_error_cause_20261107.rb',mod.VIEW_RUBY_BLOB),
+          ]
+          for path,sha in originals:
+            observed=subprocess.check_output(['git','hash-object',path],text=True).strip()
+            assert observed==sha,(path,sha,observed)
+          assert mod.DB=='cafe_synthetic' and mod.NETWORK=='cafe-upload-security-synthetic-net-20261105'
+          assert {'WEBPACKER_MANIFEST_ENTRY','SPROCKETS_ASSET_NOT_FOUND','SASS_COMPILATION','OTHER_VIEW_ERROR'} <= mod.CAUSES
+          assert mod.classify(b'P1.4 VIEW DIAG ROOT_CAUSE=WEBPACKER_MANIFEST_ENTRY\n'
+                              b'P1.4 VIEW DIAG PACK_MANIFEST=MISSING\n'
+                              b'P1.4 VIEW DIAG PUBLIC_PACKS=MISSING\n'
+                              b'P1.4 VIEW DIAG NODE_MODULES=MISSING\n'
+                              b'private password should never show') == {
+                                 'ROOT_CAUSE':'WEBPACKER_MANIFEST_ENTRY',
+                                 'PACK_MANIFEST':'MISSING',
+                                 'PUBLIC_PACKS':'MISSING',
+                                 'NODE_MODULES':'MISSING'
+                              }
+          assert mod.classify(b'P1.4 VIEW DIAG ROOT_CAUSE=untrusted-secret')[
+            'ROOT_CAUSE']=='UNAVAILABLE'
+          print('P1.4 VERIFIED ORIGINAL GIT BLOBS / FIXED REDACTED CATEGORIES PASS')
+          PY
+      - name: Forbid owner PostgreSQL writes, direct app stdout and non-GET Rails requests
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          py=Path('scripts/cafe_p14_fifth_view_error_cause_20261107.py').read_text()
+          rb=Path('qa/security/cafe_p14_fifth_view_error_cause_20261107.rb').read_text()
+          assert py.count('p13.verify()')>=2
+          assert 'argv=old.command(p14,schema,source,mounts,ip,cluster,app_file)' in py
+          assert "old.output_classification(" in py
+          assert "process.stderr" in py
+          assert "print(process.stderr)" not in py
+          assert "print(process.stdout)" not in py
+          assert "print(str(exc))" not in py
+          assert "default_transaction_read_only=on" in py
+          assert "causes = []" in rb
+          assert "inspected.cause" in rb
+          assert "P1.4 VIEW DIAG ROOT_CAUSE=" in rb
+          assert "P1.4 VIEW DIAG PACK_MANIFEST=" in rb
+          assert "P1.4 VIEW DIAG NODE_MODULES=" in rb
+          assert 'browser.get(path' in rb and 'session.get(path' in rb
+          for bad in ('browser.post(', 'session.post(', 'browser.patch(', 'session.patch(',
+                      'browser.delete(', 'session.delete(', 'User.create(', 'Order.create(',
+                      'puts error.message','puts error.backtrace','print(error.message)',
+                      'db:schema:load','db:seed','db:prepare'):
+            assert bad not in rb,bad
+          print('P1.4 NO DB WRITE / REAL GET-ONLY / NO RAW ERRORS PASS')
+          PY
+      - name: Mock substitution of reviewed disposable fifth-only runner
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import importlib.util
+          p=Path('scripts/cafe_p14_fifth_view_error_cause_20261107.py')
+          s=importlib.util.spec_from_file_location('cafe_p14_view_ci',p)
+          m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+          class MockOld:
+            def command(self,p14,schema,src,mounts,ip,cluster,secret):
+              return ['docker','run','--rm','--pull=never','--read-only',
+                      '--cap-drop=ALL','--security-opt=no-new-privileges',
+                      '--network='+m.NETWORK,'--user=1000:1000',
+                      '--env=RAILS_ENV=test',
+                      '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public',
+                      '--env=CAFE_P12_EXPECTED_CLUSTER_ID='+cluster,
+                      '--entrypoint=sh','cafe-legacy-full:node14','-c',
+                      'set -eu; bundle exec rails runner qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb']
+          args=MockOld().command(None,None,None,None,None,'7532669441155230666',None)
+          old='bundle exec rails runner qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb'
+          new='bundle exec rails runner qa/security/cafe_p14_fifth_view_error_cause_20261107.rb'
+          assert args[-1].count(old)==1 and args[-1].endswith(old)
+          args[-1]=args[-1].replace(old,new)
+          for flag in ('--rm','--read-only','--cap-drop=ALL','--network='+m.NETWORK,
+                       '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public'):
+            assert flag in args
+          assert args[-1].endswith('cafe_p14_fifth_view_error_cause_20261107.rb')
+          for command in ('db:schema:load','rails test','db:seed','db:prepare'):
+            assert command not in args[-1]
+          print('P1.4 IMMUTABLE READ-ONLY V2 DIAG RUNNER MOCK PASS')
+          PY
