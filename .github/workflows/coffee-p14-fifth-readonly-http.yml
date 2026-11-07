@@ -518,3 +518,129 @@ jobs:
           path: public/packs-test/
           if-no-files-found: error
           retention-days: 7
+
+
+  fifth-real-webpacks-owner-validator-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse immutable owner-only archive verifier and fifth-only runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p14_fifth_real_webpacks_20261107.py
+          python3 -B scripts/cafe_p14_fifth_real_webpacks_20261107.py --help
+      - name: Test ZIP SHA, path traversal, duplicate entries and symlink protection without databases
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib,importlib.util,io,json,os,stat,tempfile,zipfile
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location('p14_real_zip',
+            'scripts/cafe_p14_fifth_real_webpacks_20261107.py')
+          mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+          assert mod.ZIP_SHA256=='95cc0c7985b4aba252470aff3493ee64664f371fa7eb9a8127cccd5e551405e3'
+          assert mod.STUB_BLOB=='215312d18949745695b4fcc70d2485271386ea2f'
+          assert mod.GITHUB_RUN==42384029688 and mod.GITHUB_ARTIFACT_ID==13578972029
+          assert mod.SOURCE_SHA=='dc5dacb9d79b9d7a8951ebcd0b74b489933d53cd'
+          def zip_data(entries,link=False):
+              buf=io.BytesIO()
+              with zipfile.ZipFile(buf,'w',compression=zipfile.ZIP_DEFLATED) as z:
+                  for name,content in entries:
+                      if link and name=='js/application-abc123.js':
+                          i=zipfile.ZipInfo(name)
+                          i.create_system=3
+                          i.external_attr=(stat.S_IFLNK|0o777)<<16
+                          z.writestr(i,content)
+                      else:z.writestr(name,content)
+              return buf.getvalue()
+          base=[('manifest.json',json.dumps(
+            {'application.js':'/packs-test/js/application-abc123.js'})),
+            ('js/application-abc123.js',b"function real_app(){};\n"*80)]
+          good=zip_data(base)
+          prefix,files,entry,manifest=mod.verify_entries(good)
+          assert prefix=='' and len(files)==2
+          assert entry=='/packs-test/js/application-abc123.js'
+          with tempfile.TemporaryDirectory(prefix='cafe-p14-ci-artifact-') as t:
+              archive=Path(t)/'cafe-p14-fifth-real-packs-test.zip'
+              archive.write_bytes(good)
+              archive.chmod(0o600)
+              before=mod.ZIP_SHA256
+              mod.ZIP_SHA256=hashlib.sha256(good).hexdigest()
+              assert mod.read_archive(archive)==good
+              mod.ZIP_SHA256=before
+              try:mod.read_archive(archive)
+              except RuntimeError as e:assert 'SHA256 mismatch' in str(e)
+              else:raise AssertionError('ZIP digest mismatch allowed')
+          for entries,symlink in [
+            (base+[('../leak.js',b'attack')],False),
+            (base+[('js/application-abc123.js',b'second')],False),
+            (base+[('node_modules/attack.js',b'attack')],False),
+            (base+[('config/webpacker.yml',b'attack')],False),
+            (base,True),
+            (base[:1]+[('js/application-abc123.js',b'X'*10)],False),
+            (base[:1]+[('js/application-abc123.js',b'P1.4 disposable, NON-FUNCTIONAL frontend pack'*50)],False)
+          ]:
+              try:mod.verify_entries(zip_data(entries,symlink))
+              except RuntimeError:pass
+              else:raise AssertionError('unsafe ZIP accepted')
+          assert mod.verify_entries(zip_data(
+            [('packs-test/'+p,c) for p,c in base]))[0]=='packs-test/'
+          print('P1.4 REAL WEBPACK ZIP INTEGRITY / PATH / SYMLINK / ZIP SAFETY CI PASS')
+          PY
+      - name: Prove extraction/config overlay changes only isolated temporary tree
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util,io,json,subprocess,tempfile,zipfile
+          from pathlib import Path
+          file=Path('scripts/cafe_p14_fifth_real_webpacks_20261107.py')
+          spec=importlib.util.spec_from_file_location('p14_real',file)
+          mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+          ss=importlib.util.spec_from_file_location('p14_stub',
+            'scripts/cafe_p14_fifth_html_stub_assets_20261107.py')
+          stub=importlib.util.module_from_spec(ss);ss.loader.exec_module(stub)
+          assert stub.SOURCE==mod.SOURCE_SHA or mod.SOURCE_SHA.startswith('dc5')
+          class FakeSchema:
+              SOURCE=stub.SOURCE
+              DB=stub.DB
+              def git(self,verb,*args):
+                  if verb=='hash-object':
+                      return subprocess.check_output(['git','hash-object',*args],text=True).strip()
+                  if verb=='rev-parse':
+                      assert args==(stub.SOURCE+':config/webpacker.yml',)
+                      return stub.WEBPACKER_YML_BLOB
+                  raise AssertionError('unreviewed Git verb')
+          b=io.BytesIO()
+          items=[('manifest.json',json.dumps(
+            {'application.js':'/packs-test/js/application-a1b2.js'})),
+            ('js/application-a1b2.js',b'console.log("actual bundle test");'*90)]
+          with zipfile.ZipFile(b,'w',compression=zipfile.ZIP_DEFLATED) as z:
+              for name,data in items:z.writestr(name,data)
+          data=b.getvalue()
+          verified=mod.verify_entries(data)
+          original=Path('config/webpacker.yml').read_bytes()
+          with tempfile.TemporaryDirectory(prefix='p14-ci-real-zip-stage-') as t:
+              source=Path(t)
+              (source/'config').mkdir()
+              (source/'public').mkdir()
+              (source/'config/webpacker.yml').write_bytes(original)
+              mod.install_real_assets(stub,FakeSchema(),source,data,verified)
+              assert (source/'public/packs-test/js/application-a1b2.js').is_file()
+              assert 'compile: false' in (source/'config/webpacker.yml').read_text()
+              assert (source/'public/packs-test/manifest.json').exists()
+              assert not (source/'node_modules').exists()
+          assert Path('config/webpacker.yml').read_bytes()==original
+          code=file.read_text()
+          assert code.count('p13.verify()')>=2
+          assert 'schema.build_source(probe,stage)' in code
+          assert '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public' in code
+          assert 'stub.make_command(view,old,p14,schema,source,mounts,ip,cluster,secret)' in code
+          assert 'print(done.stderr)' not in code
+          assert 'print(str(exc))' not in code
+          for banned in ('docker stop','docker rm -f','git checkout','git reset',
+                         'db:schema:load;','rails test','db:prepare;'):
+              assert banned not in code,banned
+          print('P1.4 REAL PACKS ONLY IN TEMP SOURCE / FIFTH SCRAM READONLY GET CONTRACT PASS')
+          PY
