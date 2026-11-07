@@ -690,7 +690,7 @@ jobs:
             except RuntimeError as e:assert 'SHA256 mismatch' in str(e)
             else:raise AssertionError('sha mismatch accepted')
             try:v.read_archive(Path(t)/'missing.zip')
-            except RuntimeError as e:assert 'artifact path' in str(e) or 'missing' in str(e)
+            except RuntimeError as e:assert 'archive path' in str(e) or 'missing' in str(e)
             else:raise AssertionError('missing artifact accepted')
           assert v.verify_entries(data)[2]=='/packs-test/js/application-abcdef.js'
           print('P1.4 V2 MODE DENIAL SPECIFIC + SHA/ZIP IMMUTABLE PASS')
