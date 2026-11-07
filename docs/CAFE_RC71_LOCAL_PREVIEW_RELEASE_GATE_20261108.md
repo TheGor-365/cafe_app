@@ -70,6 +70,36 @@ The command builders have offline unit coverage in CI. Real Docker and browser
 acceptance are still required on the owner machine; static CI alone does not
 imply a Docker/browser PASS.
 
+### Owner-local RC71 result and recovery notes · 8 November 2026
+
+Owner terminal confirmed a running isolated preview after manually clearing
+**only** a stale `/app/tmp/pids/server.pid` from the RC71 scratch bind and
+starting the pre-existing preview Rails container. GET `/`, `/menu`,
+`/cart`, `/info` returned 200; owner subsequently confirmed the complete
+browser demo checkout → receipt → admin status flow works. Owner's report is
+not a substitute for independent automated browser test evidence.
+
+The prior launch command allowed Rails to write its PID to shared
+`/app/tmp/pids`, so a failed/restarted container could encounter an obsolete
+PID. The updated launcher passes `--pid /tmp/cafe-rc71-server.pid`, placing
+the PID in its container-private tmpfs. **This changes future created
+containers only; it does not rewrite/restart the owner's already-running
+preview.** Do not relaunch RC71 into the same named Docker resources.
+
+The original `--verify` required zero orders even after successful browser
+checkout. The updated **read-only** verifier accepts an integer count of
+existing demo order records, rejects unsupported order statuses, and still
+verifies exactly 20 demo products, one preview admin, expected networks,
+readonly mounts, Docker images, and HTTP endpoints. This verifier must not
+run schema/seed migrations or reset the existing demo orders.
+
+The source of this correction is the owner's published Codex handoff
+`feature/cafe-rc71-codex-handoff-20261108`. This is a new Draft PR
+(review/CI), not a merge or an instruction to replace any running service.
+Untracked local worktree and ephemeral credentials must never be copied
+to GitHub. Public deployment of Ruby 2.5 / Rails 6 code remains blocked
+pending supported-stack hardening.
+
 ### Acceptance gate
 
 1. GET Home/Menu/Cart/Info HTTP200; empty checkout redirects, admin URL
