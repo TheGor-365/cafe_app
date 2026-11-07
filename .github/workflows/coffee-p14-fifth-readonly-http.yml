@@ -1,0 +1,123 @@
+name: Cafe P1.4 fifth SCRAM read-only Rack HTTP boundary
+
+on:
+  push:
+    branches: [feature/cafe-p14-fifth-http-readonly-20261107]
+  pull_request:
+    branches: [feature/cafe-p13-fifth-synthetic-fixtures-20261107]
+
+permissions:
+  contents: read
+
+jobs:
+  fifth-readonly-http-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check fourth stage and owner-only entrypoint
+        run: |
+          python3 -B -m py_compile scripts/cafe_p14_fifth_http_readonly_20261107.py
+          ruby -c qa/security/cafe_p14_fifth_http_readonly_20261107.rb
+          python3 -B scripts/cafe_p14_fifth_http_readonly_20261107.py --help
+      - name: Pin existing fixture import and strict no-DML guest GET/ACL scope
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import subprocess
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_http_readonly_20261107.py')
+          g=Path('qa/security/cafe_p14_fifth_http_readonly_20261107.rb')
+          spec=importlib.util.spec_from_file_location('cafe_p14_static',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          assert m.PG=='cafe-upload-security-synthetic-pg-20261105'
+          assert m.NET=='cafe-upload-security-synthetic-net-20261105'
+          assert m.DB=='cafe_synthetic'
+          assert m.P13_BLOB=='8dbf42b86a4c617fb69c986e9103fce631d3a49e'
+          assert m.RUBY_BLOB=='299de6d74f55fe04c222875ca424b6c2c7443b5f'
+          assert subprocess.check_output(['git','hash-object','scripts/cafe_p13_fifth_catalog_20261107.py'],text=True).strip()==m.P13_BLOB
+          assert subprocess.check_output(['git','hash-object',str(g)],text=True).strip()==m.RUBY_BLOB
+          x=g.read_text()
+          for route in ('/menu','/cart','/info','/catering','/users/sign_in',
+                        '/users/sign_up','/users/password/new','/account',
+                        '/products','/categories'):
+              assert route in x,route
+          assert "ActionDispatch::Integration::Session.new(Rails.application)" in x
+          assert "default_transaction_read_only" in x
+          assert "server['readonly'] == 'on'" in x
+          assert "cafe_synth_app" in x and "PG16" in x
+          assert "www.example.com" in x
+          for forbidden in ('.post(','.patch(','.delete(','.put(',
+                            'rails test','db:schema:load','db:prepare','db:drop',
+                            'User.create!','Order.create!','ActiveRecord::FixtureSet',
+                            'file_upload','system('):
+              assert forbidden not in x,forbidden
+          print('P1.4 TEST READ-ONLY APP SCRAM ROLE / ONLY RACK GET / PINNED CATALOG PASS')
+          PY
+      - name: Mock no-ports disposable Docker app SCRAM runner
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_http_readonly_20261107.py')
+          spec=importlib.util.spec_from_file_location('cafe_p14_argv_ci',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          class MockSchema:
+              NETWORK=m.NET
+              SECRET=Path('/tmp/fake_superuser_pass')
+              def docker_writer(self,source,mounts,ip,ident):
+                  return ['docker','run','--rm','--pull=never','--read-only',
+                   '--cap-drop=ALL','--security-opt=no-new-privileges',
+                   '--user=1000:1000','--network='+m.NET,
+                   '--env=RAILS_ENV=test','--env=CAFE_P12_TARGET=cafe_synthetic',
+                   '--env=CAFE_P12_EXPECTED_CLUSTER_ID='+ident,
+                   '--env=PGOPTIONS=-c role=cafe_synth_owner -c search_path=public',
+                   '--mount=type=bind,source=/tmp/fake_superuser_pass,target=/tmp/cafe_p12_secret,readonly',
+                   '--entrypoint=sh','cafe-legacy-full:node14','-c',
+                   'set -eu; password="$(cat /tmp/cafe_p12_secret)"; '
+                   'export DATABASE_URL="postgresql://postgres:$password@cafe-synthetic-postgres:5432/cafe_synthetic"; '
+                   'unset password; '
+                   'bundle exec ruby qa/security/cafe_fifth_schema_cluster_guard_20261107.rb pre; '
+                   'bundle exec rails db:schema:load; '
+                   'bundle exec ruby qa/security/cafe_fifth_schema_cluster_guard_20261107.rb post']
+          app=Path('/tmp/fake_app_password')
+          argv=m.runner_command(MockSchema(),Path('/tmp/fake-src'),[],'172.18.0.2','7532669441155230666',app)
+          assert argv[:3]==['docker','run','--rm']
+          assert '--network='+m.NET in argv and '--read-only' in argv
+          assert '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public' in argv
+          assert '--env=PGOPTIONS=-c role=cafe_synth_owner -c search_path=public' not in argv
+          assert '--mount=type=bind,source=/tmp/fake_app_password,target=/tmp/cafe_p12_secret,readonly' in argv
+          assert '--mount=type=bind,source=/tmp/fake_superuser_pass,target=/tmp/cafe_p12_secret,readonly' not in argv
+          assert 'postgresql://cafe_synth_app:$password@cafe-synthetic-postgres:5432/cafe_synthetic' in argv[-1]
+          assert argv[-1].endswith('rails runner qa/security/cafe_p14_fifth_http_readonly_20261107.rb')
+          for forbidden in ('db:schema:load','db:seed','db:drop','rails test','db:prepare'):
+              assert forbidden not in argv[-1],forbidden
+          print('P1.4 NO HOST PORT / NO PRIVILEGED MOUNT / READONLY SQL RUNNER PASS')
+          PY
+
+  dependency-and-test-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure existing test harness is NOT invoked on owner fifth
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          legacy=Path('test/test_helper.rb').read_text()
+          new=Path('scripts/cafe_p14_fifth_http_readonly_20261107.py').read_text()
+          assert 'fixtures :all' in legacy
+          assert 'schema.build_source(probe,stage)' in new
+          assert 'p13.verify()' in new
+          assert 'schema.runtime()' in new
+          assert 'schema.target()' in new
+          assert "parser.add_argument(\"--probe\",action=\"store_true\",required=True)" in new
+          assert 'open(\"xb\")' in new
+          assert 'RUBY.read_bytes()' in new
+          assert 'docker stop' not in new and 'docker rm ' not in new
+          assert 'db:prepare' not in new.split('def probe():',1)[1].split('def main():',1)[0]
+          print('P1.4 READONLY SOURCE/RUNTIME/NO OWNER TEST FIXTURE RESET PASS')
+          PY
