@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# CI ONLY: mutates Gemfile/Gemfile.lock on a disposable GitHub Actions runner.
+# Never run on owner-local working trees, Docker or databases.
+set -euo pipefail
+if [[ "$GITHUB_ACTIONS" != "true" || "$CI" != "true" ||
+      -z "$GITHUB_WORKSPACE" || "$PWD" != "$GITHUB_WORKSPACE" ]]; then
+  echo "CAFE BRIDGE STOP: GitHub Actions isolated workspace required" >&2
+  exit 12
+fi
+case "$1" in
+  ruby27_rails60|ruby27_rails61) scenario="$1" ;;
+  *) echo "CAFE BRIDGE STOP: unknown scenario" >&2; exit 13 ;;
+esac
+if [[ -n "$(git status --porcelain --untracked-files=normal)" ]]; then
+  echo "CAFE BRIDGE STOP: Git checkout not pristine" >&2
+  exit 14
+fi
+ruby -v | grep -F 'ruby 2.7.8' >/dev/null
+grep -Fx "ruby '2.5.8'" Gemfile >/dev/null
+grep -Fx "gem 'rails', '~> 6.0.3', '>= 6.0.3.6'" Gemfile >/dev/null
+
+sed -i "s/ruby '2.5.8'/ruby '2.7.8'/" Gemfile
+if [[ "$scenario" == "ruby27_rails61" ]]; then
+  sed -i "s/gem 'rails', '~> 6.0.3', '>= 6.0.3.6'/gem 'rails', '~> 6.1.7', '>= 6.1.7.10'/" Gemfile
+fi
+grep -Fx "ruby '2.7.8'" Gemfile >/dev/null
+if [[ "$scenario" == "ruby27_rails61" ]]; then
+  grep -Fx "gem 'rails', '~> 6.1.7', '>= 6.1.7.10'" Gemfile >/dev/null
+fi
+
+gem install bundler -v 2.2.13 --no-document
+bundle _2.2.13_ lock --add-platform x86_64-linux --ruby
+if [[ "$scenario" == "ruby27_rails61" ]]; then
+  bundle _2.2.13_ update rails
+else
+  bundle _2.2.13_ install --jobs 2 --retry 2
+fi
+mkdir -p "bridge-artifacts/$scenario"
+cp Gemfile "bridge-artifacts/$scenario/Gemfile"
+cp Gemfile.lock "bridge-artifacts/$scenario/Gemfile.lock"
+if [[ "$scenario" == "ruby27_rails61" ]]; then rails_prefix="6.1."; else rails_prefix="6.0."; fi
+bundle _2.2.13_ exec ruby -e '
+  require "rails"
+  prefix = ARGV.fetch(0)
+  raise "Unexpected Rails version" unless Rails.version.start_with?(prefix)
+  puts "CAFE BRIDGE RUBY/RAILS VERSIONS PASS: #{RUBY_VERSION} / #{Rails.version}"
+' "$rails_prefix"
+echo "CAFE BRIDGE DEPENDENCY RESOLUTION PASS: $scenario"
