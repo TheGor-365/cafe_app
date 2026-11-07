@@ -21,11 +21,8 @@ module ApplicationHelper
   end
 
   def current_order
-    if Order.find_by_id(session[:order_id]).nil?
-      Order.new
-    else
-      Order.find_by_id(session[:order_id])
-    end
+    # Submitted orders cannot be reused as mutable shopping carts.
+    Order.find_by(id: session[:order_id], status: 'cart') || Order.new
   end
 
 end

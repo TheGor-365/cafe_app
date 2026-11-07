@@ -1,4 +1,4 @@
-ActiveRecord::Schema.define(version: 2026_11_02_000100) do
+ActiveRecord::Schema.define(version: 2026_11_07_000200) do
 
   enable_extension "plpgsql"
 
@@ -64,10 +64,18 @@ ActiveRecord::Schema.define(version: 2026_11_02_000100) do
   end
 
   create_table "orders", force: :cascade do |t|
+    t.string "status", default: "cart", null: false
+    t.string "pickup_name"
+    t.string "pickup_slot"
+    t.text "pickup_note"
+    t.datetime "placed_at", precision: 6
+    t.bigint "user_id"
     t.decimal "subtotal"
     t.decimal "total"
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
+    t.index ["status", "placed_at"], name: "index_orders_on_status_and_placed_at"
+    t.index ["user_id"], name: "index_orders_on_user_id"
   end
 
   create_table "products", force: :cascade do |t|
@@ -122,4 +130,5 @@ ActiveRecord::Schema.define(version: 2026_11_02_000100) do
   add_foreign_key "product_modifier_options", "products"
   add_foreign_key "product_variants", "products"
   add_foreign_key "products", "categories"
+  add_foreign_key "orders", "users"
 end
