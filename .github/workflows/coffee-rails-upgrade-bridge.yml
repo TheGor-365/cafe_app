@@ -45,7 +45,9 @@ jobs:
         run: |
           ruby -v
           bash -n scripts/cafe_rails_bridge_probe_20261108.sh
-          test "$(git status --porcelain)" = ""
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git status --porcelain > /tmp/cafe-bridge-git-status
+          test ! -s /tmp/cafe-bridge-git-status
       - name: Resolve only disposable bridge runtime dependencies
         run: bash scripts/cafe_rails_bridge_probe_20261108.sh "$CAFE_CI_SCENARIO"
       - name: Prepare ephemeral PostgreSQL test schema
