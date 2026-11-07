@@ -37,7 +37,7 @@ fi
 if [[ "$scenario" == "ruby27_rails61" ]]; then
   [[ -n "$GITHUB_ENV" ]] || { echo "Missing Actions environment file" >&2; exit 16; }
   export RUBYOPT=""
-  printf 'RUBYOPT=\\n' >> "$GITHUB_ENV"
+  echo 'RUBYOPT=' >> "$GITHUB_ENV"
 fi
 
 gem install bundler -v 2.2.13 --no-document
