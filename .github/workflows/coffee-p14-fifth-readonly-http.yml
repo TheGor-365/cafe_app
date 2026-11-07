@@ -337,3 +337,113 @@ jobs:
             assert command not in args[-1]
           print('P1.4 IMMUTABLE READ-ONLY V2 DIAG RUNNER MOCK PASS')
           PY
+
+
+  fifth-html-stub-server-only-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check immutable fifth-only HTML SSR smoke helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p14_fifth_html_stub_assets_20261107.py
+          python3 -B scripts/cafe_p14_fifth_html_stub_assets_20261107.py --help | grep -F -- '--check-html'
+      - name: Verify exact canonical Webpacker config and previous SHA source
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util,subprocess
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_html_stub_assets_20261107.py')
+          sp=importlib.util.spec_from_file_location('p14_ssr_ci',p)
+          mod=importlib.util.module_from_spec(sp);sp.loader.exec_module(mod)
+          assert mod.DB=='cafe_synthetic' and mod.NET=='cafe-upload-security-synthetic-net-20261105'
+          assert mod.SOURCE=='090b9d37419fcd9f393d8b686ac0f4563ef7b613'
+          assert mod.VIEW_PY_BLOB=='d0c3544f8eacc7c4940bc5c2d1fdcd0a7621b349'
+          assert mod.WEBPACKER_YML_BLOB=='83615b0f9ac0ca5508548621150789c7dad71071'
+          for path,sha in [('scripts/cafe_p14_fifth_view_error_cause_20261107.py',mod.VIEW_PY_BLOB),
+                           ('config/webpacker.yml',mod.WEBPACKER_YML_BLOB)]:
+            assert subprocess.check_output(['git','hash-object',path],text=True).strip()==sha
+          assert mod.YML_BEFORE in Path('config/webpacker.yml').read_text()
+          assert mod.YML_AFTER not in Path('config/webpacker.yml').read_text()
+          assert mod.EXPECTED_MANIFEST=={
+            'application.js':'/packs-test/js/application-p14-placeholder-get-only.js'
+          }
+          assert 'NON-FUNCTIONAL frontend' in mod.JS_STUB.decode()
+          assert 'P1.4 REAL WEBPACK JS/CSS / BROWSER INTERACTION NOT TESTED' in p.read_text()
+          print('P1.4 SOURCE IMMUTABLE WEBPACKER 4.3 / NONFUNCTIONAL PACK LABEL PASS')
+          PY
+      - name: Simulate test-only config and placeholder manifest in isolated directory
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import tempfile,importlib.util,subprocess
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_html_stub_assets_20261107.py')
+          spec=importlib.util.spec_from_file_location('p14_ssr_ci',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          class FakeSchema:
+              SOURCE=m.SOURCE
+              DB=m.DB
+              def git(self,command,*args):
+                  assert command in ('hash-object','rev-parse')
+                  if command=='rev-parse':
+                      assert args==(m.SOURCE+':config/webpacker.yml',)
+                      return m.WEBPACKER_YML_BLOB
+                  if command=='hash-object':
+                      return subprocess.check_output(['git','hash-object',*args],text=True).strip()
+          original=Path('config/webpacker.yml').read_bytes()
+          with tempfile.TemporaryDirectory(prefix='p14-ci-ssr-stub-') as t:
+              path=Path(t)
+              config=path/'config/webpacker.yml'
+              config.parent.mkdir()
+              config.write_bytes(original)
+              (path/'public').mkdir()
+              m.install_stub(FakeSchema(),path)
+              updated=config.read_text()
+              assert original.decode().replace(m.YML_BEFORE,m.YML_AFTER)==updated
+              manifest=path/'public/packs-test/manifest.json'
+              js=path/'public/packs-test/js'/m.STUB_NAME
+              assert manifest.is_file() and js.read_bytes()==m.JS_STUB
+              assert m.STUB_NAME in manifest.read_text()
+              assert not (path/'node_modules').exists()
+          assert Path('config/webpacker.yml').read_bytes()==original
+          print('P1.4 DISPOSABLE TEMP SOURCE ONLY / NO REAL NODEJS OR JS E2E PASS')
+          PY
+      - name: Mock fifth Docker read-only command and block schema/seed writers
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_html_stub_assets_20261107.py')
+          spec=importlib.util.spec_from_file_location('p14_ssr_ci',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          class FakeOld:
+              def command(self,p14,schema,src,mounts,ip,cluster,secret):
+                  return ['docker','run','--rm','--read-only','--cap-drop=ALL',
+                      '--security-opt=no-new-privileges','--network='+m.NET,
+                      '--user=1000:1000','--env=RAILS_ENV=test',
+                      '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public',
+                      '--env=CAFE_P12_EXPECTED_CLUSTER_ID='+cluster,
+                      'cafe-legacy-full:node14','-c',
+                      'set -eu; bundle exec rails runner qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb']
+          command=m.make_command(None,FakeOld(),None,None,Path('/tmp/a'),[],
+                                  '172.30.1.2','7532669441155230666',Path('/tmp/secret'))
+          assert command[-1].endswith('cafe_p14_fifth_view_error_cause_20261107.rb')
+          assert '--network='+m.NET in command and '--read-only' in command
+          assert '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public' in command
+          for blocked in ('db:schema:load','db:seed','db:prepare','rails test',
+                          'db:drop','db:migrate'):
+              assert blocked not in command[-1]
+          source=p.read_text()
+          assert source.count('p13.verify()')>=2
+          assert 'schema.build_source(runtime,stage)' in source
+          assert 'tempfile.TemporaryDirectory' in source
+          assert 'P1.4 SERVER-RENDERED HTML ROUTES/ACL PASS — STUB FRONTEND ASSETS' in source
+          assert 'with dest.open("xb")' in source
+          assert 'print(str(exc))' not in source and 'print(done.stderr)' not in source
+          print('P1.4 FIFTH APP-ROLE READONLY RACK SSR / NO WRITES OR RAW LOGS PASS')
+          PY
