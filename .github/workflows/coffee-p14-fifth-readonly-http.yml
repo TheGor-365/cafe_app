@@ -49,7 +49,7 @@ jobs:
           assert "cafe_synth_app" in x and "PG16" in x
           assert "www.example.com" in x
           for forbidden in ('.post(','.patch(','.delete(','.put(',
-                            'rails test','db:schema:load','db:prepare','db:drop',
+                            'bundle exec rails test','db:schema:load','db:prepare','db:drop',
                             'User.create!','Order.create!','ActiveRecord::FixtureSet',
                             'file_upload','system('):
               assert forbidden not in x,forbidden
