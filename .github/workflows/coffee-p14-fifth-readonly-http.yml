@@ -447,3 +447,74 @@ jobs:
           assert 'print(str(exc))' not in source and 'print(done.stderr)' not in source
           print('P1.4 FIFTH APP-ROLE READONLY RACK SSR / NO WRITES OR RAW LOGS PASS')
           PY
+
+
+  fifth-real-webpack-test-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    container:
+      image: node:14.21.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert pinned immutable legacy frontend source and test-only boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object package.json)" = "03be1481f494a833cfbfef611805d9cc2450889e"
+          test "$(git hash-object yarn.lock)" = "905bfa7861c1110fac7efb0815cbec55dfd6937e"
+          test "$(git hash-object config/webpacker.yml)" = "83615b0f9ac0ca5508548621150789c7dad71071"
+          test "$(git hash-object config/webpack/test.js)" = "c5edff94ad2d18655b31731c9ea7a767f5ba0712"
+          test "$(git hash-object app/javascript/packs/application.js)" = "86fd3f0a2233fd082b31386feea3d34ecb77e479"
+          node --version | grep -E '^v14\.21\.3$'
+          test ! -d public/packs-test
+          test ! -f public/packs-test/manifest.json
+          echo 'P1.4 FROZEN NODE14 YARN/WEBPACK CONFIG AND NO PRIOR PACKS PASS'
+      - name: Install exactly locked JS dependencies in CI checkout ONLY
+        run: yarn install --frozen-lockfile --non-interactive
+      - name: Run existing original JavaScript behavior tests without owner PG
+        shell: bash
+        run: |
+          set -euo pipefail
+          node test/javascript/coffee_price_preview.test.js
+          node test/javascript/coffee_config_panel.test.js
+          node test/javascript/coffee_quantity_stepper.test.js
+          echo 'P1.4 REAL FRONTEND MODULE BEHAVIOR TESTS PASS'
+      - name: Build real Webpacker 4.3 Rails test packs in CI only
+        shell: bash
+        env:
+          RAILS_ENV: test
+          NODE_ENV: development
+          NODE_OPTIONS: --max-old-space-size=2048
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/webpack --config config/webpack/test.js
+          echo 'P1.4 REAL WEBPACKER BUILD COMPLETED'
+      - name: Verify actual test manifest resolves non-empty generated JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'JS'
+          const fs = require('fs');
+          const path = require('path');
+          const m = JSON.parse(fs.readFileSync('public/packs-test/manifest.json','utf8'));
+          const entry=m['application.js'];
+          if(typeof entry!=='string' || !/^\/packs-test\/js\/application-[a-z0-9]+\.js$/.test(entry)) {
+            throw Error('No genuine fingerprinted Webpacker application.js entry in test manifest');
+          }
+          const relative=entry.slice('/packs-test/'.length);
+          const root=path.resolve('public/packs-test');
+          const file=path.resolve(root,relative);
+          if (!file.startsWith(root + path.sep)) throw Error('Unsafe JS manifest traversal');
+          if (fs.statSync(file).size<1000) throw Error('Missing or empty actual compiled JS');
+          if (fs.readFileSync(file,'utf8').includes('P1.4 disposable, NON-FUNCTIONAL frontend pack')) {
+            throw Error('Fake P1.4 JS placeholder instead of real Webpacker bundle');
+          }
+          console.log('P1.4 GENUINE WEBPACKER TEST MANIFEST AND NONEMPTY COMPILED JS PASS');
+          JS
+      - name: Save real compiled test assets, not node_modules, for separate later approval
+        uses: actions/upload-artifact@v4
+        with:
+          name: cafe-p14-fifth-real-packs-test
+          path: public/packs-test/
+          if-no-files-found: error
+          retention-days: 7
