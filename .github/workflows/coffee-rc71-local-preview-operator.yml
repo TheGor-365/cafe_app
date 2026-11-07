@@ -2,7 +2,7 @@ name: Cafe isolated RC71 preview operator script static safety
 
 on:
   push:
-    branches: [feature/cafe-rc71-local-preview-20261108]
+    branches: [feature/cafe-rc71-local-preview-20261108, feature/cafe-rc71-codex-handoff-20261108]
   pull_request:
     branches: [feature/cafe-admin-drink-options-20261107]
 
@@ -39,7 +39,8 @@ jobs:
           assert m.PRIVATE in m.WORK.parents
           assert m.ADMIN_EMAIL.endswith('@example.test')
           code=path.read_text()
-          for literal in ('--internal', '127.0.0.1:3003:3003', '--pull=never',
+          for literal in ('--pid /tmp/cafe-rc71-server.pid', 'preview_order_count()',
+                          '--internal', '127.0.0.1:3003:3003', '--pull=never',
                           'read-only', 'no-new-privileges', 'git_head(SOURCE)',
                           'git_clean(SOURCE)', 'source_branch',
                           'SOURCE_MOUNTPOINTS',
