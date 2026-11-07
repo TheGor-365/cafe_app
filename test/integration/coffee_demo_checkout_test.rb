@@ -80,8 +80,10 @@ class CoffeeDemoCheckoutTest < ActionDispatch::IntegrationTest
     assert_equal 302, buyer.response.status
     buyer.get demo_order_path(line.order)
     assert_equal 200, buyer.response.status
-    stranger.get demo_order_path(line.order)
-    assert_equal 404, stranger.response.status
+    # Rails test mode raises RecordNotFound rather than rendering its production 404.
+    assert_raises(ActiveRecord::RecordNotFound) do
+      stranger.get demo_order_path(line.order)
+    end
   end
 
   test 'signed in owner can see only own account history' do
