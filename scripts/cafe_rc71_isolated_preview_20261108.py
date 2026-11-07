@@ -373,7 +373,11 @@ def web_run_command(bundle, node, web_image):
     command += web_common(bundle, node)
     command += ["--network-alias", "rc71-web", "--restart", "no",
                 "--entrypoint", "sh", image_id(web_image), "-lc",
-                "bundle exec rails server -b 0.0.0.0 -p 3003"]
+                # PID lives in the container-private /tmp tmpfs, not the
+                # persistent owner workdir bind at /app/tmp/pids/server.pid.
+                # An old shared PID blocked the owner's RC71 startup once.
+                "bundle exec rails server -b 0.0.0.0 -p 3003 "
+                "--pid /tmp/cafe-rc71-server.pid"]
     return command
 
 
@@ -535,6 +539,20 @@ def http_status(path):
         c.close()
 
 
+def preview_order_count():
+    # Read-only verification must remain valid AFTER a successful browser E2E.
+    # The initial one-shot seed checks zero orders during launch, but a post-
+    # checkout preview correctly contains pending/completed demo orders.
+    count = sql("SELECT COUNT(*) FROM orders")
+    need(count.isdecimal(), "preview order count invalid")
+    unknown_statuses = sql(
+        "SELECT COUNT(*) FROM orders WHERE status NOT IN "
+        "('cart','pending','accepted','preparing','ready','completed','cancelled')"
+    )
+    need(unknown_statuses == "0", "preview has unsupported order statuses")
+    return int(count)
+
+
 def verify():
     _, _, web_image, db_image = stage_valid()
     net = inspect("network", NET)
@@ -591,9 +609,9 @@ def verify():
              stat.S_IMODE(private_file.stat().st_mode) == 0o600,
              "preview credential file permissions differ")
     need(sql("SELECT COUNT(*) FROM products") == "20" and
-         sql("SELECT COUNT(*) FROM users WHERE admin IS TRUE") == "1" and
-         sql("SELECT COUNT(*) FROM orders") == "0",
-         "preview database baseline differs")
+         sql("SELECT COUNT(*) FROM users WHERE admin IS TRUE") == "1",
+         "preview catalogue or admin baseline differs")
+    order_count = preview_order_count()
     statuses = {}
     for _ in range(25):
         statuses = {p: http_status(p) for p in ("/", "/menu", "/cart", "/info")}
@@ -606,7 +624,8 @@ def verify():
          "empty cart checkout should redirect")
     need(http_status("/admin/demo_orders") == 302,
          "guest must be redirected before admin order queue")
-    print("CAFE RC71 NEW PG 20 PRODUCTS / 1 ADMIN / ZERO ORDERS PASS")
+    print("CAFE RC71 NEW PG 20 PRODUCTS / 1 ADMIN / " +
+          str(order_count) + " DEMO ORDER RECORDS PASS")
     print("CAFE RC71 NEW CODE/DEPS RO / ISOLATED NETWORK / PORT 3003 PASS")
     print("CAFE RC71 PUBLIC GET / MENU / CART / INFO HTTP 200 PASS")
     print("CAFE RC71 GUEST CHECKOUT / ADMIN REDIRECT PASS")
