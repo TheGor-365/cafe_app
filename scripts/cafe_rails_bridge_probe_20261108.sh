@@ -31,6 +31,15 @@ if [[ "$scenario" == "ruby27_rails61" ]]; then
   grep -Fx "gem 'rails', '~> 6.1.7', '>= 6.1.7.10'" Gemfile >/dev/null
 fi
 
+# Rails 6.1 dependency resolution selects logger 1.7 while Ruby 2.7
+# preloads the 1.4.2 default gem via RUBYOPT=-rlogger. Avoid double
+# activation in this isolated Rails 6.1 CI scenario (not owner runtime).
+if [[ "$scenario" == "ruby27_rails61" ]]; then
+  [[ -n "$GITHUB_ENV" ]] || { echo "Missing Actions environment file" >&2; exit 16; }
+  export RUBYOPT=""
+  printf 'RUBYOPT=\\n' >> "$GITHUB_ENV"
+fi
+
 gem install bundler -v 2.2.13 --no-document
 # Bundler 2.2.13 has no --ruby switch on 'bundle lock'. Update the
 # exact pre-existing Ruby version line inside the disposable lockfile.
