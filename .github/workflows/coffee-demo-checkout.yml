@@ -1,0 +1,77 @@
+name: Cafe demo checkout lifecycle (disposable CI only)
+
+on:
+  push:
+    branches: [feature/cafe-demo-order-lifecycle-20261107]
+  pull_request:
+    branches: [feature/cafe-mobile-bottom-dock-20261107]
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check migrations, routes, controller, model, and ERB syntax
+        run: |
+          ruby -c db/migrate/20261107000200_add_demo_checkout_to_orders.rb
+          ruby -c app/models/order.rb
+          ruby -c app/controllers/demo_orders_controller.rb
+          ruby -c test/integration/coffee_demo_checkout_test.rb
+          ruby -c config/routes.rb
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path('app/controllers/demo_orders_controller.rb').read_text()
+          assert 'with_lock' in code and 'require_admin!' in code
+          assert 'session.delete(:order_id)' in code and 'where.not(status:' in code
+          assert 'permit(:pickup_name, :pickup_slot, :pickup_note)' in code
+          assert 'ALLOWED_TRANSITIONS' in Path('app/models/order.rb').read_text()
+          assert 'add_reference :orders, :user' in Path('db/migrate/20261107000200_add_demo_checkout_to_orders.rb').read_text()
+          assert 'app' not in Path('config/routes.rb').read_text().split('demo_checkout')[0][-30:]
+          print('DEMO CHECKOUT STATIC SAFETY PASS')
+          PY
+
+  rails:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ruby:2.5.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install legacy Bundler and locked gems
+        run: |
+          gem install bundler -v 2.2.13 --no-document
+          bundle _2.2.13_ lock --add-platform x86_64-linux
+          bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Build disposable GitHub CI schema only
+        run: |
+          bundle _2.2.13_ exec rails db:schema:load
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Test checkout, cart, auth, mobile and admin isolation
+        run: |
+          bundle _2.2.13_ exec rails test \
+            test/integration/coffee_demo_checkout_test.rb \
+            test/integration/coffee_mobile_bottom_dock_test.rb \
+            test/integration/coffee_home_cart_flow_test.rb \
+            test/integration/coffee_unified_shell_test.rb

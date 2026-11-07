@@ -1,0 +1,46 @@
+<% content_for :title, "Demo Orders · Gor's Coffee" %>
+<main class="cafe-admin" aria-labelledby="demo-admin-title">
+  <header class="cafe-admin__hero">
+    <div>
+      <p class="cafe-admin__eyebrow">Demo catalogue administration · no payments</p>
+      <h1 id="demo-admin-title">Demo order queue</h1>
+      <p>Sample orders only. Status transitions are constrained on the server.</p>
+    </div>
+    <%= link_to 'Manage products', products_path, class: 'cafe-admin__button' %>
+  </header>
+  <nav class="cafe-admin__tabs" aria-label="Admin management">
+    <%= link_to 'Demo orders', admin_demo_orders_path, 'aria-current': 'page' %>
+    <%= link_to 'Products', products_path %>
+    <%= link_to 'Categories', categories_path %>
+  </nav>
+  <% if @orders.empty? %><p class="cafe-admin__empty">No demo orders submitted yet.</p><% end %>
+  <section class="cafe-admin__panel" aria-label="Recent demo orders">
+    <div class="cafe-admin__table-wrap">
+      <table class="cafe-admin__table">
+        <thead><tr><th scope="col">Demo order</th><th scope="col">Status</th><th scope="col">Items</th><th scope="col">Total</th><th scope="col">Next step</th></tr></thead>
+        <tbody>
+          <% @orders.each do |order| %>
+            <tr>
+              <th scope="row"><%= link_to "##{order.id}", demo_order_path(order) %>
+                <small><%= order.pickup_name %></small>
+              </th>
+              <td><%= order.status.humanize %></td>
+              <td><%= order.order_items.sum(&:quantity) %></td>
+              <td><%= number_to_currency(order.total) %></td>
+              <td>
+                <% order.allowed_next_statuses.each do |next_status| %>
+                  <%= button_to next_status.humanize,
+                        admin_demo_order_status_path(order),
+                        method: :patch, params: { demo_order: { status: next_status } },
+                        class: 'cafe-checkout__small-action' %>
+                <% end %>
+                <% if order.allowed_next_statuses.empty? %>Final status<% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+    <p class="cafe-checkout__note">Latest 100 submitted demo orders only; cart drafts are excluded.</p>
+  </section>
+</main>
