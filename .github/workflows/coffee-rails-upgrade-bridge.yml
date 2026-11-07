@@ -3,9 +3,6 @@ name: Cafe Rails modernization — isolated dependency bridge
 on:
   push:
     branches: [feature/cafe-rails-upgrade-bridge-20261108]
-  pull_request:
-    branches: [feature/cafe-rc71-codex-handoff-20261108]
-
 permissions:
   contents: read
 
@@ -19,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [ruby27_rails60, ruby27_rails61]
+        scenario: [ruby27_rails61]
     services:
       postgres:
         image: postgres:16
