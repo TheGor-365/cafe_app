@@ -7,6 +7,9 @@ if [[ "$GITHUB_ACTIONS" != "true" || "$CI" != "true" ||
   echo "CAFE BRIDGE STOP: GitHub Actions isolated workspace required" >&2
   exit 12
 fi
+# Actions checkout may be owned by a different UID inside ruby:2.7.8.
+# Mark only the exact ephemeral workspace safe for Git inspection.
+git config --global --add safe.directory "$GITHUB_WORKSPACE"
 case "$1" in
   ruby27_rails60|ruby27_rails61) scenario="$1" ;;
   *) echo "CAFE BRIDGE STOP: unknown scenario" >&2; exit 13 ;;
@@ -29,7 +32,10 @@ if [[ "$scenario" == "ruby27_rails61" ]]; then
 fi
 
 gem install bundler -v 2.2.13 --no-document
-bundle _2.2.13_ lock --add-platform x86_64-linux --ruby
+# Bundler 2.2.13 has no --ruby switch on 'bundle lock'. Update the
+# exact pre-existing Ruby version line inside the disposable lockfile.
+sed -i 's/ruby 2\.5\.8p224/ruby 2.7.8p225/' Gemfile.lock
+bundle _2.2.13_ lock --add-platform x86_64-linux
 if [[ "$scenario" == "ruby27_rails61" ]]; then
   bundle _2.2.13_ update rails
 else
