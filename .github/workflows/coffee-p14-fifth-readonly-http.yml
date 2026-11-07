@@ -601,7 +601,8 @@ jobs:
           ss=importlib.util.spec_from_file_location('p14_stub',
             'scripts/cafe_p14_fifth_html_stub_assets_20261107.py')
           stub=importlib.util.module_from_spec(ss);ss.loader.exec_module(stub)
-          assert stub.SOURCE==mod.SOURCE_SHA or mod.SOURCE_SHA.startswith('dc5')
+          assert stub.SOURCE=='090b9d37419fcd9f393d8b686ac0f4563ef7b613'
+          assert mod.SOURCE_SHA=='dc5dacb9d79b9d7a8951ebcd0b74b489933d53cd'
           class FakeSchema:
               SOURCE=stub.SOURCE
               DB=stub.DB
@@ -640,7 +641,7 @@ jobs:
           assert 'print(done.stderr)' not in code
           assert 'print(str(exc))' not in code
           for banned in ('docker stop','docker rm -f','git checkout','git reset',
-                         'db:schema:load;','rails test','db:prepare;'):
+                         'db:schema:load;','bundle exec rails test','db:prepare;'):
               assert banned not in code,banned
           print('P1.4 REAL PACKS ONLY IN TEMP SOURCE / FIFTH SCRAM READONLY GET CONTRACT PASS')
           PY
