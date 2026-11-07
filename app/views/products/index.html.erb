@@ -35,6 +35,8 @@
               <td class="cafe-admin__actions">
                 <%= link_to 'View', product_path(product) %>
                 <%= link_to 'Edit', edit_product_path(product) %>
+                <%= link_to 'Sizes', product_product_variants_path(product) %>
+                <%= link_to 'Extras', product_product_modifier_options_path(product) %>
                 <%= link_to 'Delete', product_path(product), method: :delete,
                       data: { confirm: 'Delete this demo product? Referenced products cannot be deleted.' },
                       class: 'cafe-admin__danger-link' %>
