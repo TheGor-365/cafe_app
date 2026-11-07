@@ -1,0 +1,45 @@
+<%# Five guest destinations; authenticated extras via native, no-JS More menu. %>
+<% cafe_dock_count = current_order.order_items.to_a.sum { |item| item.quantity.to_i } %>
+<nav class="cafe-mobile-dock" aria-label="Mobile navigation">
+  <%= link_to root_path, class: 'cafe-dock__link', 'aria-current': (@page == 'home' ? 'page' : nil) do %>
+    <svg class="cafe-dock__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg>
+    <span class="cafe-dock__label">Home</span>
+    
+  <% end %>
+  <%= link_to menu_path, class: 'cafe-dock__link', 'aria-current': (@page == 'menu' ? 'page' : nil) do %>
+    <svg class="cafe-dock__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 9h13v5a6.5 6.5 0 0 1-13 0V9zM17 10h2a3 3 0 0 1 0 6h-2M4 21h14M8 3v3M13 3v3"/></svg>
+    <span class="cafe-dock__label">Menu</span>
+    
+  <% end %>
+  <%= link_to cart_path, class: 'cafe-dock__link', 'aria-current': (@page == 'cart' ? 'page' : nil), 'aria-label': "Cart, #{cafe_dock_count} items" do %>
+    <svg class="cafe-dock__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 4h2l2.1 11h11.8L21 8H6M9 20h.01M18 20h.01"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+    <span class="cafe-dock__label">Cart</span>
+    <span class="cafe-dock__badge" aria-hidden="true"><%= cafe_dock_count %></span>
+  <% end %>
+  <%= link_to catering_path, class: 'cafe-dock__link', 'aria-current': (@page == 'catering' ? 'page' : nil) do %>
+    <svg class="cafe-dock__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="6" width="18" height="15" rx="2"/><path d="M7 3v6M17 3v6M3 11h18M8 15h3M14 15h3"/></svg>
+    <span class="cafe-dock__label">Catering</span>
+    
+  <% end %>
+  <%= link_to info_path, class: 'cafe-dock__link', 'aria-current': (@page == 'info' ? 'page' : nil) do %>
+    <svg class="cafe-dock__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg>
+    <span class="cafe-dock__label">Info</span>
+    
+  <% end %>
+  <% if user_signed_in? %>
+    <details class="cafe-dock__more">
+      <summary class="cafe-dock__link cafe-dock__summary">
+        <svg class="cafe-dock__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+        <span class="cafe-dock__label">More</span>
+      </summary>
+      <div class="cafe-dock__popup" role="group" aria-label="Account and management">
+        <%= link_to 'My account', account_path, 'aria-current': (@page == 'account' ? 'page' : nil) %>
+        <%= link_to 'Edit profile', edit_user_registration_path %>
+        <% if current_user&.admin? %>
+          <%= link_to 'Manage products', products_path %>
+          <%= link_to 'Manage categories', categories_path %>
+        <% end %>
+      </div>
+    </details>
+  <% end %>
+</nav>

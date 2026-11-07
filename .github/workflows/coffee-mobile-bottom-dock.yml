@@ -1,0 +1,76 @@
+name: Cafe mobile bottom dock (isolated checks)
+
+on:
+  push:
+    branches: [feature/cafe-mobile-bottom-dock-20261107]
+  pull_request:
+    branches: [feature/cafe-ui-account-fixed-backdrop-20261106]
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify accessible icon markup and responsive overrides
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          layout=Path('app/views/layouts/application.html.erb').read_text()
+          markup=Path('app/views/layouts/_mobile_dock.html.erb').read_text()
+          css=Path('app/assets/stylesheets/zzzzzzz_cafe_mobile_dock.scss').read_text()
+          assert layout.count("render 'layouts/mobile_dock'")==1
+          assert "render 'layouts/links'" in layout
+          assert markup.count('class="cafe-dock__icon"')==6
+          assert "user_signed_in?" in markup and "current_user&.admin?" in markup
+          assert 'aria-current' in markup and 'aria-label' in markup
+          assert 'position: fixed' in css and 'safe-area-inset-bottom' in css
+          assert '@media (max-width: 760px)' in css and '@media (min-width: 761px)' in css
+          assert not any(x in markup for x in ('<script', 'javascript:', 'User.create', 'Order.create'))
+          print('MOBILE DOCK STATIC PASS')
+          PY
+
+  rails:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ruby:2.5.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install legacy bundler
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Prepare disposable Linux lockfile and install gems
+        run: |
+          bundle _2.2.13_ lock --add-platform x86_64-linux
+          bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Prepare isolated CI schema and test-only Webpacker stub
+        run: |
+          bundle _2.2.13_ exec rails db:schema:load
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Test mobile bottom dock and existing shell regressions
+        run: |
+          bundle _2.2.13_ exec rails test \
+            test/integration/coffee_mobile_bottom_dock_test.rb \
+            test/integration/coffee_mobile_shell_test.rb \
+            test/integration/coffee_unified_shell_test.rb
