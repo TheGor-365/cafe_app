@@ -645,3 +645,53 @@ jobs:
               assert banned not in code,banned
           print('P1.4 REAL PACKS ONLY IN TEMP SOURCE / FIFTH SCRAM READONLY GET CONTRACT PASS')
           PY
+
+
+  fifth-real-webpacks-v2-mode-denials:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: V2 exact archive safety-gate classification, no direct DB access
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p14_fifth_real_webpacks_gate_v2_20261107.py
+          python3 -B scripts/cafe_p14_fifth_real_webpacks_gate_v2_20261107.py --help
+          python3 - <<'PY'
+          import hashlib,importlib.util,io,json,os,stat,tempfile,zipfile
+          from pathlib import Path
+          s=importlib.util.spec_from_file_location('gate_v2','scripts/cafe_p14_fifth_real_webpacks_gate_v2_20261107.py')
+          v=importlib.util.module_from_spec(s);s.loader.exec_module(v)
+          assert v.ZIP_SHA256=='95cc0c7985b4aba252470aff3493ee64664f371fa7eb9a8127cccd5e551405e3'
+          assert v.DB=='cafe_synthetic' and v.NETWORK=='cafe-upload-security-synthetic-net-20261105'
+          assert v.STUB_BLOB=='215312d18949745695b4fcc70d2485271386ea2f'
+          def fixture():
+            b=io.BytesIO()
+            with zipfile.ZipFile(b,'w',compression=zipfile.ZIP_DEFLATED) as z:
+              z.writestr('manifest.json',json.dumps({'application.js':'/packs-test/js/application-abcdef.js'}))
+              z.writestr('js/application-abcdef.js',b'function demo_test() {};\n'*80)
+            return b.getvalue()
+          data=fixture()
+          with tempfile.TemporaryDirectory(prefix='cafe-v2-modegate-ci-') as t:
+            path=Path(t)/'cafe-p14-fifth-real-packs-test.zip'
+            path.write_bytes(data);path.chmod(0o600)
+            old=v.ZIP_SHA256
+            v.ZIP_SHA256=hashlib.sha256(data).hexdigest()
+            assert v.read_archive(path)==data
+            path.chmod(0o660)
+            try:v.read_archive(path)
+            except RuntimeError as e:
+              assert 'group/other write permission present' in str(e)
+            else:raise AssertionError('group writable archive accepted')
+            path.chmod(0o600)
+            v.ZIP_SHA256=old
+            try:v.read_archive(path)
+            except RuntimeError as e:assert 'SHA256 mismatch' in str(e)
+            else:raise AssertionError('sha mismatch accepted')
+            try:v.read_archive(Path(t)/'missing.zip')
+            except RuntimeError as e:assert 'artifact path' in str(e) or 'missing' in str(e)
+            else:raise AssertionError('missing artifact accepted')
+          assert v.verify_entries(data)[2]=='/packs-test/js/application-abcdef.js'
+          print('P1.4 V2 MODE DENIAL SPECIFIC + SHA/ZIP IMMUTABLE PASS')
+          PY
