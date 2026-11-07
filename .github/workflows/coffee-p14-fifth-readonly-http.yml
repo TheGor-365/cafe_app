@@ -121,3 +121,111 @@ jobs:
           assert 'db:prepare' not in new.split('def probe():',1)[1].split('def main():',1)[0]
           print('P1.4 READONLY SOURCE/RUNTIME/NO OWNER TEST FIXTURE RESET PASS')
           PY
+
+
+  fifth-readonly-fault-diagnostic-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check reviewed Python and Ruby diagnostic syntax and immutable pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p14_fifth_http_fault_diagnostic_20261107.py
+          ruby -c qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb
+          python3 scripts/cafe_p14_fifth_http_fault_diagnostic_20261107.py --help | grep -F -- --diagnose
+          python3 - <<'PY'
+          from pathlib import Path
+          import importlib.util,subprocess
+          p=Path('scripts/cafe_p14_fifth_http_fault_diagnostic_20261107.py')
+          s=importlib.util.spec_from_file_location('cafe_p14_diag',p)
+          x=importlib.util.module_from_spec(s)
+          s.loader.exec_module(x)
+          assert x.P14_BLOB=='426414d64584231df380c9588c9e0b80e32589c7'
+          assert x.ORIG_RUBY_BLOB=='299de6d74f55fe04c222875ca424b6c2c7443b5f'
+          assert x.DIAG_RUBY_BLOB=='e7738e20f8d8656a685d0084f31f19a5e04bed64'
+          assert x.NETWORK=='cafe-upload-security-synthetic-net-20261105'
+          assert x.DB=='cafe_synthetic'
+          for file,sha in (('scripts/cafe_p14_fifth_http_readonly_20261107.py',x.P14_BLOB),
+                           ('qa/security/cafe_p14_fifth_http_readonly_20261107.rb',x.ORIG_RUBY_BLOB),
+                           ('qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb',x.DIAG_RUBY_BLOB)):
+            assert subprocess.check_output(['git','hash-object',file],text=True).strip()==sha
+          script=p.read_text()
+          assert 'p13.verify()' in script and script.count('p13.verify()')>=2
+          assert 'argv=p14.runner_command(schema,src,mounts,ip,cluster,secret)' in script
+          assert 'output_classification(process.stdout,process.returncode,process.stderr)' in script
+          assert "result.stderr.decode" not in script
+          assert 'print(process.stderr)' not in script and 'print(process.stdout)' not in script
+          print('P1.4 DIAG IMMUTABLE PINS / REDACTED OUTPUT / BEFORE-AFTER COUNTS PASS')
+          PY
+      - name: Validate Ruby is only scoped read-only SELECT / GET diagnostic
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb').read_text()
+          for expected in ('default_transaction_read_only','read_page','ActionDispatch::Integration::Session',):
+            if expected=='read_page': continue
+            assert expected in s,expected
+          assert "browser.get(path" in s
+          assert "session.get(path" in s
+          assert "'/users/sign_in'" in s and "'/users/sign_up'" in s
+          assert "'/account'" in s and "'/categories'" in s
+          assert "P1.4 GET DIAG FAILED_STAGE=" in s
+          assert "P1.4 GET DIAG ERROR_KIND=" in s
+          assert 'error.class.name' in s and 'kinds.fetch' in s
+          assert "response.body.include?" in s
+          for forbidden in ('browser.post(', 'browser.patch(', 'browser.delete(',
+                           'session.post(', 'session.patch(', 'session.delete(',
+                           'rails db:','rails test','CREATE TABLE','DROP TABLE',
+                           'User.create','Order.create','print(error.message)',
+                           'puts error.message','puts error.backtrace'):
+            assert forbidden not in s,forbidden
+          print('P1.4 DIAG HTTP GET ONLY / FIXED STAGES / NO RAW ERRORS PASS')
+          PY
+      - name: Prove no DB writers and safe classification on mocked runner
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_http_fault_diagnostic_20261107.py')
+          spec=importlib.util.spec_from_file_location('cafe_p14_diag',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          class FakeSchema:
+            pass
+          class FakeP14:
+            def runner_command(self,schema,src,mounts,ip,cluster,secret):
+              return ['docker','run','--rm','--pull=never','--read-only',
+               '--cap-drop=ALL','--security-opt=no-new-privileges',
+               '--network='+m.NETWORK,'--user=1000:1000',
+               '--env=RAILS_ENV=test',
+               '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public',
+               '--env=CAFE_P12_EXPECTED_CLUSTER_ID='+cluster,
+               '--entrypoint=sh','cafe-legacy-full:node14','-c',
+               'set -eu; password="$(cat /tmp/cafe_p12_secret)"; '
+               'export DATABASE_URL="postgresql://cafe_synth_app:$password@cafe-synthetic-postgres:5432/cafe_synthetic"; '
+               'unset password; '
+               'bundle exec rails runner qa/security/cafe_p14_fifth_http_readonly_20261107.rb']
+          args=m.command(FakeP14(),FakeSchema(),Path('/tmp/readonly-source'),[],
+                         '172.17.0.2','7532669441155230666',Path('/tmp/readonly-secret'))
+          assert '--network='+m.NETWORK in args and '--read-only' in args
+          assert '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public' in args
+          assert args[-1].endswith('cafe_p14_fifth_http_fault_diagnostic_20261107.rb')
+          for bad in ('db:schema:load','db:seed','db:migrate','db:drop','rails test'):
+            assert bad not in args[-1]
+          log=("P1.4 GET DIAG RUBY_ENTRY PASS\n"
+               "P1.4 GET DIAG APP ROLE / POSTGRES READ-ONLY / CATALOG PASS\n"
+               "P1.4 GET DIAG HTTP_STATUS=500\n"
+               "P1.4 GET DIAG FAILED_STAGE=get_home\n"
+               "P1.4 GET DIAG ERROR_KIND=VIEW_ERROR\n"
+               "P1.4 GET DIAG RESULT=BLOCKED; NO INTENDED DB WRITES\n"
+               "secret password=never-print\n")
+          assert m.output_classification(log.encode(),6,b'dsn=secret')==('BLOCKED','get_home','VIEW_ERROR','500')
+          assert m.output_classification(b'',1,b'Could not find rails gem')==('BLOCKED','BOOT','BOOT_DEPENDENCY',None)
+          assert m.output_classification(b'',1,b'private database://pass')==('BLOCKED','BOOT','RUBY_DID_NOT_START',None)
+          ok=b'P1.4 GET DIAG RUBY_ENTRY PASS\nP1.4 GET DIAG APP ROLE / POSTGRES READ-ONLY / CATALOG PASS\nP1.4 GET DIAG ALL HTTP ROUTES / COUNT ASSERTIONS PASS'
+          assert m.output_classification(ok,0,b'')==('PASSED','ALL_GETS_PASS','NONE',None)
+          print('P1.4 DIAG FIFTH-ONLY NO-WRITE RUNNER / PRIVATE FAILURE CODES PASS')
+          PY
