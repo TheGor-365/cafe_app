@@ -71,6 +71,28 @@ class CafeRc71PreviewOperatorTest(unittest.TestCase):
         self.assertNotIn("127.0.0.1:3003:3003", web)
         self.assertNotIn(preview.IMAGE, web)
 
+    def test_rails_pid_is_container_private_and_not_shared_with_owner_checkout(self):
+        web = preview.web_run_command("private-bundle", "node-volume", WEB_IMAGE_ID)
+        self.assertIn("--pid /tmp/cafe-rc71-server.pid", web[-1])
+        self.assertNotIn("/app/tmp/pids/server.pid", web[-1])
+        self.assertIn("--tmpfs", web)
+        self.assertIn("/tmp:rw,size=128m,mode=1777", web)
+
+    def test_readonly_post_e2e_verifier_accepts_recorded_orders(self):
+        with mock.patch.object(preview, "sql", side_effect=["0", "0"]) as sql:
+            self.assertEqual(preview.preview_order_count(), 0)
+            self.assertEqual(sql.call_count, 2)
+        with mock.patch.object(preview, "sql", side_effect=["8", "0"]) as sql:
+            self.assertEqual(preview.preview_order_count(), 8)
+            self.assertEqual(sql.call_count, 2)
+
+    def test_post_e2e_verifier_rejects_bad_count_and_unknown_statuses(self):
+        for results in (["not-a-count", "0"], ["2", "1"]):
+            with self.subTest(results=results):
+                with mock.patch.object(preview, "sql", side_effect=results):
+                    with self.assertRaises(preview.Stop):
+                        preview.preview_order_count()
+
     def test_stateless_proxy_is_only_loopback_publisher(self):
         proxy = preview.proxy_run_command(WEB_IMAGE_ID)
         self.assertIn("127.0.0.1:3003:3003", proxy)
