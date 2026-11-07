@@ -12,6 +12,10 @@ Rails.application.routes.draw do
   get 'menu',     to: 'menu#index'
   get 'search',   to: 'menu#search'
   get 'cart',     to: 'cart#show'
+  get 'demo_checkout', to: 'demo_orders#new', as: :demo_checkout
+  resources :demo_orders, only: %i[create show]
+  get 'admin/demo_orders', to: 'demo_orders#index', as: :admin_demo_orders
+  patch 'admin/demo_orders/:id/status', to: 'demo_orders#update', as: :admin_demo_order_status
   post 'cart/consolidate', to: 'cart#consolidate', as: :consolidate_cart
   
   get 'info',     to: 'pages#info'

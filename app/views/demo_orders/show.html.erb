@@ -1,0 +1,28 @@
+<% content_for :title, "Demo Order · Gor's Coffee" %>
+<main class="cafe-checkout" aria-labelledby="demo-order-title">
+  <header class="cafe-checkout__hero">
+    <p class="cafe-checkout__eyebrow">Not a live order · no payment</p>
+    <h1 id="demo-order-title">Demo order #<%= @order.id %></h1>
+    <p>Your fictional order is recorded for portfolio testing only. No food or drink is prepared.</p>
+  </header>
+  <p class="cafe-checkout__status">Status: <strong><%= @order.status.humanize %></strong></p>
+  <dl class="cafe-checkout__details">
+    <dt>Sample name</dt><dd><%= @order.pickup_name %></dd>
+    <dt>Sample pickup</dt><dd><%= @order.pickup_slot.to_s.humanize %></dd>
+    <% if @order.pickup_note.present? %><dt>Sample note</dt><dd><%= @order.pickup_note %></dd><% end %>
+  </dl>
+  <h2>Saved items</h2>
+  <ul class="cafe-checkout__items">
+    <% @items.each do |item| %>
+      <li>
+        <span><%= item.product.name %> × <%= item.quantity %>
+          <% if item.variant_label_snapshot.present? %> · <%= item.variant_label_snapshot %><% end %>
+          <% item.order_item_modifiers.each do |extra| %> · <%= extra.label_snapshot %><% end %>
+        </span>
+        <strong><%= number_to_currency(item.total) %></strong>
+      </li>
+    <% end %>
+  </ul>
+  <p class="cafe-checkout__total">Snapshot total <strong><%= number_to_currency(@order.total) %></strong></p>
+  <%= link_to 'Browse the menu', menu_path, class: 'cafe-checkout__submit' %>
+</main>

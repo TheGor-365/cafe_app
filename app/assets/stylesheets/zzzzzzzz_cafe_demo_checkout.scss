@@ -1,0 +1,52 @@
+/* Demo checkout and status UI. No remote dependencies, plain HTML forms. */
+html body .cafe-checkout,
+html body .cafe-checkout__history {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 1.15rem;
+  margin: .5rem auto 1rem;
+  background: #fffaf1;
+  color: #30251a;
+  border: 1px solid #ecd7bc;
+  border-radius: 14px;
+}
+html body .cafe-checkout__hero {
+  border-radius: 12px;
+  padding: 1.4rem;
+  color: #fff9e8;
+  background: linear-gradient(135deg,#3a2415,#754c2b);
+}
+html body .cafe-checkout__eyebrow {color:#ffdb9b; font-size:.76rem; text-transform:uppercase;letter-spacing:.1em;}
+html body .cafe-checkout__items {list-style:none;margin:.7rem 0 1.3rem;padding:0;}
+html body .cafe-checkout__items li {display:flex;gap:.75rem;align-items:baseline;justify-content:space-between;border-bottom:1px solid #e8d6c1;padding:.6rem .1rem;overflow-wrap:anywhere;}
+html body .cafe-checkout__items li span {min-width:0;flex:1;}
+html body .cafe-checkout__total {display:flex;justify-content:space-between;font-size:1.2rem;border-top:2px solid #b98b60;padding-top:.7rem;}
+html body .cafe-checkout__form {display:grid;grid-template-columns:1fr;gap:.55rem;max-width:650px;}
+html body .cafe-checkout__form label {font-weight:700;}
+html body .cafe-checkout__form input,
+html body .cafe-checkout__form select,
+html body .cafe-checkout__form textarea {box-sizing:border-box;display:block;width:100%;min-width:0;max-width:100%;min-height:44px;padding:.7rem;border:1px solid #b89773;border-radius:9px;background:white;color:#30251a;font:inherit;}
+html body .cafe-checkout__form :focus-visible,
+html body .cafe-checkout a:focus-visible,
+html body .cafe-checkout__small-action:focus-visible {outline:3px solid #bd803c;outline-offset:2px;}
+html body .cafe-checkout__submit,
+html body .cafe-checkout__small-action {display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;padding:.7rem 1rem;background:#69401d;color:#fff9eb;border:0;border-radius:8px;cursor:pointer;font-weight:700;text-decoration:none;}
+html body .cafe-checkout__small-action {margin:2px;padding:.5rem .6rem;min-width:80px;}
+html body .cafe-checkout__back {display:inline-block;margin-top:.8rem;color:#5c331c;}
+html body .cafe-checkout__status {padding:1rem;border:1px solid #d9b789;border-radius:10px;}
+html body .cafe-checkout__details {display:grid;grid-template-columns:minmax(100px,140px) minmax(0,1fr);gap:.4rem;padding:1rem;}
+html body .cafe-checkout__details dd {margin:0;overflow-wrap:anywhere;}
+html body .cafe-checkout__errors {border:2px solid #b54430;background:#fff0eb;padding:1rem;border-radius:10px;}
+html body .cafe-checkout__history {margin:1rem 0;}
+html body .cafe-checkout__note {font-size:.85rem;color:#6b5b4b;}
+@media (max-width:760px) {
+  html body .cafe-checkout,html body .cafe-checkout__history {padding:.8rem;margin:0 0 1rem;}
+  html body .cafe-checkout__hero {padding:1rem;}
+  html body .cafe-checkout__details {grid-template-columns:1fr;}
+  html body .cafe-admin__table-wrap {overflow-x:auto;}
+}
+@media (prefers-reduced-motion:reduce) {
+  html body .cafe-checkout__submit,html body .cafe-checkout__small-action {transition:none;}
+}

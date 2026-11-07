@@ -30,5 +30,20 @@
     </article>
   </section>
 
-  <p class="cafe-account__privacy">Account features are limited to Devise profile settings and the current demo session. There is no order history, payment method, loyalty balance or email verification workflow advertised.</p>
+
+  <section class="cafe-checkout__history" aria-labelledby="account-demo-orders">
+    <h2 id="account-demo-orders">Your demo orders</h2>
+    <% if @demo_orders.empty? %>
+      <p>No fictional orders submitted from this account yet.</p>
+    <% else %>
+      <ul class="cafe-checkout__items">
+        <% @demo_orders.each do |order| %>
+          <li><%= link_to "Demo order ##{order.id}", demo_order_path(order) %>
+            <span><%= order.status.humanize %> · <%= number_to_currency(order.total) %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+  <p class="cafe-account__privacy">Your cart is browser-session scoped. Demo orders submitted while signed in are visible to this account. No real purchases, payments, loyalty balance or delivery.</p>
 </main>

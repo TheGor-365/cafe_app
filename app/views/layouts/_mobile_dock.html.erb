@@ -38,6 +38,7 @@
         <% if current_user&.admin? %>
           <%= link_to 'Manage products', products_path %>
           <%= link_to 'Manage categories', categories_path %>
+          <%= link_to 'Demo orders', admin_demo_orders_path %>
         <% end %>
       </div>
     </details>
