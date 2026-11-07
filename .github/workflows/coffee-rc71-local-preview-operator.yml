@@ -1,0 +1,56 @@
+name: Cafe isolated RC71 preview operator script static safety
+
+on:
+  push:
+    branches: [feature/cafe-rc71-local-preview-20261108, feature/cafe-rc71-codex-handoff-20261108]
+  pull_request:
+    branches: [feature/cafe-admin-drink-options-20261107]
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python compile/help and pinned preview safety contract
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python3 -m py_compile scripts/cafe_rc71_isolated_preview_20261108.py
+          python3 scripts/cafe_rc71_isolated_preview_20261108.py --help
+          python3 -m unittest discover -s test/scripts -p '*_test.py'
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          path=Path('scripts/cafe_rc71_isolated_preview_20261108.py')
+          spec=importlib.util.spec_from_file_location('cafe_rc71', path)
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          assert m.EXPECTED_HEAD == '83d3346418fccc158bcc72d9c30fb17603b43d30'
+          assert m.PORT == 3003
+          assert m.WEB_LIVE == 'cafe-app-local-3001-web'
+          assert m.DB_LIVE == 'cafe-app-db'
+          assert 'cafe-rc71-' in m.NET and 'cafe-rc71-' in m.PG_VOLUME
+          assert 'cafe-rc71-' in m.ACCESS_NET and 'cafe-rc71-' in m.PROXY
+          assert 'cafe-rc71-' in m.BUNDLE_VOLUME
+          assert m.PRIVATE in m.WORK.parents
+          assert m.ADMIN_EMAIL.endswith('@example.test')
+          code=path.read_text()
+          for literal in ('--pid /tmp/cafe-rc71-server.pid', 'preview_order_count()',
+                          '--internal', '127.0.0.1:3003:3003', '--pull=never',
+                          'read-only', 'no-new-privileges', 'git_head(SOURCE)',
+                          'git_clean(SOURCE)', 'source_branch',
+                          'SOURCE_MOUNTPOINTS',
+                          'BUNDLE_LOCAL__DEVISE=/vendor/devise',
+                          'secrets.token_urlsafe(24)',
+                          'ports[0].get("HostIp") == "127.0.0.1"'):
+              assert literal in code, literal
+          for forbidden in ('docker rm ', 'docker stop ', 'db:drop',
+                            'db:reset', 'git reset --hard', 'git clean -fd',
+                            'systemctl restart', 'docker compose down'):
+              assert forbidden not in code, forbidden
+          print('CAFE RC71 SCRIPT STATIC ISOLATION PASS')
+          PY
