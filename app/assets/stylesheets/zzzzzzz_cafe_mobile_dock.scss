@@ -1,0 +1,166 @@
+/* Mobile icon dock, appended after existing responsive and top-lock styles.
+ * Keep desktop sidebar and all existing Rails actions/routes unchanged. */
+@media (min-width: 761px) {
+  html body nav.cafe-mobile-dock { display: none; }
+}
+@media (max-width: 760px) {
+  html body .page-container.row {
+    grid-template-areas: "account" "main";
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html body .page-container.row > nav.cafe-sidebar { display: none; }
+  html body .page-container.row > nav.cafe-account-widget {
+    position: relative;
+    top: auto;
+    z-index: 15;
+    justify-self: stretch;
+    max-width: none;
+  }
+  html body .page-container.row > .col-8#cafe-main-content > .cafe-brandbar.title-card {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  html body .cafe-page {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+  html body nav.cafe-mobile-dock {
+    display: flex;
+    box-sizing: border-box;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 50;
+    width: 100%;
+    height: calc(70px + env(safe-area-inset-bottom, 0px));
+    align-items: stretch;
+    justify-content: space-around;
+    gap: 2px;
+    margin: 0;
+    padding: 5px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: rgba(39, 27, 19, .97);
+    border-top: 1px solid rgba(237, 194, 137, .4);
+    box-shadow: 0 -6px 20px rgba(15, 9, 5, .32);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+  html body nav.cafe-mobile-dock > a.cafe-dock__link,
+  html body nav.cafe-mobile-dock > details.cafe-dock__more {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+  html body nav.cafe-mobile-dock .cafe-dock__link {
+    box-sizing: border-box;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 52px;
+    min-width: 0;
+    margin: 0;
+    padding: 5px 2px;
+    gap: 3px;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    color: #f7e8d3;
+    background: transparent;
+    font-family: inherit;
+    font-weight: 650;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  html body nav.cafe-mobile-dock .cafe-dock__icon {
+    display: block;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+  }
+  html body nav.cafe-mobile-dock .cafe-dock__label {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 10px;
+    line-height: 1.25;
+  }
+  html body nav.cafe-mobile-dock .cafe-dock__link[aria-current="page"],
+  html body nav.cafe-mobile-dock details.cafe-dock__more[open] > summary.cafe-dock__summary {
+    background: #f0c58f;
+    border-color: #e7b879;
+    color: #2c1c13;
+  }
+  html body nav.cafe-mobile-dock .cafe-dock__link:focus-visible,
+  html body nav.cafe-mobile-dock .cafe-dock__popup a:focus-visible {
+    outline: 3px solid #ffd994;
+    outline-offset: -3px;
+  }
+  html body nav.cafe-mobile-dock .cafe-dock__badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0;
+    left: calc(50% + 8px);
+    min-width: 17px;
+    height: 17px;
+    padding: 0 3px;
+    border-radius: 10px;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 800;
+    background: #e8a958;
+    color: #281810;
+    border: 1px solid #281810;
+  }
+  html body nav.cafe-mobile-dock > details.cafe-dock__more {
+    position: relative;
+    display: block;
+  }
+  html body nav.cafe-mobile-dock .cafe-dock__summary { list-style: none; }
+  html body nav.cafe-mobile-dock .cafe-dock__summary::-webkit-details-marker { display: none; }
+  html body nav.cafe-mobile-dock .cafe-dock__popup {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 12px);
+    width: 255px;
+    max-width: calc(100vw - 20px);
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 7px;
+    border: 1px solid #d9aa74;
+    border-radius: 12px;
+    background: #2d2018;
+    box-shadow: 0 8px 28px rgba(13, 8, 5, .48);
+  }
+  html body nav.cafe-mobile-dock .cafe-dock__popup a {
+    display: block;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 12px 10px;
+    border-radius: 7px;
+    font-size: 14px;
+    font-weight: 650;
+    color: #f7e8d3;
+    text-decoration: none;
+  }
+  html body nav.cafe-mobile-dock .cafe-dock__popup a[aria-current="page"],
+  html body nav.cafe-mobile-dock .cafe-dock__popup a:hover {
+    color: #281810;
+    background: #f0c58f;
+  }
+}
+@media (max-width: 360px) {
+  html body nav.cafe-mobile-dock { gap: 0; padding-left: 4px; padding-right: 4px; }
+  html body nav.cafe-mobile-dock .cafe-dock__label { font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html body nav.cafe-mobile-dock,
+  html body nav.cafe-mobile-dock .cafe-dock__link { transition: none; }
+}
