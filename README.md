@@ -2,6 +2,19 @@
 
 [Русский](#русский) · [English](#english)
 
+## Current development checkpoint — 7 Nov 2026 (Draft; not deployed)
+
+**Active candidate:** [PR #71 — admin drink options](https://github.com/TheGor-365/cafe_app/pull/71), stacked on [PR #70 — demo checkout and order lifecycle](https://github.com/TheGor-365/cafe_app/pull/70) and [PR #69 — mobile bottom dock](https://github.com/TheGor-365/cafe_app/pull/69). This branch is **not merged into master**, and this code is **not** running on the owner's existing localhost:3001.
+
+- Functional candidate code: sample menu, drink sizes and add-ons, server-validated cart and price snapshots, mobile icon navigation, Devise account, **fictional checkout**, session/user-scoped receipt and demo order history, admin-only order statuses, nested admin CRUD for sizes and extras.
+- Verified isolated GitHub Actions for PR #71 commit `d4d8388fac18eec022fb90dddcb3bbfd0d039016`: [push](https://github.com/TheGor-365/cafe_app/actions/runs/42412310443) and [pull request](https://github.com/TheGor-365/cafe_app/actions/runs/42412334965) **SUCCESS**. Full Rails suite: **158 runs, 1328 assertions, zero failures/errors**. Isolated test DB only; not an owner's local database acceptance.
+- Owner localhost:3001 screenshots confirm existing Home/Info/Sign in/account layout and bottom nav from PR #69 in Chrome; the *new PR #70/71 checkout/admin code* has **not** been installed or browser-tested there. A signed-in user named Jack is observed, but their `admin` role is not verified.
+- Deployment gates still OPEN: safe isolated preview and legacy data migration tests, full browser/JS/CSS/CSRF and media QA, owner backup/rollback, Railway project, paid-resource approval, public HTTPS and portfolio evidence. Ruby 2.5 and Rails 6.0 are EOL — **do not expose this candidate as an unrestricted public service without a supported-stack/security plan**.
+- No real café, payments, production orders, delivery, customer contact collection or order fulfilment. Only fictional sample names/notes should be entered.
+
+**RU:** Новая цепочка Draft PR реализует демонстрационное оформление заказа и административное управление вариантами напитков. Автотесты зелёные; перенос в локальный Docker, браузерный E2E и публичное развёртывание пока **не выполнены**. Старые описания ниже — исторические этапы, не актуальный статус релиза.
+
+
 > **Portfolio demonstration only.** This is not an operating coffee shop. Prices and products are sample data. The app does **not** accept payments, process real orders, guarantee fulfilment or represent actual customers.
 
 ## Русский

@@ -1,0 +1,17 @@
+<%= form_with model: [@product, @option], local: true, html: { class: 'cafe-admin__form' } do |form| %>
+  <% if @option.errors.any? %>
+    <div class="cafe-admin__alert" role="alert"><h2>Check the demo add-on</h2>
+      <ul><% @option.errors.full_messages.each do |error| %><li><%= error %></li><% end %></ul></div>
+  <% end %>
+  <div class="cafe-admin__field"><%= form.label :group_code, 'Type of add-on' %>
+    <%= form.select :group_code, ProductModifierOption::GROUPS.map { |code| [code.humanize, code] },
+          { prompt: 'Select type' }, { required: true, class: 'form-control' } %></div>
+  <div class="cafe-admin__field"><%= form.label :code, 'Internal code' %>
+    <%= form.text_field :code, required: true, maxlength: 40, class: 'form-control' %></div>
+  <div class="cafe-admin__field"><%= form.label :label, 'Customer-facing label' %>
+    <%= form.text_field :label, required: true, maxlength: 100, class: 'form-control' %></div>
+  <div class="cafe-admin__field"><%= form.label :price_cents, 'Additional demo price in cents' %>
+    <%= form.number_field :price_cents, min: 0, step: 1, required: true, class: 'form-control' %></div>
+  <div class="cafe-admin__checkbox-group"><label><%= form.check_box :available %> Available in demo menu</label></div>
+  <%= form.submit class: 'cafe-admin__button' %>
+<% end %>

@@ -1,0 +1,8 @@
+<% content_for :title, "New Add-on · Gor's Coffee" %>
+<main class="cafe-admin cafe-admin--form" aria-labelledby="extra-form-title">
+  <header class="cafe-admin__hero"><h1 id="extra-form-title">New add-on · <%= @product.name %></h1></header>
+  <div class="cafe-admin__panel cafe-admin__form-panel">
+    <%= render 'form' %>
+    <%= link_to 'Back to extras', product_product_modifier_options_path(@product) %>
+  </div>
+</main>

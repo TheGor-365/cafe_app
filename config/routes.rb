@@ -6,7 +6,10 @@ Rails.application.routes.draw do
   root to: 'pages#home'
 
   resources :categories
-  resources :products
+  resources :products do
+    resources :product_variants, except: %i[show]
+    resources :product_modifier_options, except: %i[show]
+  end
   resources :order_items
 
   get 'menu',     to: 'menu#index'

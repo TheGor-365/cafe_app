@@ -1,0 +1,76 @@
+name: Cafe admin drink size and add-on CRUD (isolated)
+
+on:
+  push:
+    branches: [feature/cafe-admin-drink-options-20261107]
+  pull_request:
+    branches: [feature/cafe-demo-order-lifecycle-20261107]
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect protected admin controllers and Ruby syntax
+        run: |
+          ruby -c app/controllers/product_variants_controller.rb
+          ruby -c app/controllers/product_modifier_options_controller.rb
+          ruby -c test/integration/coffee_admin_drink_options_test.rb
+          ruby -c config/routes.rb
+          python3 - <<'PY'
+          from pathlib import Path
+          for p in ('app/controllers/product_variants_controller.rb',
+                    'app/controllers/product_modifier_options_controller.rb'):
+              source=Path(p).read_text()
+              assert 'authenticate_user!' in source and 'require_admin!' in source
+              assert '.find(params[:id])' in source
+              assert 'params.require(' in source and '.permit(' in source
+              assert 'where(' not in source
+          print('ADMIN DRINK OPTIONS STATIC ACL / ROUTES PASS')
+          PY
+
+  rails:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ruby:2.5.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install legacy Bundler and dependencies
+        run: |
+          gem install bundler -v 2.2.13 --no-document
+          bundle _2.2.13_ lock --add-platform x86_64-linux
+          bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Prepare isolated Github CI database and test-only packs
+        run: |
+          bundle _2.2.13_ exec rails db:schema:load
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Run admin size/add-on CRUD and cart snapshot safety
+        run: |
+          bundle _2.2.13_ exec rails test \
+            test/integration/coffee_admin_drink_options_test.rb \
+            test/integration/coffee_demo_checkout_test.rb
+      - name: Run complete Rails regression baseline
+        run: bundle _2.2.13_ exec rails test
