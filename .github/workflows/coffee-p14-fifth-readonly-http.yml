@@ -1,0 +1,697 @@
+name: Cafe P1.4 fifth SCRAM read-only Rack HTTP boundary
+
+on:
+  push:
+    branches: [feature/cafe-p14-fifth-http-readonly-20261107]
+  pull_request:
+    branches: [feature/cafe-p13-fifth-synthetic-fixtures-20261107]
+
+permissions:
+  contents: read
+
+jobs:
+  fifth-readonly-http-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check fourth stage and owner-only entrypoint
+        run: |
+          python3 -B -m py_compile scripts/cafe_p14_fifth_http_readonly_20261107.py
+          ruby -c qa/security/cafe_p14_fifth_http_readonly_20261107.rb
+          python3 -B scripts/cafe_p14_fifth_http_readonly_20261107.py --help
+      - name: Pin existing fixture import and strict no-DML guest GET/ACL scope
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import subprocess
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_http_readonly_20261107.py')
+          g=Path('qa/security/cafe_p14_fifth_http_readonly_20261107.rb')
+          spec=importlib.util.spec_from_file_location('cafe_p14_static',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          assert m.PG=='cafe-upload-security-synthetic-pg-20261105'
+          assert m.NET=='cafe-upload-security-synthetic-net-20261105'
+          assert m.DB=='cafe_synthetic'
+          assert m.P13_BLOB=='8dbf42b86a4c617fb69c986e9103fce631d3a49e'
+          assert m.RUBY_BLOB=='299de6d74f55fe04c222875ca424b6c2c7443b5f'
+          assert subprocess.check_output(['git','hash-object','scripts/cafe_p13_fifth_catalog_20261107.py'],text=True).strip()==m.P13_BLOB
+          assert subprocess.check_output(['git','hash-object',str(g)],text=True).strip()==m.RUBY_BLOB
+          x=g.read_text()
+          for route in ('/menu','/cart','/info','/catering','/users/sign_in',
+                        '/users/sign_up','/users/password/new','/account',
+                        '/products','/categories'):
+              assert route in x,route
+          assert "ActionDispatch::Integration::Session.new(Rails.application)" in x
+          assert "default_transaction_read_only" in x
+          assert "server['readonly'] == 'on'" in x
+          assert "cafe_synth_app" in x and "PG16" in x
+          assert "www.example.com" in x
+          for forbidden in ('.post(','.patch(','.delete(','.put(',
+                            'bundle exec rails test','db:schema:load','db:prepare','db:drop',
+                            'User.create!','Order.create!','ActiveRecord::FixtureSet',
+                            'file_upload','system('):
+              assert forbidden not in x,forbidden
+          print('P1.4 TEST READ-ONLY APP SCRAM ROLE / ONLY RACK GET / PINNED CATALOG PASS')
+          PY
+      - name: Mock no-ports disposable Docker app SCRAM runner
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_http_readonly_20261107.py')
+          spec=importlib.util.spec_from_file_location('cafe_p14_argv_ci',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          class MockSchema:
+              NETWORK=m.NET
+              SECRET=Path('/tmp/fake_superuser_pass')
+              def docker_writer(self,source,mounts,ip,ident):
+                  return ['docker','run','--rm','--pull=never','--read-only',
+                   '--cap-drop=ALL','--security-opt=no-new-privileges',
+                   '--user=1000:1000','--network='+m.NET,
+                   '--env=RAILS_ENV=test','--env=CAFE_P12_TARGET=cafe_synthetic',
+                   '--env=CAFE_P12_EXPECTED_CLUSTER_ID='+ident,
+                   '--env=PGOPTIONS=-c role=cafe_synth_owner -c search_path=public',
+                   '--mount=type=bind,source=/tmp/fake_superuser_pass,target=/tmp/cafe_p12_secret,readonly',
+                   '--entrypoint=sh','cafe-legacy-full:node14','-c',
+                   'set -eu; password="$(cat /tmp/cafe_p12_secret)"; '
+                   'export DATABASE_URL="postgresql://postgres:$password@cafe-synthetic-postgres:5432/cafe_synthetic"; '
+                   'unset password; '
+                   'bundle exec ruby qa/security/cafe_fifth_schema_cluster_guard_20261107.rb pre; '
+                   'bundle exec rails db:schema:load; '
+                   'bundle exec ruby qa/security/cafe_fifth_schema_cluster_guard_20261107.rb post']
+          app=Path('/tmp/fake_app_password')
+          argv=m.runner_command(MockSchema(),Path('/tmp/fake-src'),[],'172.18.0.2','7532669441155230666',app)
+          assert argv[:3]==['docker','run','--rm']
+          assert '--network='+m.NET in argv and '--read-only' in argv
+          assert '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public' in argv
+          assert '--env=PGOPTIONS=-c role=cafe_synth_owner -c search_path=public' not in argv
+          assert '--mount=type=bind,source=/tmp/fake_app_password,target=/tmp/cafe_p12_secret,readonly' in argv
+          assert '--mount=type=bind,source=/tmp/fake_superuser_pass,target=/tmp/cafe_p12_secret,readonly' not in argv
+          assert 'postgresql://cafe_synth_app:$password@cafe-synthetic-postgres:5432/cafe_synthetic' in argv[-1]
+          assert argv[-1].endswith('rails runner qa/security/cafe_p14_fifth_http_readonly_20261107.rb')
+          for forbidden in ('db:schema:load','db:seed','db:drop','rails test','db:prepare'):
+              assert forbidden not in argv[-1],forbidden
+          print('P1.4 NO HOST PORT / NO PRIVILEGED MOUNT / READONLY SQL RUNNER PASS')
+          PY
+
+  dependency-and-test-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure existing test harness is NOT invoked on owner fifth
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          legacy=Path('test/test_helper.rb').read_text()
+          new=Path('scripts/cafe_p14_fifth_http_readonly_20261107.py').read_text()
+          assert 'fixtures :all' in legacy
+          assert 'schema.build_source(probe,stage)' in new
+          assert 'p13.verify()' in new
+          assert 'schema.runtime()' in new
+          assert 'schema.target()' in new
+          assert "parser.add_argument(\"--probe\",action=\"store_true\",required=True)" in new
+          assert 'open(\"xb\")' in new
+          assert 'RUBY.read_bytes()' in new
+          assert 'docker stop' not in new and 'docker rm ' not in new
+          assert 'db:prepare' not in new.split('def probe():',1)[1].split('def main():',1)[0]
+          print('P1.4 READONLY SOURCE/RUNTIME/NO OWNER TEST FIXTURE RESET PASS')
+          PY
+
+
+  fifth-readonly-fault-diagnostic-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check reviewed Python and Ruby diagnostic syntax and immutable pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p14_fifth_http_fault_diagnostic_20261107.py
+          ruby -c qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb
+          python3 scripts/cafe_p14_fifth_http_fault_diagnostic_20261107.py --help | grep -F -- --diagnose
+          python3 - <<'PY'
+          from pathlib import Path
+          import importlib.util,subprocess
+          p=Path('scripts/cafe_p14_fifth_http_fault_diagnostic_20261107.py')
+          s=importlib.util.spec_from_file_location('cafe_p14_diag',p)
+          x=importlib.util.module_from_spec(s)
+          s.loader.exec_module(x)
+          assert x.P14_BLOB=='426414d64584231df380c9588c9e0b80e32589c7'
+          assert x.ORIG_RUBY_BLOB=='299de6d74f55fe04c222875ca424b6c2c7443b5f'
+          assert x.DIAG_RUBY_BLOB=='e7738e20f8d8656a685d0084f31f19a5e04bed64'
+          assert x.NETWORK=='cafe-upload-security-synthetic-net-20261105'
+          assert x.DB=='cafe_synthetic'
+          for file,sha in (('scripts/cafe_p14_fifth_http_readonly_20261107.py',x.P14_BLOB),
+                           ('qa/security/cafe_p14_fifth_http_readonly_20261107.rb',x.ORIG_RUBY_BLOB),
+                           ('qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb',x.DIAG_RUBY_BLOB)):
+            assert subprocess.check_output(['git','hash-object',file],text=True).strip()==sha
+          script=p.read_text()
+          assert 'p13.verify()' in script and script.count('p13.verify()')>=2
+          assert 'argv=p14.runner_command(schema,src,mounts,ip,cluster,secret)' in script
+          assert 'output_classification(process.stdout,process.returncode,process.stderr)' in script
+          assert "result.stderr.decode" not in script
+          assert 'print(process.stderr)' not in script and 'print(process.stdout)' not in script
+          print('P1.4 DIAG IMMUTABLE PINS / REDACTED OUTPUT / BEFORE-AFTER COUNTS PASS')
+          PY
+      - name: Validate Ruby is only scoped read-only SELECT / GET diagnostic
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb').read_text()
+          for expected in ('default_transaction_read_only','read_page','ActionDispatch::Integration::Session',):
+            if expected=='read_page': continue
+            assert expected in s,expected
+          assert "browser.get(path" in s
+          assert "session.get(path" in s
+          assert "'/users/sign_in'" in s and "'/users/sign_up'" in s
+          assert "'/account'" in s and "'/categories'" in s
+          assert "P1.4 GET DIAG FAILED_STAGE=" in s
+          assert "P1.4 GET DIAG ERROR_KIND=" in s
+          assert 'error.class.name' in s and 'kinds.fetch' in s
+          assert "response.body.include?" in s
+          for forbidden in ('browser.post(', 'browser.patch(', 'browser.delete(',
+                           'session.post(', 'session.patch(', 'session.delete(',
+                           'rails db:','rails test','CREATE TABLE','DROP TABLE',
+                           'User.create','Order.create','print(error.message)',
+                           'puts error.message','puts error.backtrace'):
+            assert forbidden not in s,forbidden
+          print('P1.4 DIAG HTTP GET ONLY / FIXED STAGES / NO RAW ERRORS PASS')
+          PY
+      - name: Prove no DB writers and safe classification on mocked runner
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_http_fault_diagnostic_20261107.py')
+          spec=importlib.util.spec_from_file_location('cafe_p14_diag',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          class FakeSchema:
+            pass
+          class FakeP14:
+            def runner_command(self,schema,src,mounts,ip,cluster,secret):
+              return ['docker','run','--rm','--pull=never','--read-only',
+               '--cap-drop=ALL','--security-opt=no-new-privileges',
+               '--network='+m.NETWORK,'--user=1000:1000',
+               '--env=RAILS_ENV=test',
+               '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public',
+               '--env=CAFE_P12_EXPECTED_CLUSTER_ID='+cluster,
+               '--entrypoint=sh','cafe-legacy-full:node14','-c',
+               'set -eu; password="$(cat /tmp/cafe_p12_secret)"; '
+               'export DATABASE_URL="postgresql://cafe_synth_app:$password@cafe-synthetic-postgres:5432/cafe_synthetic"; '
+               'unset password; '
+               'bundle exec rails runner qa/security/cafe_p14_fifth_http_readonly_20261107.rb']
+          args=m.command(FakeP14(),FakeSchema(),Path('/tmp/readonly-source'),[],
+                         '172.17.0.2','7532669441155230666',Path('/tmp/readonly-secret'))
+          assert '--network='+m.NETWORK in args and '--read-only' in args
+          assert '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public' in args
+          assert args[-1].endswith('cafe_p14_fifth_http_fault_diagnostic_20261107.rb')
+          for bad in ('db:schema:load','db:seed','db:migrate','db:drop','rails test'):
+            assert bad not in args[-1]
+          log=("P1.4 GET DIAG RUBY_ENTRY PASS\n"
+               "P1.4 GET DIAG APP ROLE / POSTGRES READ-ONLY / CATALOG PASS\n"
+               "P1.4 GET DIAG HTTP_STATUS=500\n"
+               "P1.4 GET DIAG FAILED_STAGE=get_home\n"
+               "P1.4 GET DIAG ERROR_KIND=VIEW_ERROR\n"
+               "P1.4 GET DIAG RESULT=BLOCKED; NO INTENDED DB WRITES\n"
+               "secret password=never-print\n")
+          assert m.output_classification(log.encode(),6,b'dsn=secret')==('BLOCKED','get_home','VIEW_ERROR','500')
+          assert m.output_classification(b'',1,b'Could not find rails gem')==('BLOCKED','BOOT','BOOT_DEPENDENCY',None)
+          assert m.output_classification(b'',1,b'private database://pass')==('BLOCKED','BOOT','RUBY_DID_NOT_START',None)
+          ok=b'P1.4 GET DIAG RUBY_ENTRY PASS\nP1.4 GET DIAG APP ROLE / POSTGRES READ-ONLY / CATALOG PASS\nP1.4 GET DIAG ALL HTTP ROUTES / COUNT ASSERTIONS PASS'
+          assert m.output_classification(ok,0,b'')==('PASSED','ALL_GETS_PASS','NONE',None)
+          print('P1.4 DIAG FIFTH-ONLY NO-WRITE RUNNER / PRIVATE FAILURE CODES PASS')
+          PY
+
+
+  fifth-only-view-cause-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check view-cause classifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p14_fifth_view_error_cause_20261107.py
+          ruby -c qa/security/cafe_p14_fifth_view_error_cause_20261107.rb
+          python3 scripts/cafe_p14_fifth_view_error_cause_20261107.py --help | grep -F -- --classify-view
+      - name: Review original immutable dependency chain and fixed cause categories
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import subprocess
+          from pathlib import Path
+          file=Path('scripts/cafe_p14_fifth_view_error_cause_20261107.py')
+          spec=importlib.util.spec_from_file_location('cafe_p14_view_ci',file)
+          mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+          originals=[
+            ('scripts/cafe_p14_fifth_http_fault_diagnostic_20261107.py',mod.OLD_DIAG_BLOB),
+            ('qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb',mod.OLD_RUBY_BLOB),
+            ('qa/security/cafe_p14_fifth_view_error_cause_20261107.rb',mod.VIEW_RUBY_BLOB),
+          ]
+          for path,sha in originals:
+            observed=subprocess.check_output(['git','hash-object',path],text=True).strip()
+            assert observed==sha,(path,sha,observed)
+          assert mod.DB=='cafe_synthetic' and mod.NETWORK=='cafe-upload-security-synthetic-net-20261105'
+          assert {'WEBPACKER_MANIFEST_ENTRY','SPROCKETS_ASSET_NOT_FOUND','SASS_COMPILATION','OTHER_VIEW_ERROR'} <= mod.CAUSES
+          assert mod.classify(b'P1.4 VIEW DIAG ROOT_CAUSE=WEBPACKER_MANIFEST_ENTRY\n'
+                              b'P1.4 VIEW DIAG PACK_MANIFEST=MISSING\n'
+                              b'P1.4 VIEW DIAG PUBLIC_PACKS=MISSING\n'
+                              b'P1.4 VIEW DIAG NODE_MODULES=MISSING\n'
+                              b'private password should never show') == {
+                                 'ROOT_CAUSE':'WEBPACKER_MANIFEST_ENTRY',
+                                 'PACK_MANIFEST':'MISSING',
+                                 'PUBLIC_PACKS':'MISSING',
+                                 'NODE_MODULES':'MISSING'
+                              }
+          assert mod.classify(b'P1.4 VIEW DIAG ROOT_CAUSE=untrusted-secret')[
+            'ROOT_CAUSE']=='UNAVAILABLE'
+          print('P1.4 VERIFIED ORIGINAL GIT BLOBS / FIXED REDACTED CATEGORIES PASS')
+          PY
+      - name: Forbid owner PostgreSQL writes, direct app stdout and non-GET Rails requests
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          py=Path('scripts/cafe_p14_fifth_view_error_cause_20261107.py').read_text()
+          rb=Path('qa/security/cafe_p14_fifth_view_error_cause_20261107.rb').read_text()
+          assert py.count('p13.verify()')>=2
+          assert 'argv=old.command(p14,schema,source,mounts,ip,cluster,app_file)' in py
+          assert "old.output_classification(" in py
+          assert "process.stderr" in py
+          assert "print(process.stderr)" not in py
+          assert "print(process.stdout)" not in py
+          assert "print(str(exc))" not in py
+          assert "default_transaction_read_only=on" in py
+          assert "causes = []" in rb
+          assert "inspected.cause" in rb
+          assert "P1.4 VIEW DIAG ROOT_CAUSE=" in rb
+          assert "P1.4 VIEW DIAG PACK_MANIFEST=" in rb
+          assert "P1.4 VIEW DIAG NODE_MODULES=" in rb
+          assert 'browser.get(path' in rb and 'session.get(path' in rb
+          for bad in ('browser.post(', 'session.post(', 'browser.patch(', 'session.patch(',
+                      'browser.delete(', 'session.delete(', 'User.create(', 'Order.create(',
+                      'puts error.message','puts error.backtrace','print(error.message)',
+                      'db:schema:load','db:seed','db:prepare'):
+            assert bad not in rb,bad
+          print('P1.4 NO DB WRITE / REAL GET-ONLY / NO RAW ERRORS PASS')
+          PY
+      - name: Mock substitution of reviewed disposable fifth-only runner
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import importlib.util
+          p=Path('scripts/cafe_p14_fifth_view_error_cause_20261107.py')
+          s=importlib.util.spec_from_file_location('cafe_p14_view_ci',p)
+          m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+          class MockOld:
+            def command(self,p14,schema,src,mounts,ip,cluster,secret):
+              return ['docker','run','--rm','--pull=never','--read-only',
+                      '--cap-drop=ALL','--security-opt=no-new-privileges',
+                      '--network='+m.NETWORK,'--user=1000:1000',
+                      '--env=RAILS_ENV=test',
+                      '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public',
+                      '--env=CAFE_P12_EXPECTED_CLUSTER_ID='+cluster,
+                      '--entrypoint=sh','cafe-legacy-full:node14','-c',
+                      'set -eu; bundle exec rails runner qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb']
+          args=MockOld().command(None,None,None,None,None,'7532669441155230666',None)
+          old='bundle exec rails runner qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb'
+          new='bundle exec rails runner qa/security/cafe_p14_fifth_view_error_cause_20261107.rb'
+          assert args[-1].count(old)==1 and args[-1].endswith(old)
+          args[-1]=args[-1].replace(old,new)
+          for flag in ('--rm','--read-only','--cap-drop=ALL','--network='+m.NETWORK,
+                       '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public'):
+            assert flag in args
+          assert args[-1].endswith('cafe_p14_fifth_view_error_cause_20261107.rb')
+          for command in ('db:schema:load','rails test','db:seed','db:prepare'):
+            assert command not in args[-1]
+          print('P1.4 IMMUTABLE READ-ONLY V2 DIAG RUNNER MOCK PASS')
+          PY
+
+
+  fifth-html-stub-server-only-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check immutable fifth-only HTML SSR smoke helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p14_fifth_html_stub_assets_20261107.py
+          python3 -B scripts/cafe_p14_fifth_html_stub_assets_20261107.py --help | grep -F -- '--check-html'
+      - name: Verify exact canonical Webpacker config and previous SHA source
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util,subprocess
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_html_stub_assets_20261107.py')
+          sp=importlib.util.spec_from_file_location('p14_ssr_ci',p)
+          mod=importlib.util.module_from_spec(sp);sp.loader.exec_module(mod)
+          assert mod.DB=='cafe_synthetic' and mod.NET=='cafe-upload-security-synthetic-net-20261105'
+          assert mod.SOURCE=='090b9d37419fcd9f393d8b686ac0f4563ef7b613'
+          assert mod.VIEW_PY_BLOB=='d0c3544f8eacc7c4940bc5c2d1fdcd0a7621b349'
+          assert mod.WEBPACKER_YML_BLOB=='83615b0f9ac0ca5508548621150789c7dad71071'
+          for path,sha in [('scripts/cafe_p14_fifth_view_error_cause_20261107.py',mod.VIEW_PY_BLOB),
+                           ('config/webpacker.yml',mod.WEBPACKER_YML_BLOB)]:
+            assert subprocess.check_output(['git','hash-object',path],text=True).strip()==sha
+          assert mod.YML_BEFORE in Path('config/webpacker.yml').read_text()
+          assert mod.YML_AFTER not in Path('config/webpacker.yml').read_text()
+          assert mod.EXPECTED_MANIFEST=={
+            'application.js':'/packs-test/js/application-p14-placeholder-get-only.js'
+          }
+          assert 'NON-FUNCTIONAL frontend' in mod.JS_STUB.decode()
+          assert 'P1.4 REAL WEBPACK JS/CSS / BROWSER INTERACTION NOT TESTED' in p.read_text()
+          print('P1.4 SOURCE IMMUTABLE WEBPACKER 4.3 / NONFUNCTIONAL PACK LABEL PASS')
+          PY
+      - name: Simulate test-only config and placeholder manifest in isolated directory
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import tempfile,importlib.util,subprocess
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_html_stub_assets_20261107.py')
+          spec=importlib.util.spec_from_file_location('p14_ssr_ci',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          class FakeSchema:
+              SOURCE=m.SOURCE
+              DB=m.DB
+              def git(self,command,*args):
+                  assert command in ('hash-object','rev-parse')
+                  if command=='rev-parse':
+                      assert args==(m.SOURCE+':config/webpacker.yml',)
+                      return m.WEBPACKER_YML_BLOB
+                  if command=='hash-object':
+                      return subprocess.check_output(['git','hash-object',*args],text=True).strip()
+          original=Path('config/webpacker.yml').read_bytes()
+          with tempfile.TemporaryDirectory(prefix='p14-ci-ssr-stub-') as t:
+              path=Path(t)
+              config=path/'config/webpacker.yml'
+              config.parent.mkdir()
+              config.write_bytes(original)
+              (path/'public').mkdir()
+              m.install_stub(FakeSchema(),path)
+              updated=config.read_text()
+              assert original.decode().replace(m.YML_BEFORE,m.YML_AFTER)==updated
+              manifest=path/'public/packs-test/manifest.json'
+              js=path/'public/packs-test/js'/m.STUB_NAME
+              assert manifest.is_file() and js.read_bytes()==m.JS_STUB
+              assert m.STUB_NAME in manifest.read_text()
+              assert not (path/'node_modules').exists()
+          assert Path('config/webpacker.yml').read_bytes()==original
+          print('P1.4 DISPOSABLE TEMP SOURCE ONLY / NO REAL NODEJS OR JS E2E PASS')
+          PY
+      - name: Mock fifth Docker read-only command and block schema/seed writers
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          p=Path('scripts/cafe_p14_fifth_html_stub_assets_20261107.py')
+          spec=importlib.util.spec_from_file_location('p14_ssr_ci',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          class FakeOld:
+              def command(self,p14,schema,src,mounts,ip,cluster,secret):
+                  return ['docker','run','--rm','--read-only','--cap-drop=ALL',
+                      '--security-opt=no-new-privileges','--network='+m.NET,
+                      '--user=1000:1000','--env=RAILS_ENV=test',
+                      '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public',
+                      '--env=CAFE_P12_EXPECTED_CLUSTER_ID='+cluster,
+                      'cafe-legacy-full:node14','-c',
+                      'set -eu; bundle exec rails runner qa/security/cafe_p14_fifth_http_fault_diagnostic_20261107.rb']
+          command=m.make_command(None,FakeOld(),None,None,Path('/tmp/a'),[],
+                                  '172.30.1.2','7532669441155230666',Path('/tmp/secret'))
+          assert command[-1].endswith('cafe_p14_fifth_view_error_cause_20261107.rb')
+          assert '--network='+m.NET in command and '--read-only' in command
+          assert '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public' in command
+          for blocked in ('db:schema:load','db:seed','db:prepare','rails test',
+                          'db:drop','db:migrate'):
+              assert blocked not in command[-1]
+          source=p.read_text()
+          assert source.count('p13.verify()')>=2
+          assert 'schema.build_source(runtime,stage)' in source
+          assert 'tempfile.TemporaryDirectory' in source
+          assert 'P1.4 SERVER-RENDERED HTML ROUTES/ACL PASS — STUB FRONTEND ASSETS' in source
+          assert 'with dest.open("xb")' in source
+          assert 'print(str(exc))' not in source and 'print(done.stderr)' not in source
+          print('P1.4 FIFTH APP-ROLE READONLY RACK SSR / NO WRITES OR RAW LOGS PASS')
+          PY
+
+
+  fifth-real-webpack-test-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    container:
+      image: node:14.21.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert pinned immutable legacy frontend source and test-only boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object package.json)" = "03be1481f494a833cfbfef611805d9cc2450889e"
+          test "$(git hash-object yarn.lock)" = "905bfa7861c1110fac7efb0815cbec55dfd6937e"
+          test "$(git hash-object config/webpacker.yml)" = "83615b0f9ac0ca5508548621150789c7dad71071"
+          test "$(git hash-object config/webpack/test.js)" = "c5edff94ad2d18655b31731c9ea7a767f5ba0712"
+          test "$(git hash-object app/javascript/packs/application.js)" = "86fd3f0a2233fd082b31386feea3d34ecb77e479"
+          node --version | grep -E '^v14\.21\.3$'
+          test ! -d public/packs-test
+          test ! -f public/packs-test/manifest.json
+          echo 'P1.4 FROZEN NODE14 YARN/WEBPACK CONFIG AND NO PRIOR PACKS PASS'
+      - name: Install exactly locked JS dependencies in CI checkout ONLY
+        run: yarn install --frozen-lockfile --non-interactive
+      - name: Run existing original JavaScript behavior tests without owner PG
+        shell: bash
+        run: |
+          set -euo pipefail
+          node test/javascript/coffee_price_preview.test.js
+          node test/javascript/coffee_config_panel.test.js
+          node test/javascript/coffee_quantity_stepper.test.js
+          echo 'P1.4 REAL FRONTEND MODULE BEHAVIOR TESTS PASS'
+      - name: Build real Webpacker 4.3 Rails test packs in CI only
+        shell: bash
+        env:
+          RAILS_ENV: test
+          NODE_ENV: development
+          NODE_OPTIONS: --max-old-space-size=2048
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/webpack --config config/webpack/test.js
+          echo 'P1.4 REAL WEBPACKER BUILD COMPLETED'
+      - name: Verify actual test manifest resolves non-empty generated JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'JS'
+          const fs = require('fs');
+          const path = require('path');
+          const m = JSON.parse(fs.readFileSync('public/packs-test/manifest.json','utf8'));
+          const entry=m['application.js'];
+          if(typeof entry!=='string' || !/^\/packs-test\/js\/application-[a-z0-9]+\.js$/.test(entry)) {
+            throw Error('No genuine fingerprinted Webpacker application.js entry in test manifest');
+          }
+          const relative=entry.slice('/packs-test/'.length);
+          const root=path.resolve('public/packs-test');
+          const file=path.resolve(root,relative);
+          if (!file.startsWith(root + path.sep)) throw Error('Unsafe JS manifest traversal');
+          if (fs.statSync(file).size<1000) throw Error('Missing or empty actual compiled JS');
+          if (fs.readFileSync(file,'utf8').includes('P1.4 disposable, NON-FUNCTIONAL frontend pack')) {
+            throw Error('Fake P1.4 JS placeholder instead of real Webpacker bundle');
+          }
+          console.log('P1.4 GENUINE WEBPACKER TEST MANIFEST AND NONEMPTY COMPILED JS PASS');
+          JS
+      - name: Save real compiled test assets, not node_modules, for separate later approval
+        uses: actions/upload-artifact@v4
+        with:
+          name: cafe-p14-fifth-real-packs-test
+          path: public/packs-test/
+          if-no-files-found: error
+          retention-days: 7
+
+
+  fifth-real-webpacks-owner-validator-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse immutable owner-only archive verifier and fifth-only runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p14_fifth_real_webpacks_20261107.py
+          python3 -B scripts/cafe_p14_fifth_real_webpacks_20261107.py --help
+      - name: Test ZIP SHA, path traversal, duplicate entries and symlink protection without databases
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib,importlib.util,io,json,os,stat,tempfile,zipfile
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location('p14_real_zip',
+            'scripts/cafe_p14_fifth_real_webpacks_20261107.py')
+          mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+          assert mod.ZIP_SHA256=='95cc0c7985b4aba252470aff3493ee64664f371fa7eb9a8127cccd5e551405e3'
+          assert mod.STUB_BLOB=='215312d18949745695b4fcc70d2485271386ea2f'
+          assert mod.GITHUB_RUN==42384029688 and mod.GITHUB_ARTIFACT_ID==13578972029
+          assert mod.SOURCE_SHA=='dc5dacb9d79b9d7a8951ebcd0b74b489933d53cd'
+          def zip_data(entries,link=False):
+              buf=io.BytesIO()
+              with zipfile.ZipFile(buf,'w',compression=zipfile.ZIP_DEFLATED) as z:
+                  for name,content in entries:
+                      if link and name=='js/application-abc123.js':
+                          i=zipfile.ZipInfo(name)
+                          i.create_system=3
+                          i.external_attr=(stat.S_IFLNK|0o777)<<16
+                          z.writestr(i,content)
+                      else:z.writestr(name,content)
+              return buf.getvalue()
+          base=[('manifest.json',json.dumps(
+            {'application.js':'/packs-test/js/application-abc123.js'})),
+            ('js/application-abc123.js',b"function real_app(){};\n"*80)]
+          good=zip_data(base)
+          prefix,files,entry,manifest=mod.verify_entries(good)
+          assert prefix=='' and len(files)==2
+          assert entry=='/packs-test/js/application-abc123.js'
+          with tempfile.TemporaryDirectory(prefix='cafe-p14-ci-artifact-') as t:
+              archive=Path(t)/'cafe-p14-fifth-real-packs-test.zip'
+              archive.write_bytes(good)
+              archive.chmod(0o600)
+              before=mod.ZIP_SHA256
+              mod.ZIP_SHA256=hashlib.sha256(good).hexdigest()
+              assert mod.read_archive(archive)==good
+              mod.ZIP_SHA256=before
+              try:mod.read_archive(archive)
+              except RuntimeError as e:assert 'SHA256 mismatch' in str(e)
+              else:raise AssertionError('ZIP digest mismatch allowed')
+          for entries,symlink in [
+            (base+[('../leak.js',b'attack')],False),
+            (base+[('js/application-abc123.js',b'second')],False),
+            (base+[('node_modules/attack.js',b'attack')],False),
+            (base+[('config/webpacker.yml',b'attack')],False),
+            (base,True),
+            (base[:1]+[('js/application-abc123.js',b'X'*10)],False),
+            (base[:1]+[('js/application-abc123.js',b'P1.4 disposable, NON-FUNCTIONAL frontend pack'*50)],False)
+          ]:
+              try:mod.verify_entries(zip_data(entries,symlink))
+              except RuntimeError:pass
+              else:raise AssertionError('unsafe ZIP accepted')
+          assert mod.verify_entries(zip_data(
+            [('packs-test/'+p,c) for p,c in base]))[0]=='packs-test/'
+          print('P1.4 REAL WEBPACK ZIP INTEGRITY / PATH / SYMLINK / ZIP SAFETY CI PASS')
+          PY
+      - name: Prove extraction/config overlay changes only isolated temporary tree
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util,io,json,subprocess,tempfile,zipfile
+          from pathlib import Path
+          file=Path('scripts/cafe_p14_fifth_real_webpacks_20261107.py')
+          spec=importlib.util.spec_from_file_location('p14_real',file)
+          mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+          ss=importlib.util.spec_from_file_location('p14_stub',
+            'scripts/cafe_p14_fifth_html_stub_assets_20261107.py')
+          stub=importlib.util.module_from_spec(ss);ss.loader.exec_module(stub)
+          assert stub.SOURCE=='090b9d37419fcd9f393d8b686ac0f4563ef7b613'
+          assert mod.SOURCE_SHA=='dc5dacb9d79b9d7a8951ebcd0b74b489933d53cd'
+          class FakeSchema:
+              SOURCE=stub.SOURCE
+              DB=stub.DB
+              def git(self,verb,*args):
+                  if verb=='hash-object':
+                      return subprocess.check_output(['git','hash-object',*args],text=True).strip()
+                  if verb=='rev-parse':
+                      assert args==(stub.SOURCE+':config/webpacker.yml',)
+                      return stub.WEBPACKER_YML_BLOB
+                  raise AssertionError('unreviewed Git verb')
+          b=io.BytesIO()
+          items=[('manifest.json',json.dumps(
+            {'application.js':'/packs-test/js/application-a1b2.js'})),
+            ('js/application-a1b2.js',b'console.log("actual bundle test");'*90)]
+          with zipfile.ZipFile(b,'w',compression=zipfile.ZIP_DEFLATED) as z:
+              for name,data in items:z.writestr(name,data)
+          data=b.getvalue()
+          verified=mod.verify_entries(data)
+          original=Path('config/webpacker.yml').read_bytes()
+          with tempfile.TemporaryDirectory(prefix='p14-ci-real-zip-stage-') as t:
+              source=Path(t)
+              (source/'config').mkdir()
+              (source/'public').mkdir()
+              (source/'config/webpacker.yml').write_bytes(original)
+              mod.install_real_assets(stub,FakeSchema(),source,data,verified)
+              assert (source/'public/packs-test/js/application-a1b2.js').is_file()
+              assert 'compile: false' in (source/'config/webpacker.yml').read_text()
+              assert (source/'public/packs-test/manifest.json').exists()
+              assert not (source/'node_modules').exists()
+          assert Path('config/webpacker.yml').read_bytes()==original
+          code=file.read_text()
+          assert code.count('p13.verify()')>=2
+          assert 'schema.build_source(probe,stage)' in code
+          assert '--env=PGOPTIONS=-c default_transaction_read_only=on -c search_path=public' in code
+          assert 'stub.make_command(view,old,p14,schema,source,mounts,ip,cluster,secret)' in code
+          assert 'print(done.stderr)' not in code
+          assert 'print(str(exc))' not in code
+          for banned in ('docker stop','docker rm -f','git checkout','git reset',
+                         'db:schema:load;','bundle exec rails test','db:prepare;'):
+              assert banned not in code,banned
+          print('P1.4 REAL PACKS ONLY IN TEMP SOURCE / FIFTH SCRAM READONLY GET CONTRACT PASS')
+          PY
+
+
+  fifth-real-webpacks-v2-mode-denials:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: V2 exact archive safety-gate classification, no direct DB access
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_p14_fifth_real_webpacks_gate_v2_20261107.py
+          python3 -B scripts/cafe_p14_fifth_real_webpacks_gate_v2_20261107.py --help
+          python3 - <<'PY'
+          import hashlib,importlib.util,io,json,os,stat,tempfile,zipfile
+          from pathlib import Path
+          s=importlib.util.spec_from_file_location('gate_v2','scripts/cafe_p14_fifth_real_webpacks_gate_v2_20261107.py')
+          v=importlib.util.module_from_spec(s);s.loader.exec_module(v)
+          assert v.ZIP_SHA256=='95cc0c7985b4aba252470aff3493ee64664f371fa7eb9a8127cccd5e551405e3'
+          assert v.DB=='cafe_synthetic' and v.NETWORK=='cafe-upload-security-synthetic-net-20261105'
+          assert v.STUB_BLOB=='215312d18949745695b4fcc70d2485271386ea2f'
+          def fixture():
+            b=io.BytesIO()
+            with zipfile.ZipFile(b,'w',compression=zipfile.ZIP_DEFLATED) as z:
+              z.writestr('manifest.json',json.dumps({'application.js':'/packs-test/js/application-abcdef.js'}))
+              z.writestr('js/application-abcdef.js',b'function demo_test() {};\n'*80)
+            return b.getvalue()
+          data=fixture()
+          with tempfile.TemporaryDirectory(prefix='cafe-v2-modegate-ci-') as t:
+            path=Path(t)/'cafe-p14-fifth-real-packs-test.zip'
+            path.write_bytes(data);path.chmod(0o600)
+            old=v.ZIP_SHA256
+            v.ZIP_SHA256=hashlib.sha256(data).hexdigest()
+            assert v.read_archive(path)==data
+            path.chmod(0o660)
+            try:v.read_archive(path)
+            except RuntimeError as e:
+              assert 'group/other write permission present' in str(e)
+            else:raise AssertionError('group writable archive accepted')
+            path.chmod(0o600)
+            v.ZIP_SHA256=old
+            try:v.read_archive(path)
+            except RuntimeError as e:assert 'SHA256 mismatch' in str(e)
+            else:raise AssertionError('sha mismatch accepted')
+            try:v.read_archive(Path(t)/'missing.zip')
+            except RuntimeError as e:assert 'archive path' in str(e) or 'missing' in str(e)
+            else:raise AssertionError('missing artifact accepted')
+          assert v.verify_entries(data)[2]=='/packs-test/js/application-abcdef.js'
+          print('P1.4 V2 MODE DENIAL SPECIFIC + SHA/ZIP IMMUTABLE PASS')
+          PY
