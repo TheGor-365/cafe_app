@@ -41,14 +41,16 @@ class CoffeeStaticBrandingTest < ActionDispatch::IntegrationTest
     refute_includes svg, 'href="http', 'SVG must not link external files'
   end
 
-  test 'README accurately documents draft-only status and legacy limitations' do
+  test 'README accurately documents the educational preview and intermediate legacy stack' do
     readme = Rails.root.join('README.md').read
-    assert_includes readme, 'Gor\'s Coffee'
+    assert_includes readme, "Gor's Coffee"
     assert_includes readme, 'Русский'
     assert_includes readme, 'English'
-    assert_includes readme, 'Ruby 2.5.8'
-    assert_includes readme, 'Draft PR'
-    assert_includes readme, 'No real checkout'
-    assert_includes readme, '/products/:id'
+    assert_includes readme, 'Ruby 2.7.8'
+    assert_includes readme, 'Rails 6.1.7.10'
+    assert_includes readme, 'fictional checkout'
+    assert_includes readme, 'No payments'
+    assert_includes readme, 'CAFE_PREVIEW_SEED_ALLOWED'
+    assert_includes readme, 'not a real café'
   end
 end
