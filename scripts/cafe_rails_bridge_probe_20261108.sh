@@ -25,20 +25,15 @@ grep -Fx "gem 'rails', '~> 6.0.3', '>= 6.0.3.6'" Gemfile >/dev/null
 sed -i "s/ruby '2.5.8'/ruby '2.7.8'/" Gemfile
 if [[ "$scenario" == "ruby27_rails61" ]]; then
   sed -i "s/gem 'rails', '~> 6.0.3', '>= 6.0.3.6'/gem 'rails', '~> 6.1.7', '>= 6.1.7.10'/" Gemfile
+  echo "gem 'logger', '= 1.4.2'" >> Gemfile
 fi
 grep -Fx "ruby '2.7.8'" Gemfile >/dev/null
 if [[ "$scenario" == "ruby27_rails61" ]]; then
   grep -Fx "gem 'rails', '~> 6.1.7', '>= 6.1.7.10'" Gemfile >/dev/null
 fi
 
-# Rails 6.1 dependency resolution selects logger 1.7 while Ruby 2.7
-# preloads the 1.4.2 default gem via RUBYOPT=-rlogger. Avoid double
-# activation in this isolated Rails 6.1 CI scenario (not owner runtime).
-if [[ "$scenario" == "ruby27_rails61" ]]; then
-  [[ -n "$GITHUB_ENV" ]] || { echo "Missing Actions environment file" >&2; exit 16; }
-  export RUBYOPT=""
-  echo 'RUBYOPT=' >> "$GITHUB_ENV"
-fi
+# Rails 6.1 requires Logger constant during boot. Keep -rlogger and
+# pin the Ruby 2.7 default gem in this disposable bridge.
 
 gem install bundler -v 2.2.13 --no-document
 # Bundler 2.2.13 has no --ruby switch on 'bundle lock'. Update the
