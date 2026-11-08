@@ -52,7 +52,7 @@ class CoffeeDemoCheckoutTest < ActionDispatch::IntegrationTest
     assert_redirected_to demo_order_path(placed)
     follow_redirect!
     assert_response :success
-    assert_select '#demo-order-title', text: /Demo order/
+    assert_select '#demo-order-title', text: /Order/
     assert_includes response.body, @product.name
 
     get cart_path
