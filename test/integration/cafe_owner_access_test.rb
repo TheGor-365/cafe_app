@@ -51,7 +51,7 @@ class CafeOwnerAccessTest < ActionDispatch::IntegrationTest
       post user_session_path, params: { user: { email: other.email, password: 'StrongPassword123' } }
       get account_path
       assert_response :success
-      assert_select "a[href='#{new_owner_access_path}]", count: 0
+      assert_select "a[href='#{new_owner_access_path}']", count: 0
       post owner_access_path, params: { owner_access_code: TOKEN }
       assert_redirected_to new_owner_access_path
       assert_not other.reload.admin?
