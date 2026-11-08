@@ -1,9 +1,9 @@
-<% content_for :title, "Demo Sizes · Gor's Coffee" %>
+<% content_for :title, "Drink Sizes · Gor's Coffee" %>
 <main class="cafe-admin" aria-labelledby="sizes-title">
   <header class="cafe-admin__hero">
-    <div><p class="cafe-admin__eyebrow">Admin · Demo drink configuration</p>
+    <div><p class="cafe-admin__eyebrow">Admin · Drink configuration</p>
       <h1 id="sizes-title">Sizes: <%= @product.name %></h1>
-      <p>Manage available sizes and server-authoritative sample prices. Existing saved basket prices are snapshots.</p>
+      <p>Manage available sizes and server-authoritative prices. Existing saved basket prices are snapshots.</p>
     </div>
     <%= link_to 'New size', new_product_product_variant_path(@product), class: 'cafe-admin__button' %>
   </header>
@@ -31,6 +31,6 @@
         </tr><% end %></tbody>
       </table>
     </div>
-    <% if @variants.empty? %><p>No custom sizes yet; the demo product uses its base price.</p><% end %>
+    <% if @variants.empty? %><p>No custom sizes yet; the product uses its base price.</p><% end %>
   </section>
 </main>
