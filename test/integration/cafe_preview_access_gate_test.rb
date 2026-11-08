@@ -17,7 +17,7 @@ class CafePreviewAccessGateTest < ActiveSupport::TestCase
   test 'anonymous browser gets a login page, not a repeated 401 Basic challenge' do
     response = @request.get('/')
     assert_equal 200, response.status
-    assert_includes response.body, 'Private portfolio preview'
+    assert_includes response.body, 'Create a demo account'
     assert_includes response.body, 'name="csrf"'
     assert_nil response['WWW-Authenticate']
     assert_includes response['Set-Cookie'], 'Secure'
@@ -65,6 +65,50 @@ class CafePreviewAccessGateTest < ActiveSupport::TestCase
 
     tampered = @request.get('/menu', 'HTTP_COOKIE' => session_cookie + 'x')
     assert_includes tampered.body, 'Private portfolio preview'
+  end
+
+  test 'preview access clearly offers registration, sign in and guest browsing in English' do
+    response = @request.get('/')
+    assert_equal 200, response.status
+    assert_includes response.body, 'Create a demo account'
+    assert_includes response.body, 'Sign in to my account'
+    assert_includes response.body, 'Browse as a guest'
+    assert_includes response.body, 'Step 1 of 2'
+    assert_includes response.body, 'Preview access username'
+    assert_not_includes response.body, 'Закрытая'
+    assert_not_includes response.body, 'Войти'
+  end
+
+  test 'valid preview credentials route to chosen Devise registration and sign in pages' do
+    %w[register sign_in browse].zip(%w[/users/sign_up /users/sign_in /]).each do |intent, expected|
+      page = @request.get('/')
+      csrf = page.body[/name="csrf" value="([^"]+)"/, 1]
+      cookie = page['Set-Cookie'].split(';').first
+      result = @request.post(CafePreviewAccessGate::LOGIN_PATH,
+        'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
+        'HTTP_COOKIE' => cookie,
+        :input => Rack::Utils.build_query(
+          csrf: csrf, username: 'portfolio', password: 'local-test-password-123456789',
+          intent: intent
+        ))
+      assert_equal 303, result.status
+      assert_equal expected, result['Location']
+      assert_includes result['Set-Cookie'], '__Host-cafe_preview='
+    end
+  end
+
+  test 'preview login does not allow arbitrary external redirect destination' do
+    page = @request.get('/')
+    csrf = page.body[/name="csrf" value="([^"]+)"/, 1]
+    result = @request.post(CafePreviewAccessGate::LOGIN_PATH,
+      'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
+      'HTTP_COOKIE' => page['Set-Cookie'].split(';').first,
+      :input => Rack::Utils.build_query(
+        csrf: csrf, username: 'portfolio', password: 'local-test-password-123456789',
+        intent: 'https://example.org/evil'
+      ))
+    assert_equal 303, result.status
+    assert_equal '/', result['Location']
   end
 
   test 'browser form rejects missing csrf without reaching the application' do
