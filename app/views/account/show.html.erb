@@ -6,6 +6,15 @@
     <p>Manage your profile, browse the menu and review your orders.</p>
   </header>
 
+  <% if !current_user.admin? && ENV['CAFE_OWNER_CLAIM_TOKEN'].to_s.bytesize >= 48 &&
+        current_user.username.to_s.casecmp(ENV.fetch('CAFE_OWNER_USERNAME', '')).zero? %>
+    <section class="cafe-auth__notice" aria-label="Owner permissions">
+      <strong>Owner permissions</strong>
+      <p>Activate your management tools using the one-time code stored in Railway.</p>
+      <%= link_to 'Activate owner access', new_owner_access_path, class: 'cafe-account__action' %>
+    </section>
+  <% end %>
+
   <section class="cafe-account__grid" aria-label="Account shortcuts">
     <article class="cafe-account__card">
       <h2>Your profile</h2>
