@@ -4,7 +4,7 @@
 
 [Русский](#русский) · [English](#english) · [Source](https://github.com/TheGor-365/cafe_app) · [Release checklist](docs/CAFE_RELEASE_CHECKLIST.md)
 
-> **Release status · 8 November 2026:** the integrated feature candidate has passed isolated Rails CI, but the Railway `preview` web deployment has **not yet passed Docker build, runtime and external HTTP checks**. Do **not** treat `master` or the private preview as a live public production application. Public deployment remains gated on a supported Ruby/Rails stack and security testing. See [deployment branch](https://github.com/TheGor-365/cafe_app/tree/deploy/cafe-railway-private-preview-20261108).
+> **Release status · 8 November 2026:** the integrated candidate passed complete Rails CI and production Docker build. The isolated Railway `preview` deployment is **SUCCESS**, with HTTPS health endpoint returning `ok` externally. The application is protected by HTTP Basic authorization for private portfolio review. Full authenticated browser/E2E checks are pending. **This is not an unrestricted production service**: Ruby 2.7, Rails 6.1, and Node 14 are end-of-life. [Release candidate PR #77](https://github.com/TheGor-365/cafe_app/pull/77).
 
 ## Русский
 
@@ -27,7 +27,7 @@ Gor's Coffee — учебный full-stack веб-сервис кафе для �
 
 - Подтверждённая изолированная CI-проверка функциональной ветки: [PR #71 / run 42412310443](https://github.com/TheGor-365/cafe_app/actions/runs/42412310443) — **158 tests, 1328 assertions, 0 failures/errors**. Она не доказывает работу Docker/Railway.
 - Промежуточная миграция на Ruby 2.7/Rails 6.1 отдельно прошла [CI run 42428798391](https://github.com/TheGor-365/cafe_app/actions/runs/42428798391). Rails 7.0 проверен только как следующий **неподдерживаемый** промежуточный этап.
-- Приватный Railway-проект `gors-coffee-cafe-app` имеет **отдельную** PostgreSQL 18, без подтверждённого работоспособного публичного адреса. Локальные пользовательские базы и загруженные файлы не затрагиваются.
+- Приватный Railway-проект `gors-coffee-cafe-app` имеет **отдельную** PostgreSQL 18 и защищённую тестовую точку входа: https://cafe-web-preview.up.railway.app. Внешний `GET /__cafe_health` подтверждён, авторизованное browser QA ожидается. Локальные пользовательские базы и загруженные файлы не затрагиваются.
 - Права на некоторые старые фотографии товаров не подтверждены. Не публиковать чужие материалы без разрешения.
 - Регистрация и восстановление пароля по почте не должны считаться готовыми к реальному использованию, пока не настроена и не проверена отправка писем.
 - Медиахранилище в Railway **не настроено как постоянное**: локальные uploads нельзя считать надёжно сохраняемыми при повторных деплоях.
@@ -52,7 +52,7 @@ RUBYOPT=-rlogger RAILS_ENV=test bundle _2.2.13_ exec rails test
 - Изолированный проект `gors-coffee-cafe-app`, окружение `preview`, сервис `cafe-web` + отдельный Postgres с томом.
 - Сборка из `Dockerfile`; `SECRET_KEY_BASE` задаётся через секреты Railway; `DATABASE_URL` — только приватное соединение.
 - Разрешённый demo-bootstrap ограничен конкретными Railway project ID, environment ID и `CAFE_PREVIEW_SEED_ALLOWED=YES`. Он не создаёт учетных записей и не должен переноситься в другие среды.
-- Пока не подтверждены сборка, миграции, HTTP smoke, авторизация, HTTPS, стабильность медиа и поддерживаемый стек — не включать unrestricted public access.
+- Docker/CI сборка, миграции, запуск Puma, внутренний healthcheck и внешняя HTTPS-проверка `GET /__cafe_health` подтверждены. Для просмотра требуется отдельный HTTP Basic логин; значения задаются только в Railway, никогда не публикуются в репозитории. Открытый доступ без пароля запрещён до обновления поддерживаемого стека и проверок безопасности/медиа.
 
 ### Портфолио
 
@@ -68,7 +68,7 @@ Gor's Coffee is an **educational Rails coffee-shop demo**, not an operating busi
 
 **Reproducibility:** use only a clean disposable PostgreSQL database; never reset the owner's existing development or QA databases. Set `RUBYOPT=-rlogger` for this Rails 6.1 bridge. See the technical and release sections above.
 
-**Evidence:** [158 tests / 1328 assertions (PR #71 CI)](https://github.com/TheGor-365/cafe_app/actions/runs/42412310443); [Ruby 2.7/Rails 6.1 regression CI](https://github.com/TheGor-365/cafe_app/actions/runs/42428798391). Public HTTPS verification and final screenshots are pending.
+**Evidence:** [158 tests / 1328 assertions (PR #71 CI)](https://github.com/TheGor-365/cafe_app/actions/runs/42412310443); [Ruby 2.7/Rails 6.1 regression CI](https://github.com/TheGor-365/cafe_app/actions/runs/42428798391); [release Rails + Docker + Basic gate CI](https://github.com/TheGor-365/cafe_app/actions/runs/42519024703) **SUCCESS**. Railway preview: https://cafe-web-preview.up.railway.app (HTTP Basic restricted; external health verified). Authenticated browser proof and final screenshots are pending.
 
 ---
 
