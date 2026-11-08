@@ -9,8 +9,7 @@ namespace :cafe do
       Rails.env.production? &&
       ENV['RAILWAY_PROJECT_ID'] == 'a6c48a67-c6f4-4f12-a5df-6d1de0f45d69' &&
       ENV['RAILWAY_ENVIRONMENT_ID'] == 'e47229ba-6dd7-47ec-9155-a329bb2a963c' &&
-      ENV['CAFE_OWNER_USERNAME'] == 'Eric' &&
-      ENV.fetch('CAFE_OWNER_CLAIM_TOKEN', '').bytesize >= 32
+      ENV['CAFE_OWNER_USERNAME'] == 'Eric'
 
     require 'uri'
     database = URI.parse(ENV.fetch('DATABASE_URL'))
