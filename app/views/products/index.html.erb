@@ -4,14 +4,14 @@
     <div>
       <p class="cafe-admin__eyebrow">Restricted · Catalogue administration</p>
       <h1 id="cafe-admin-title">Manage products</h1>
-      <p>Edit the sample catalogue. Public customers see the separate menu, not this administrative view.</p>
+      <p>Edit the catalogue. Public customers see the separate menu, not this administrative view.</p>
     </div>
     <%= link_to 'New product', new_product_path, class: 'cafe-admin__button' %>
   </header>
   <nav class="cafe-admin__tabs" aria-label="Catalogue management">
     <%= link_to 'Products', products_path, 'aria-current': 'page' %>
     <%= link_to 'Categories', categories_path %>
-    <%= link_to 'Public demo menu', menu_path %>
+    <%= link_to 'View menu', menu_path %>
   </nav>
   <%= tag.p(alert, class: 'cafe-admin__alert', role: 'alert') if alert.present? %>
   <%= tag.p(notice, class: 'cafe-admin__notice', role: 'status') if notice.present? %>
@@ -38,7 +38,7 @@
                 <%= link_to 'Sizes', product_product_variants_path(product) %>
                 <%= link_to 'Extras', product_product_modifier_options_path(product) %>
                 <%= link_to 'Delete', product_path(product), method: :delete,
-                      data: { confirm: 'Delete this demo product? Referenced products cannot be deleted.' },
+                      data: { confirm: 'Delete this product? Referenced products cannot be deleted.' },
                       class: 'cafe-admin__danger-link' %>
               </td>
             </tr>
@@ -47,7 +47,7 @@
       </table>
     </div>
     <% if @products.empty? %>
-      <p class="cafe-admin__empty">No catalogue products yet. Add the first sample product to begin.</p>
+      <p class="cafe-admin__empty">No catalogue products yet. Add the first product to begin.</p>
     <% end %>
   </section>
 </main>
