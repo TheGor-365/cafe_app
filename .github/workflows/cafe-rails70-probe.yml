@@ -1,0 +1,56 @@
+name: Cafe Ruby 2.7 Rails 7.0 incremental CI probe
+
+on:
+  push:
+    branches: [feature/cafe-rails70-probe-20261108]
+
+permissions:
+  contents: read
+
+jobs:
+  rails70:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    container:
+      image: ruby:2.7.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_rails70_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      CI: "true"
+      DATABASE_URL: postgres://postgres:cafe_rails70_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-rails70-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard upgrade script and Rails 6.1 source lock
+        run: |
+          bash -n scripts/cafe_rails70_probe_20261108.sh
+          grep -Fx '    rails (6.1.7.10)' Gemfile.lock
+      - name: Upgrade only CI copy to Rails 7.0.10
+        run: bash scripts/cafe_rails70_probe_20261108.sh
+      - name: Prepare disposable PostgreSQL test DB and stub packs
+        run: |
+          bundle _2.2.13_ exec rails db:schema:load
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Full Rails 7.0 Minitest regression suite
+        run: bundle _2.2.13_ exec rails test
+      - name: Save only dependency metadata for next stage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cafe-rails70-candidate-lock
+          path: rails70-artifact/
+          retention-days: 7
+          if-no-files-found: ignore
