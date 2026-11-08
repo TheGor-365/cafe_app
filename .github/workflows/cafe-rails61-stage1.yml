@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   promote:
-    if: github.event.head_commit.message == 'ci(cafe): prepare one-shot Rails 6.1 lock promotion'
+    if: contains(github.event.head_commit.message, 'prepare one-shot Rails 6.1 lock promotion')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -48,7 +48,7 @@ jobs:
           git push origin HEAD:feature/cafe-rails61-stage1-20261108
 
   regression:
-    if: github.event.head_commit.message != 'ci(cafe): prepare one-shot Rails 6.1 lock promotion'
+    if: ${{ !contains(github.event.head_commit.message, 'prepare one-shot Rails 6.1 lock promotion') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
