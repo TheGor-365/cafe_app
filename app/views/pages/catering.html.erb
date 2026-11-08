@@ -3,8 +3,8 @@
   <header class="cafe-content-page__hero">
     <p class="cafe-content-page__eyebrow">Catering · Concept showcase</p>
     <h1 id="cafe-catering-title">A little coffee, a lot of good company.</h1>
-    <p>Imagine a customizable coffee and pastry selection for meetings and celebrations. This page demonstrates how a catering service could be presented; it does not accept bookings or inquiries for a real café.</p>
-    <%= link_to 'Browse sample items', menu_path, class: 'cafe-content-page__button' %>
+    <p>Imagine a customizable coffee and pastry selection for meetings and celebrations. Browse the selection and plan a menu for a gathering.</p>
+    <%= link_to 'Browse the menu', menu_path, class: 'cafe-content-page__button' %>
   </header>
 
   <section class="cafe-content-page__section" aria-labelledby="cafe-catering-options">
@@ -19,14 +19,14 @@
       <article class="cafe-content-page__card">
         <p class="cafe-content-page__eyebrow">02 · Morning treats</p>
         <h3>Bakery selection</h3>
-        <p>Explore croissants, cinnamon rolls and other items from the fictional demo menu.</p>
+        <p>Explore croissants, cinnamon rolls and other items from the menu.</p>
         <%= link_to 'Browse bakery', menu_path(search: 'croissant'), class: 'cafe-content-page__text-link' %>
       </article>
       <article class="cafe-content-page__card">
         <p class="cafe-content-page__eyebrow">03 · A simple workflow</p>
         <h3>How it could work</h3>
         <p>A future production version might support enquiries, availability checks, quotes and confirmation.</p>
-        <%= link_to 'See the demo basket', cart_path, class: 'cafe-content-page__text-link' %>
+        <%= link_to 'View your cart', cart_path, class: 'cafe-content-page__text-link' %>
       </article>
     </div>
   </section>
@@ -34,7 +34,7 @@
   <section class="cafe-content-page__section" aria-labelledby="cafe-catering-process">
     <h2 id="cafe-catering-process">A possible catering journey</h2>
     <ol class="cafe-content-page__steps">
-      <li><strong>Discover.</strong> Review a sample selection and dietary attributes.</li>
+      <li><strong>Discover.</strong> Review your selection and dietary attributes.</li>
       <li><strong>Plan.</strong> Choose a format and estimated quantities in a future ordering flow.</li>
       <li><strong>Confirm.</strong> A real café would verify location, timing, availability and pricing before taking an order.</li>
     </ol>
