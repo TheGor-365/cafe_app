@@ -21,3 +21,5 @@ files in GitHub CI on a fresh, disposable PostgreSQL 16 instance.
 Do not claim Rails 8 compatibility or supported public readiness.
 
 Promotion retry: the initial GitHub Actions attempt stopped before any Git write because the downloaded, digest-pinned artifact appeared as an untracked directory. Only tracked-source cleanliness is checked on retry; artifact contents remain SHA-256 pinned. No original source, DB or deployed service is touched.
+
+LOCK PROMOTION VERIFIED: GitHub branch SHA 7d159f2b70f076e6e7475e4cb529bc70912716e6, exact Gemfile and Gemfile.lock imported from successful isolated CI artifact and .ruby-version updated to 2.7.8; the next GitHub Actions run tests only committed dependencies on disposable PostgreSQL16. This is an unsupported-runtime intermediate, not a public deployment.
