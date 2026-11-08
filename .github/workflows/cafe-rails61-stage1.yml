@@ -27,7 +27,9 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF_NAME" = "feature/cafe-rails61-stage1-20261108"
           test "$(git log -1 --format=%s)" = "ci(cafe): prepare one-shot Rails 6.1 lock promotion"
-          test -z "$(git status --porcelain)"
+          # The authenticated artifact directory is intentionally untracked.
+          # Refuse tracked-source modifications, then verify artifact SHA-256.
+          test -z "$(git status --porcelain --untracked-files=no)"
           printf '%s\n' \
             '7d059de9e1bb03c178ba7b2ff9c7947fba3c067b92d8d5c040c6142b0743b544  verified-lock/Gemfile' \
             'f5803e40308ac3ab519f886f6afff84cebffd9534616dc30e81f4537e7f7e1ff  verified-lock/Gemfile.lock' \
