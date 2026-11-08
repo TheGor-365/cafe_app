@@ -19,6 +19,9 @@ class CafeOwnerAccessTest < ActionDispatch::IntegrationTest
                           password: 'StrongPassword123', password_confirmation: 'StrongPassword123')
       post user_session_path, params: { user: { email: user.email, password: 'StrongPassword123' } }
       assert_response :redirect
+      get account_path
+      assert_response :success
+      assert_select "a[href='#{new_owner_access_path}']", text: 'Activate owner access'
       get new_owner_access_path
       assert_response :success
       assert_select 'form[action=?]', owner_access_path
@@ -46,6 +49,9 @@ class CafeOwnerAccessTest < ActionDispatch::IntegrationTest
       other = User.create!(username: 'Other_Cafe_User', email: 'other-cafe-qa@example.test',
                            password: 'StrongPassword123', password_confirmation: 'StrongPassword123')
       post user_session_path, params: { user: { email: other.email, password: 'StrongPassword123' } }
+      get account_path
+      assert_response :success
+      assert_select "a[href='#{new_owner_access_path}]", count: 0
       post owner_access_path, params: { owner_access_code: TOKEN }
       assert_redirected_to new_owner_access_path
       assert_not other.reload.admin?
