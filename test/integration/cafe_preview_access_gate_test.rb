@@ -1,151 +1,113 @@
 require 'test_helper'
-require 'base64'
 require_relative '../../lib/cafe_preview_access_gate'
 
 class CafePreviewAccessGateTest < ActiveSupport::TestCase
+  class FakeWarden
+    def initialize(authenticated)
+      @authenticated = authenticated
+    end
+
+    def authenticated?(scope)
+      scope == :user && @authenticated
+    end
+  end
+
   def setup
-    downstream = ->(_env) { [200, { 'Content-Type' => 'text/plain' }, ['demo']] }
-    @gate = CafePreviewAccessGate.new(
-      downstream,
-      username: 'portfolio',
-      password: 'local-test-password-123456789',
-      secret: 'ci-only-preview-cookie-signing-secret-123456'
-    )
+    @calls = []
+    calls = @calls
+    downstream = lambda do |env|
+      calls << [env['REQUEST_METHOD'], env['PATH_INFO']]
+      authenticated = env['HTTP_TEST_AUTH_SUCCESS'] == 'yes'
+      env['warden'] = FakeWarden.new(authenticated)
+      if authenticated
+        [302, { 'Location' => '/', 'Set-Cookie' => '_cafe_test=devise; Path=/; HttpOnly' }, []]
+      else
+        [200, { 'Content-Type' => 'text/html' }, ['Rails form']]
+      end
+    end
+    @gate = CafePreviewAccessGate.new(downstream, secret: 'test-only-signing-secret-long-enough-123456789')
     @request = Rack::MockRequest.new(@gate)
   end
 
-  test 'anonymous browser gets a login page, not a repeated 401 Basic challenge' do
+  test 'anonymous homepage shows exactly ordinary sign in and register options' do
     response = @request.get('/')
     assert_equal 200, response.status
-    assert_includes response.body, 'Create a demo account'
-    assert_includes response.body, 'name="csrf"'
+    assert_includes response.body, 'Sign in'
+    assert_includes response.body, 'Create account'
+    assert_includes response.body, '/users/sign_up'
+    assert_includes response.body, '/users/sign_in'
+    refute_includes response.body, 'preview access password'
     assert_nil response['WWW-Authenticate']
-    assert_includes response['Set-Cookie'], 'Secure'
-    assert_includes response['Set-Cookie'], 'HttpOnly'
-    assert_includes response['Set-Cookie'], 'SameSite=Strict'
-    refute_includes response.body, 'local-test-password'
+    assert_empty @calls
   end
 
-  test 'incorrect HTTP Basic credentials never reach the Rails app' do
-    header = 'Basic ' + Base64.strict_encode64('portfolio:wrong-password')
-    response = @request.get('/menu', 'HTTP_AUTHORIZATION' => header)
-    assert_equal 200, response.status
-    refute_equal 'demo', response.body
-    assert_nil response['WWW-Authenticate']
-  end
-
-  test 'existing valid HTTP Basic credentials still reach Rails for test clients' do
-    header = 'Basic ' + Base64.strict_encode64('portfolio:local-test-password-123456789')
-    response = @request.get('/menu', 'HTTP_AUTHORIZATION' => header)
-    assert_equal 200, response.status
-    assert_equal 'demo', response.body
-  end
-
-  test 'browser login sets a signed Secure HttpOnly cookie and grants access' do
-    page = @request.get('/')
-    csrf = page.body[/name="csrf" value="([^"]+)"/, 1]
-    assert csrf
-    csrf_cookie = page['Set-Cookie'].split(';').first
-
-    login = @request.post(CafePreviewAccessGate::LOGIN_PATH,
-      'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
-      'HTTP_COOKIE' => csrf_cookie,
-      :input => Rack::Utils.build_query(
-        csrf: csrf, username: 'portfolio', password: 'local-test-password-123456789'
-      ))
-    assert_equal 303, login.status
-    assert_equal '/', login['Location']
-    assert_includes login['Set-Cookie'], 'Secure'
-    assert_includes login['Set-Cookie'], 'HttpOnly'
-
-    session_cookie = login['Set-Cookie'].split(';').first
-    response = @request.get('/menu', 'HTTP_COOKIE' => session_cookie)
-    assert_equal 200, response.status
-    assert_equal 'demo', response.body
-
-    tampered = @request.get('/menu', 'HTTP_COOKIE' => session_cookie + 'x')
-    assert_includes tampered.body, 'Private portfolio preview'
-  end
-
-  test 'preview access clearly offers registration, sign in and guest browsing in English' do
-    response = @request.get('/')
-    assert_equal 200, response.status
-    assert_includes response.body, 'Create a demo account'
-    assert_includes response.body, 'Sign in to my account'
-    assert_includes response.body, 'Browse as a guest'
-    assert_includes response.body, 'Step 1 of 2'
-    assert_includes response.body, 'Preview access username'
-    assert_not_includes response.body, 'Закрытая'
-    assert_not_includes response.body, 'Войти'
-  end
-
-  test 'valid preview credentials route to chosen Devise registration and sign in pages' do
-    %w[register sign_in browse].zip(%w[/users/sign_up /users/sign_in /]).each do |intent, expected|
-      page = @request.get('/')
-      csrf = page.body[/name="csrf" value="([^"]+)"/, 1]
-      cookie = page['Set-Cookie'].split(';').first
-      result = @request.post(CafePreviewAccessGate::LOGIN_PATH,
-        'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
-        'HTTP_COOKIE' => cookie,
-        :input => Rack::Utils.build_query(
-          csrf: csrf, username: 'portfolio', password: 'local-test-password-123456789',
-          intent: intent
-        ))
-      assert_equal 303, result.status
-      assert_equal expected, result['Location']
-      assert_includes result['Set-Cookie'], '__Host-cafe_preview='
+  test 'Devise account forms and their styles are reachable without any shared preview credentials' do
+    %w[/users/sign_in /users/sign_up /users/password/new /assets/application.css /packs/js/application.js].each do |path|
+      response = @request.get(path)
+      assert_equal 200, response.status, path
+      assert_equal 'Rails form', response.body, path
     end
+    assert_equal 5, @calls.size
   end
 
-  test 'preview login does not allow arbitrary external redirect destination' do
-    page = @request.get('/')
-    csrf = page.body[/name="csrf" value="([^"]+)"/, 1]
-    result = @request.post(CafePreviewAccessGate::LOGIN_PATH,
-      'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
-      'HTTP_COOKIE' => page['Set-Cookie'].split(';').first,
-      :input => Rack::Utils.build_query(
-        csrf: csrf, username: 'portfolio', password: 'local-test-password-123456789',
-        intent: 'https://example.org/evil'
-      ))
-    assert_equal 303, result.status
-    assert_equal '/', result['Location']
+  test 'an authenticating Devise post issues a signed HttpOnly session cookie and retains the Rails cookie' do
+    response = @request.post('/users/sign_in', 'HTTP_TEST_AUTH_SUCCESS' => 'yes')
+    assert_equal 302, response.status
+    cookie_header = response['Set-Cookie']
+    assert_includes cookie_header, '_cafe_test=devise'
+    assert_includes cookie_header, '__Host-cafe_preview='
+    assert_includes cookie_header, 'Secure'
+    assert_includes cookie_header, 'HttpOnly'
+    cookie = cookie_header[/__Host-cafe_preview=[^;]+/]
+
+    page = @request.get('/menu', 'HTTP_COOKIE' => cookie)
+    assert_equal 200, page.status
+    assert_equal 'Rails form', page.body
+    assert_includes @calls, ['GET', '/menu']
   end
 
-  test 'browser form rejects missing csrf without reaching the application' do
-    response = @request.post(CafePreviewAccessGate::LOGIN_PATH,
-      'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
-      :input => Rack::Utils.build_query(
-        username: 'portfolio', password: 'local-test-password-123456789'
-      ))
-    assert_equal 403, response.status
-    refute_equal 'demo', response.body
+  test 'registration also unlocks browsing only after a genuine Devise sign in' do
+    failed = @request.post('/users')
+    assert_equal 200, failed.status
+    assert_nil failed['Set-Cookie']
+    assert_empty @calls.select { |_, path| path == '/products' }
+
+    success = @request.post('/users', 'HTTP_TEST_AUTH_SUCCESS' => 'yes')
+    cookie = success['Set-Cookie'][/__Host-cafe_preview=[^;]+/]
+    assert cookie
+    assert_equal 200, @request.get('/products', 'HTTP_COOKIE' => cookie).status
   end
 
-  test 'browser form rejects wrong credentials and never repeats a Basic challenge' do
-    page = @request.get('/')
-    csrf = page.body[/name="csrf" value="([^"]+)"/, 1]
-    response = @request.post(CafePreviewAccessGate::LOGIN_PATH,
-      'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
-      'HTTP_COOKIE' => page['Set-Cookie'].split(';').first,
-      :input => Rack::Utils.build_query(csrf: csrf, username: 'portfolio', password: 'wrong'))
-    assert_equal 401, response.status
-    assert_nil response['WWW-Authenticate']
-    assert_includes response.body, 'Incorrect preview credentials'
+  test 'anonymous access to cart and admin is blocked' do
+    assert_equal 200, @request.get('/cart').status
+    assert_includes @request.get('/admin/demo_orders').body, 'Sign in'
+    assert_equal 403, @request.post('/admin/demo_orders/1/status').status
+    refute @calls.any? { |_, path| path == '/admin/demo_orders' }
   end
 
-  test 'the DB health probe remains accessible without credentials' do
-    response = @request.get(CafePreviewAccessGate::HEALTH_PATH)
-    assert_equal 200, response.status
-    assert_equal 'ok', response.body
+  test 'invalid cookie cannot bypass authentication' do
+    r = @request.post('/users/sign_in', 'HTTP_TEST_AUTH_SUCCESS' => 'yes')
+    cookie = r['Set-Cookie'][/__Host-cafe_preview=[^;]+/]
+    invalid = @request.get('/menu', 'HTTP_COOKIE' => cookie + 'x')
+    assert_includes invalid.body, 'Create account'
+    refute @calls.any? { |_, path| path == '/menu' }
   end
 
-  test 'weak or missing passwords or signing secrets fail closed during boot' do
-    app = ->(_env) { [200, {}, ['ok']] }
+  test 'Devise sign out clears preview browser cookie' do
+    r = @request.post('/users/sign_in', 'HTTP_TEST_AUTH_SUCCESS' => 'yes')
+    cookie = r['Set-Cookie'][/__Host-cafe_preview=[^;]+/]
+    signed_out = @request.delete('/users/sign_out', 'HTTP_COOKIE' => cookie)
+    assert_includes signed_out['Set-Cookie'], 'Max-Age=0'
+  end
+
+  test 'health probe stays unauthenticated and queries database' do
+    assert_equal 200, @request.get(CafePreviewAccessGate::HEALTH_PATH).status
+    assert_equal 'ok', @request.get(CafePreviewAccessGate::HEALTH_PATH).body
+  end
+
+  test 'weak signing secret fails closed' do
     assert_raises(ArgumentError) do
-      CafePreviewAccessGate.new(app, username: 'portfolio', password: 'short', secret: 'a' * 40)
-    end
-    assert_raises(ArgumentError) do
-      CafePreviewAccessGate.new(app, username: 'portfolio', password: 'a' * 30, secret: 'short')
+      CafePreviewAccessGate.new(->(_env) { [200, {}, ['ok']] }, secret: 'short')
     end
   end
 end
