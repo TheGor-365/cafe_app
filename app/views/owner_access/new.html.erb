@@ -1,0 +1,26 @@
+<% content_for :title, "Owner Access · Gor's Coffee" %>
+<main class="cafe-auth" aria-labelledby="cafe-owner-heading">
+  <header class="cafe-auth__intro">
+    <p class="cafe-auth__eyebrow">Account permissions</p>
+    <h1 id="cafe-owner-heading">Owner access</h1>
+    <p>Activate the existing management tools for your verified account.</p>
+  </header>
+  <section class="cafe-auth__card">
+    <% if @owner_matches && @available %>
+      <p>Signed in as <strong><%= current_user.username %></strong>. Enter the one-time owner access code from Railway service variables.</p>
+      <%= form_with url: owner_access_path, method: :post, local: true do |f| %>
+        <div class="cafe-auth__field">
+          <%= f.label :owner_access_code, 'Owner access code' %>
+          <%= f.password_field :owner_access_code, class: 'form-control', required: true,
+               autocomplete: 'off', minlength: 48 %>
+        </div>
+        <%= f.submit 'Activate owner access', class: 'cafe-auth__submit' %>
+      <% end %>
+    <% elsif !@available %>
+      <p>Owner access has already been assigned. Contact the project owner to make further changes.</p>
+    <% else %>
+      <p>This account is not eligible for owner access.</p>
+    <% end %>
+    <nav class="cafe-auth__links"><%= link_to 'Back to my account', account_path %></nav>
+  </section>
+</main>
