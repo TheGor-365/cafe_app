@@ -1,0 +1,98 @@
+name: Cafe synthetic Rails schema and fixture proof (CI-only)
+on:
+  push:
+    branches: [feature/cafe-synthetic-schema-readonly-gate-20261105]
+  pull_request:
+    branches: [feature/cafe-synthetic-db-scoped-roles-gate-20261105]
+permissions:
+  contents: read
+
+jobs:
+  scoped-schema-and-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ruby:2.5.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: cafe_synthetic
+          POSTGRES_PASSWORD: CIOnlyPostgresBootstrap_20261105
+          POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+          POSTGRES_INITDB_ARGS: --auth-local=peer --auth-host=scram-sha-256
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d cafe_synthetic"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:CIOnlyPostgresBootstrap_20261105@postgres:5432/cafe_synthetic
+      BUNDLE_PATH: /tmp/cafe-bundle
+      APP_DATABASE_URL: postgres://cafe_synth_app:CIOnlySyntheticRolePass_20261105@postgres:5432/cafe_synthetic
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify pinned schema and seed contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/cafe_synthetic_schema_readonly_gate.py
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          schema=Path('db/schema.rb').read_text()
+          seeds=Path('db/seeds.rb').read_text()
+          expected = {
+            'categories', 'products', 'product_variants',
+            'product_modifier_options', 'orders', 'order_items',
+            'order_item_modifiers', 'users'
+          }
+          assert set(re.findall(r'^  create_table "([^"]+)"',schema,re.M)) == expected
+          assert len(re.findall(r'^  add_foreign_key ',schema,re.M)) == 8
+          assert 'unless Rails.env.development? || Rails.env.test?' in seeds
+          assert 'demo_items = [' in seeds
+          assert 'configurable_drinks =' in seeds
+          assert not re.search(r'\bUser\.(?:create|create!|first_or_create)\b',seeds)
+          print('CANONICAL EIGHT-TABLE RAILS SCHEMA / SYNTHETIC SEED SOURCE PASS')
+          PY
+      - name: Install legacy Bundler + dependencies (temporary checkout only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          gem install bundler -v 2.2.13 --no-document
+          bundle _2.2.13_ lock --add-platform x86_64-linux
+          bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Provision scoped roles via bundled PostgreSQL driver (no psql dependency)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb provision
+      - name: Independently verify empty schema, SCRAM auth and role restrictions
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb preload
+      - name: Load Rails schema via non-login owner SET ROLE in disposable database
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only the ephemeral GitHub Actions PostgreSQL can receive this DDL.
+          export PGOPTIONS='-c role=cafe_synth_owner'
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb owner
+          bundle _2.2.13_ exec rails db:schema:load
+          unset PGOPTIONS
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb schema
+      - name: Seed fictional catalog strictly as restricted application role
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DATABASE_URL="$APP_DATABASE_URL"
+          bundle _2.2.13_ exec rails db:seed
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb seeds
+          # Re-seed once in ephemeral CI to prove fixture idempotency.
+          bundle _2.2.13_ exec rails db:seed
+          bundle _2.2.13_ exec ruby qa/security/cafe_synthetic_schema_seeds_ci.rb seeds
+          echo "RAILS SCHEMA + IDEMPOTENT SYNTHETIC SEEDS / APP DDL DENIED PASS"

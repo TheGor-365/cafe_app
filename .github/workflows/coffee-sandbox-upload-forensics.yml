@@ -1,0 +1,91 @@
+name: Cafe sandbox avatar cleanup forensics static verification
+on:
+  push:
+    branches: [feature/cafe-sandbox-upload-forensics-20261104]
+  pull_request:
+    branches: [feature/cafe-upload-sandbox-http-20261104]
+permissions:
+  contents: read
+jobs:
+  read-only-forensics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile read-only Python script
+        run: python3 -m py_compile scripts/cafe_sandbox_media_forensics.py
+      - name: Test private archive verification and media classification
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import importlib.util
+          import io
+          import json
+          import tarfile
+          import tempfile
+          from pathlib import Path
+
+          filename = "scripts/cafe_sandbox_media_forensics.py"
+          spec = importlib.util.spec_from_file_location("forensics", filename)
+          f = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(f)
+          with tempfile.TemporaryDirectory() as temp:
+              root = Path(temp)
+              f.SNAPSHOT = root / "snapshot"
+              f.MEDIA = root / "media"
+              f.SNAPSHOT.mkdir()
+              f.MEDIA.mkdir()
+
+              tarpath = f.SNAPSHOT / "qa_uploads_patched.tar.gz"
+              with tarfile.open(tarpath, "w:gz") as handle:
+                  directory = tarfile.TarInfo("patched_qa_uploads")
+                  directory.type = tarfile.DIRTYPE
+                  handle.addfile(directory)
+                  for i in range(10):
+                      content = ("media_fixture_" + str(i)).encode()
+                      member = tarfile.TarInfo("patched_qa_uploads/user/img-" + str(i) + ".png")
+                      member.size = len(content)
+                      handle.addfile(member, io.BytesIO(content))
+                      (f.MEDIA / "user").mkdir(exist_ok=True)
+                      (f.MEDIA / "user" / ("img-" + str(i) + ".png")).write_bytes(content)
+
+              sha = hashlib.sha256(tarpath.read_bytes()).hexdigest()
+              (f.SNAPSHOT / "manifest.json").write_text(json.dumps({
+                  "verified": True,
+                  "patched_uploads": {
+                      "archive": "qa_uploads_patched.tar.gz",
+                      "files": 10,
+                      "sha256": sha
+                  }
+              }))
+              original = f.verified_archive()
+              assert len(original) == 10
+              assert f.current_files() == original
+              (f.MEDIA / "tmp").mkdir()
+              (f.MEDIA / "tmp" / "leftover.png").write_bytes(b"leftover")
+              current = f.current_files()
+              extras = set(current) - set(original)
+              assert extras == {"tmp/leftover.png"}, extras
+              assert f.category("tmp/leftover.png") == "temporary/cache"
+              assert f.category("user/avatar/55/thumb.jpg") == "avatar/or-thumbnail"
+              assert f.category("misc/unknown.bin") == "other"
+              assert f.shasum(tarpath)[1] == sha
+              print("SANDBOX FORENSIC DIFF / CACHE CLASSIFICATION PASS")
+          PY
+      - name: Enforce no unsafe mutation methods or sensitive data prints
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("scripts/cafe_sandbox_media_forensics.py").read_text()
+          for token in ["FORENSICS READ-ONLY COMPLETE", "SANDBOX/LIVE ISOLATION",
+                        "sha256", "RESIDUAL GENERATED ACCEPT-USERS",
+                        "ADDED FILES", "CHANGED BASELINE FILES"]:
+              assert token in s, token
+          for forbidden in [
+              "unlink(", "rmtree(", "rmdir(", "write_bytes(",
+              "write_text(", "mkdir(", "docker stop", "docker rm",
+              "docker restart", "psql -c DELETE", "db:drop",
+              "db:reset", "extractall(", "print(name)"]:
+              assert forbidden not in s, forbidden
+          print("FORENSICS NO-MUTATION STATIC GUARD PASS")
+          PY

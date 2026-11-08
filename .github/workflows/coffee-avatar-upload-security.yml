@@ -1,0 +1,46 @@
+name: Cafe security upload policy (patched CarrierWave CI)
+on:
+  push:
+    branches: [feature/cafe-upload-security-gate-20261104]
+  pull_request:
+    branches: [feature/cafe-account-corner-responsive-20261104]
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-preflight-syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile local preflight without accessing Docker
+        run: python3 -m py_compile scripts/cafe_security_preflight.py
+  patched-avatar-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ruby:2.5.8
+    env:
+      BUNDLE_PATH: /tmp/cafe-bundle
+      RUBYOPT: -rlogger
+      RAILS_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Bundler for original Ruby 2.5 app
+        run: gem install bundler -v 2.2.13 --no-document
+      - name: Resolve fixed CarrierWave inside CI only
+        run: |
+          ruby -e "p = 'Gemfile'; s = File.read(p); old = %q(gem 'carrierwave'); abort('Unexpected Gemfile') unless s.scan(old).length == 1; File.write(p, s.sub(old, %q(gem 'carrierwave', '= 2.2.7')))"
+          bundle _2.2.13_ lock --add-platform x86_64-linux
+          bundle _2.2.13_ update carrierwave --conservative
+          ruby -e "abort('CarrierWave fix not resolved') unless File.read('Gemfile.lock').include?('carrierwave (2.2.7)')"
+          echo "==== CI-only dependency diff ===="
+          git diff -- Gemfile Gemfile.lock
+      - name: Install CI bundle
+        run: bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Assert patched release
+        run: |
+          bundle _2.2.13_ exec ruby -e "require 'carrierwave'; abort('wrong CarrierWave version') unless Gem.loaded_specs.fetch('carrierwave').version.to_s == '2.2.7'; puts 'CARRIERWAVE 2.2.7 VERSION PASS'"
+      - name: Validate signature, extension, MIME and byte-size policy
+        run: bundle _2.2.13_ exec ruby test/security/cafe_avatar_policy_test.rb

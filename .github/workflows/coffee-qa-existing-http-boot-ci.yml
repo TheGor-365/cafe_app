@@ -1,0 +1,113 @@
+name: Cafe isolated QA HTTP 3002 boot safety and mock acceptance
+
+on:
+  push:
+    branches: [feature/cafe-qa-persistent-pg-recovery-20261106]
+  pull_request:
+    branches: [feature/cafe-p12-fifth-only-schema-loader-20261105]
+
+permissions:
+  contents: read
+
+jobs:
+  qa-existing-web-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and strict exclusive CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile scripts/cafe_qa_existing_http_boot_20261106.py
+          python3 scripts/cafe_qa_existing_http_boot_20261106.py --help | grep -F -- '--check'
+          python3 scripts/cafe_qa_existing_http_boot_20261106.py --help | grep -F -- '--start'
+          python3 scripts/cafe_qa_existing_http_boot_20261106.py --help | grep -F -- '--verify'
+          if python3 scripts/cafe_qa_existing_http_boot_20261106.py --start --verify >/dev/null 2>&1; then
+            echo 'Mutually exclusive modes bypassed' >&2
+            exit 1
+          fi
+      - name: Static explicit allowlist/never-touch-production safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          content=Path('scripts/cafe_qa_existing_http_boot_20261106.py').read_text()
+          tree=ast.parse(content)
+          names={x.name for x in ast.walk(tree) if isinstance(x,ast.FunctionDef)}
+          assert {'baseline','start','verify','verified_resume','http','git_sha'} <= names
+          expected=(
+              'cafe_qa_persistent_resume_v1_20261106.py',
+              'f87419e7119b0c360db70ebb3684c857424922f1',
+              'cafe-app-patched-qa-candidate-20261104',
+              'cafe-upload-qa-proxy-patched-20261104',
+              'cafe-upload-qa-net-20261103',
+              'cafe-app-private',
+              'cafe-upload-qa-access-20261103',
+              'cafe-upload-qa-pg-20261103',
+              'resume.verify()',
+              'main.pg_audit("running")',
+              '"127.0.0.1"',
+              '"3002/tcp"',
+              'CarrierWave',
+              '2.2.7',
+          )
+          for word in expected: assert word in content,word
+          forbidden=(
+              'docker compose down',
+              'docker-compose',
+              'db:reset',
+              'db:drop',
+              'db:schema:load',
+              'db:prepare',
+              'docker volume rm',
+              'docker rm ',
+              'docker restart',
+              'git checkout',
+              'git reset',
+              'PGPASSWORD=',
+              '--publish',
+              '--privileged',
+          )
+          for word in forbidden: assert word not in content,word
+          print('CAFE QA HTTP START EXACT TARGETS / NO LIVE MUTATION PASS')
+          PY
+      - name: Execute mocked scoped boot and already-running idempotency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          from unittest.mock import patch,Mock
+          script=Path('scripts/cafe_qa_existing_http_boot_20261106.py')
+          spec=importlib.util.spec_from_file_location('cafe_web_boot_test',script)
+          module=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          web={'State':{'Status':'exited'}}
+          proxy={'State':{'Status':'exited'}}
+          members={module.WEB:web,module.PROXY:proxy}
+          original=Mock()
+          original.inspect.side_effect=lambda k,n: members[n]
+          calls=[]
+          def fake_run(args,**kw):
+              assert args==['docker','start',module.WEB] or args==['docker','start',module.PROXY],args
+              calls.append(args)
+              members[args[-1]]['State']['Status']='running'
+              return CompletedProcess(args,0,b'',b'')
+          fake_resume=Mock()
+          with patch.object(module,'baseline',return_value=(fake_resume,original,web,proxy)), \
+               patch.object(module.subprocess,'run',side_effect=fake_run), \
+               patch.object(module,'http',return_value=(200,'')), \
+               patch.object(module,'verify') as verify_mock:
+              module.start()
+              assert calls==[['docker','start',module.WEB],['docker','start',module.PROXY]]
+              verify_mock.assert_called_once()
+              module.start()
+              assert len(calls)==2,'already-running QA services must not be restarted'
+          print('CAFE QA ONLY EXISTING PATCHED RAILS + EXISTING PROXY START PASS')
+          print('CAFE QA NO RESTART / NO PRODUCTION / NO REAL DOCKER IN CI PASS')
+          PY

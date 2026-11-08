@@ -1,4 +1,4 @@
-ActiveRecord::Schema.define(version: 2021_04_08_124332) do
+ActiveRecord::Schema.define(version: 2026_11_07_000200) do
 
   enable_extension "plpgsql"
 
@@ -13,6 +13,8 @@ ActiveRecord::Schema.define(version: 2021_04_08_124332) do
   create_table "order_items", force: :cascade do |t|
     t.integer "quantity"
     t.bigint "product_id", null: false
+    t.bigint "product_variant_id"
+    t.string "variant_label_snapshot"
     t.bigint "order_id", null: false
     t.decimal "total"
     t.decimal "unit_price"
@@ -20,13 +22,60 @@ ActiveRecord::Schema.define(version: 2021_04_08_124332) do
     t.datetime "updated_at", precision: 6, null: false
     t.index ["order_id"], name: "index_order_items_on_order_id"
     t.index ["product_id"], name: "index_order_items_on_product_id"
+    t.index ["product_variant_id"], name: "index_order_items_on_product_variant_id"
+  end
+
+  create_table "product_variants", force: :cascade do |t|
+    t.bigint "product_id", null: false
+    t.string "code", null: false
+    t.string "label", null: false
+    t.integer "price_cents", null: false
+    t.boolean "available", default: true, null: false
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+    t.index ["product_id", "code"], name: "index_product_variants_on_product_id_and_code", unique: true
+    t.index ["product_id"], name: "index_product_variants_on_product_id"
+  end
+
+  create_table "product_modifier_options", force: :cascade do |t|
+    t.bigint "product_id", null: false
+    t.string "group_code", null: false
+    t.string "code", null: false
+    t.string "label", null: false
+    t.integer "price_cents", default: 0, null: false
+    t.boolean "available", default: true, null: false
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+    t.index ["product_id", "group_code", "code"], name: "index_coffee_modifiers_on_product_group_code", unique: true
+    t.index ["product_id"], name: "index_product_modifier_options_on_product_id"
+  end
+
+  create_table "order_item_modifiers", force: :cascade do |t|
+    t.bigint "order_item_id", null: false
+    t.bigint "product_modifier_option_id", null: false
+    t.string "group_code_snapshot", null: false
+    t.string "label_snapshot", null: false
+    t.integer "price_cents_snapshot", null: false
+    t.datetime "created_at", precision: 6, null: false
+    t.datetime "updated_at", precision: 6, null: false
+    t.index ["order_item_id", "group_code_snapshot"], name: "index_coffee_cart_options_on_line_and_group", unique: true
+    t.index ["order_item_id"], name: "index_order_item_modifiers_on_order_item_id"
+    t.index ["product_modifier_option_id"], name: "index_order_item_modifiers_on_product_modifier_option_id"
   end
 
   create_table "orders", force: :cascade do |t|
+    t.string "status", default: "cart", null: false
+    t.string "pickup_name"
+    t.string "pickup_slot"
+    t.text "pickup_note"
+    t.datetime "placed_at", precision: 6
+    t.bigint "user_id"
     t.decimal "subtotal"
     t.decimal "total"
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
+    t.index ["status", "placed_at"], name: "index_orders_on_status_and_placed_at"
+    t.index ["user_id"], name: "index_orders_on_user_id"
   end
 
   create_table "products", force: :cascade do |t|
@@ -75,5 +124,11 @@ ActiveRecord::Schema.define(version: 2021_04_08_124332) do
 
   add_foreign_key "order_items", "orders"
   add_foreign_key "order_items", "products"
+  add_foreign_key "order_items", "product_variants"
+  add_foreign_key "order_item_modifiers", "order_items"
+  add_foreign_key "order_item_modifiers", "product_modifier_options"
+  add_foreign_key "product_modifier_options", "products"
+  add_foreign_key "product_variants", "products"
   add_foreign_key "products", "categories"
+  add_foreign_key "orders", "users"
 end

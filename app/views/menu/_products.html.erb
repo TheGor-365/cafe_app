@@ -1,82 +1,133 @@
-<div class="row">
-  <% @cats.each do |cat| %>
+<% products_by_category = @products.group_by(&:category_id) %>
 
-    <% if cat.products.first.present? %>
-      <%= product_image cat.products.first %>
-    <% end %>
+<% if @products.empty? %>
+  <div class="coffee-menu__empty" role="status">
+    <h2>No matching items</h2>
+    <p>Try another search or remove a dietary filter.</p>
+    <%= link_to 'View the full menu', menu_path, class: 'coffee-menu__reset-link' %>
+  </div>
+<% else %>
+  <p class="coffee-menu__result-count"><%= pluralize(@products.size, 'item') %> available in this demo menu</p>
+  <% @cats.each do |category| %>
+    <% items = products_by_category.fetch(category.id, []) %>
+    <% next if items.empty? %>
+    <section class="coffee-menu__section" aria-labelledby="coffee-category-<%= category.id %>">
+      <header class="coffee-menu__section-header">
+        <h2 id="coffee-category-<%= category.id %>"><%= category.heading %></h2>
+        <% if category.body.present? %><p><%= category.body %></p><% end %>
+      </header>
 
-    <div class="col-12 mt-3">
-      <h1 class="text-muted" style="text-align:center;"><%= cat.heading %></h1>
-      <hr>
-    </div>
-
-    <% @products.each do |product| %>
-
-      <% if product.category == cat %>
-        <div class="col-4 mb-5">
-
-          <h5><%= product.name %></h5>
-
-          <div class="card-text">
-            <div class="mt-3">
-
-              <small class="float-left text-muted">Price</small>
-
-              <p class="float-right text-muted mb-0">
-                <strong>
-                  $<%= product.price %> <%= '| Available for catering' if product.catering? %>
+      <div class="coffee-menu__grid">
+        <% items.each do |product| %>
+          <article class="coffee-product-card">
+            <div class="coffee-product-card__visual">
+              <% if product.image.present? && product.image.url.present? %>
+                <%= image_tag product.image.url, alt: product.name, loading: 'lazy', class: 'coffee-product-card__image' %>
+              <% else %>
+                <span class="coffee-product-card__placeholder" aria-hidden="true">☕</span>
+              <% end %>
+              <% if product.featured? %><span class="coffee-product-card__featured">Popular pick</span><% end %>
+            </div>
+            <div class="coffee-product-card__content">
+              <h3><%= product.name %></h3>
+              <p class="coffee-product-card__description"><%= truncate(product.description.to_s, length: 125) %></p>
+              <div class="coffee-product-card__badges" aria-label="Product information">
+                <% if product.vegan? %><span>Vegan</span><% end %>
+                <% if product.dairy_free? %><span>Dairy free</span><% end %>
+                <% if product.gluten_free? %><span>Gluten free</span><% end %>
+              </div>
+              <% variants = product.product_variants.select(&:available?).sort_by(&:price_cents) %>
+              <% configurable = product.product_variants.any? %>
+              <div class="coffee-product-card__footer">
+                <strong class="coffee-product-card__price">
+                  <% if configurable && variants.any? %>
+                    From <%= number_to_currency(BigDecimal(variants.first.price_cents.to_s) / 100) %>
+                  <% elsif configurable %>
+                    Temporarily unavailable
+                  <% else %>
+                    <%= number_to_currency(product.price) %>
+                  <% end %>
                 </strong>
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <div class="accordion" id="accordionExample">
-
-              <button
-                class="btn btn-link btn-block text-left text-muted text-decoration-none text-dark pl-0 pt-0 pb-2"
-                type="button"
-                data-toggle="collapse"
-                data-target="#<%= product.name %>-description"
-                aria-expanded="true"
-                aria-controls="collapseOne">
-                <small>
-                  View  Description
-                </small>
-              </button>
-
-              <div
-                id="<%= product.name %>-description"
-                class="collapse mb-2"
-                aria-labelledby="headingOne"
-                data-parent="#accordionExample">
-                <div class="card-body bg-light mt-2">
-                  <small class="text-muted">
-                    <%= product.description %>
-                  </small>
+                <%= link_to 'Details', product_path(product), class: 'coffee-product-card__details' %>
+              </div>
+              <%# Without JavaScript, this native details element exposes the full working HTML form. %>
+              <details class="coffee-config" data-coffee-config>
+                <summary class="coffee-config__trigger" aria-label="<%= configurable ? 'Customize' : 'Add' %> <%= product.name %>">
+                  <span><%= configurable ? 'Customize' : 'Add to cart' %></span>
+                  <span aria-hidden="true">↗</span>
+                </summary>
+                <div class="coffee-config__sheet" data-coffee-config-panel
+                     aria-labelledby="coffee-config-title-<%= product.id %>">
+                  <div class="coffee-config__header">
+                    <div>
+                      <p class="coffee-config__eyebrow">Gor's Coffee · Demo order</p>
+                      <h4 id="coffee-config-title-<%= product.id %>"><%= product.name %></h4>
+                      <p><%= truncate(product.description.to_s, length: 170) %></p>
+                    </div>
+                    <button type="button" class="coffee-config__close" data-coffee-config-close
+                            aria-label="Close configuration for <%= product.name %>">Close ×</button>
+                  </div>
+              <%= form_with url: order_items_path, scope: :order_item, method: :post,
+                    local: true, class: 'coffee-product-card__cart-form',
+                    data: { coffee_price_form: true,
+                            base_price_cents: (product.price * 100).round.to_i } do |form| %>
+                <%= form.hidden_field :product_id, value: product.id, id: nil %>
+                <% if variants.any? %>
+                  <div class="coffee-product-card__config">
+                    <%= form.label :product_variant_id, 'Drink size', for: "coffee-size-#{product.id}" %>
+                    <%= form.select :product_variant_id,
+                        options_for_select(variants.sort_by(&:price_cents).map { |v|
+                          ["#{v.label} — #{number_to_currency(BigDecimal(v.price_cents.to_s) / 100)}",
+                            v.id, { data: { price_cents: v.price_cents } }]
+                        }),
+                        {}, id: "coffee-size-#{product.id}", class: 'coffee-product-card__select' %>
+                  </div>
+                <% end %>
+                <% [['milk', 'Milk choice'], ['syrup', 'Syrup'], ['shot', 'Extra espresso']].each do |group_code, label| %>
+                  <% options = product.product_modifier_options.select { |o| o.available? && o.group_code == group_code } %>
+                  <% next if options.empty? %>
+                  <div class="coffee-product-card__config">
+                    <% field_id = "coffee-#{group_code}-#{product.id}" %>
+                    <%= label_tag field_id, label %>
+                    <%= select_tag 'order_item[modifier_option_ids][]',
+                          options_for_select([['No extra (+$0.00)', '', { data: { price_cents: 0 } }]] +
+                            options.sort_by(&:price_cents).map { |o|
+                              ["#{o.label} (+#{number_to_currency(BigDecimal(o.price_cents.to_s) / 100)})",
+                                o.id, { data: { price_cents: o.price_cents } }]
+                            }), id: field_id, class: 'coffee-product-card__select' %>
+                  </div>
+                <% end %>
+                <%= form.label :quantity, 'Qty', for: "coffee-qty-#{product.id}" %>
+                <div class="coffee-quantity" data-coffee-quantity-control>
+                  <button type="button" class="coffee-quantity__step" data-coffee-quantity-step="-1"
+                          aria-label="Decrease quantity for <%= product.name %>">−</button>
+                  <%= form.number_field :quantity, value: 1, min: 1, max: 20, required: true,
+                        id: "coffee-qty-#{product.id}", class: 'coffee-product-card__quantity',
+                        data: { coffee_quantity: true, coffee_quantity_input: true } %>
+                  <button type="button" class="coffee-quantity__step" data-coffee-quantity-step="1"
+                          aria-label="Increase quantity for <%= product.name %>">+</button>
                 </div>
-              </div>
-
+                <% if variants.any? %>
+                  <output class="coffee-product-card__live-price"
+                          data-coffee-price-output aria-live="polite" aria-atomic="true"
+                          for="coffee-size-#{product.id} coffee-qty-#{product.id}">
+                    <span data-coffee-unit-price>Unit: <%= number_to_currency(BigDecimal(variants.first.price_cents.to_s) / 100) %></span>
+                    <strong data-coffee-total-price>Total: <%= number_to_currency(BigDecimal(variants.first.price_cents.to_s) / 100) %></strong>
+                  </output>
+                  <p class="coffee-product-card__price-note">Estimate shown before checkout; the server verifies your selections and final price.</p>
+                <% elsif configurable %>
+                  <p class="coffee-product-card__unavailable" role="status">All sizes are currently unavailable.</p>
+                <% end %>
+                <%= form.submit 'Add to cart', class: 'coffee-product-card__add',
+                      disabled: configurable && variants.empty? %>
+              <% end %>
+                  <p class="coffee-config__disclaimer">Demo basket only · No payment or actual order is placed.</p>
+                </div>
+              </details>
             </div>
-          </div>
-
-          <%= form_with model: @order_item do |f| %>
-
-            <%= f.hidden_field :product_id, value: product.id %>
-            <div class="input-group input-group-sm mt-4">
-              <small class="mt-2">Count</small>
-              <%= f.number_field :quantity, value: 1, min: 1, class: 'form-control', id: 'product-count-field' %>
-              <div class="input-group-append">
-                <%= f.submit "Add To Cart", class: "btn btn-sm btn-outline-primary" %>
-                <%= button_to "Buy now", product, class: "btn btn-sm btn-outline-success" %>
-                <%= button_to "Details", product, method: :get, class: "btn btn-sm btn-outline-secondary" %>
-              </div>
-            </div>
-          <% end %>
-
-        </div>
-      <% end %>
-    <% end %>
-
+          </article>
+        <% end %>
+      </div>
+    </section>
   <% end %>
-</div>
+<% end %>

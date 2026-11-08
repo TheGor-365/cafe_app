@@ -1,17 +1,61 @@
-<% @order_items.each do |item| %>
-
-  <h3><%= item.product.name %></h3>
-  <h3><%= item.product.price %></h3>
-
-  <%= form_with model: item do |f| %>
-    <%= f.hidden_field :product_id, value: item.product.id %>
-    <%= f.number_field :quantity, value: item.quantity.to_i %>
-    <%= f.submit 'Update Cart', class: 'btn btn-sm btn-primary' %>
-    <%= link_to 'Remove Items', item, method: :delete, remote: true, class: 'btn btn-sm btn-danger' %>
+<% if @order_items.empty? %>
+  <section class="cafe-cart__empty" role="status">
+    <div aria-hidden="true" class="cafe-cart__empty-icon">☕</div>
+    <h2>Your cart is empty</h2>
+    <p>Explore the menu and find something worth a coffee break.</p>
+    <%= link_to 'Browse menu', menu_path, class: 'cafe-cart__primary-action' %>
+  </section>
+<% else %>
+  <div class="cafe-cart__items">
+    <% @order_items.each do |item| %>
+      <article class="cafe-cart__item">
+        <div>
+          <p class="cafe-cart__item-category"><%= item.product.category.heading %></p>
+          <h2><%= item.product.name %></h2>
+          <% if item.variant_label_snapshot.present? || item.order_item_modifiers.any? %>
+            <ul class="cafe-cart__selected-options" aria-label="Drink configuration">
+              <% if item.variant_label_snapshot.present? %>
+                <li>Size: <%= item.variant_label_snapshot %></li>
+              <% end %>
+              <% item.order_item_modifiers.each do |extra| %>
+                <li><%= extra.label_snapshot %> (+<%= number_to_currency(BigDecimal(extra.price_cents_snapshot.to_s) / 100) %>)</li>
+              <% end %>
+            </ul>
+          <% end %>
+          <p class="cafe-cart__item-price">Unit price: <%= number_to_currency(item.unit_price) %></p>
+          <strong class="cafe-cart__item-total"><%= number_to_currency(item.total) %></strong>
+        </div>
+        <div class="cafe-cart__item-actions">
+          <%= form_with model: item, local: true, class: 'cafe-cart__update-form' do |form| %>
+            <%= form.label :quantity, "Quantity for #{item.product.name}" %>
+            <div class="coffee-quantity" data-coffee-quantity-control>
+              <button type="button" class="coffee-quantity__step" data-coffee-quantity-step="-1"
+                      aria-label="Decrease quantity for <%= item.product.name %>">−</button>
+              <%= form.number_field :quantity, min: 1, max: 20, required: true,
+                    class: 'cafe-cart__quantity', data: { coffee_quantity_input: true } %>
+              <button type="button" class="coffee-quantity__step" data-coffee-quantity-step="1"
+                      aria-label="Increase quantity for <%= item.product.name %>">+</button>
+            </div>
+            <%= form.submit 'Update', class: 'cafe-cart__update-button' %>
+          <% end %>
+          <%= button_to 'Remove', order_item_path(item), method: :delete,
+                class: 'cafe-cart__remove-button', form_class: 'cafe-cart__remove-form' %>
+        </div>
+      </article>
+    <% end %>
+  </div>
+  <aside class="cafe-cart__summary" aria-label="Cart summary">
+    <span>Subtotal · <%= pluralize(@order_items.sum { |item| item.quantity.to_i }, 'item') %></span>
+    <strong><%= number_to_currency(@order_items.sum { |item| item.total || 0 }) %></strong>
+  </aside>
+  <% if @mergeable_lines %>
+    <div class="cafe-cart__merge-block">
+      <p>Identical items can be grouped without changing their saved price or chosen extras.</p>
+      <%= button_to 'Combine matching items', consolidate_cart_path, method: :post,
+            class: 'cafe-cart__merge-button' %>
+    </div>
   <% end %>
-
-  <h2>Subtotal: <%= item.total %></h2>
-
+  <p class="cafe-cart__disclaimer">Portfolio demo only: use fictional sample details. No payments, preparation or delivery.</p>
+  <%= link_to 'Continue to demo checkout', demo_checkout_path, class: 'cafe-cart__primary-action' %>
+  <%= link_to 'Continue shopping', menu_path, class: 'cafe-cart__secondary-action' %>
 <% end %>
-
-<h3>Your current order has a total of: <%= current_order.subtotal %></h3>

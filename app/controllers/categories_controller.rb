@@ -1,9 +1,13 @@
 class CategoriesController < ApplicationController
 
+  before_action :authenticate_user!
+  before_action :require_admin!
+
   before_action :set_category, only: %i[ show edit update destroy ]
 
   def index
-    @categories = Category.all
+    @page = 'admin'
+    @categories = Category.includes(:products).order(:heading)
   end
 
   def show; end
@@ -36,10 +40,12 @@ class CategoriesController < ApplicationController
   end
 
   def destroy
-    @category.destroy
-
-    respond_to do |format|
-      format.html { redirect_to categories_url }
+    if @category.products.exists?
+      redirect_to categories_url, alert: 'This category contains products. Reassign them before deleting it.'
+    elsif @category.destroy
+      redirect_to categories_url, notice: 'Category removed.'
+    else
+      redirect_to categories_url, alert: 'Category could not be removed.'
     end
   end
 

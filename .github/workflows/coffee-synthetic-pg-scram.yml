@@ -1,0 +1,132 @@
+name: Cafe synthetic-only PostgreSQL SCRAM gate
+on:
+  push:
+    branches: [feature/cafe-synthetic-pg-scram-gate-20261105]
+  pull_request:
+    branches: [feature/cafe-e2e-write-boundary-ci-20261105]
+permissions:
+  contents: read
+jobs:
+  synthetic-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and exact non-destructive staged modes
+        run: |
+          python3 -m py_compile scripts/cafe_synthetic_pg_scram_gate.py
+          python3 scripts/cafe_synthetic_pg_scram_gate.py --help
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          p = Path("scripts/cafe_synthetic_pg_scram_gate.py")
+          source = p.read_text()
+          ast.parse(source)
+          for required in (
+              "FIFTH SYNTHETIC PG OWNER", "SCRAM AUTH",
+              "POSTGRES_PASSWORD_FILE=", "POSTGRES_HOST_AUTH_METHOD=scram-sha-256",
+              "POSTGRES_INITDB_ARGS=--auth-local=peer --auth-host=scram-sha-256",
+              "cafe-upload-security-synthetic-net-20261105",
+              "cafe-upload-security-synthetic-pg-20261105",
+              '"--read-only"', '"--restart", "no"',
+              '"network", "create", "--internal"',
+              '"--tmpfs", "/var/lib/postgresql/data:rw,size=512m,mode=700"',
+              '"--tmpfs", "/var/run/postgresql:rw,size=16m,mode=3775"',
+              '"--tmpfs", "/tmp:rw,size=64m,mode=1777"',
+              "SECRET.chmod(0o644)", "STAGE.mkdir(mode=0o700)",
+              "len(set(identities + [fifth])) == 5",
+              '"SELECT COUNT(*) FROM pg_tables',
+              "len(mounts) == 1", "PG_IMAGE =",
+          ):
+              assert required in source, required
+          for rejected in (
+              'docker("rm"', 'docker("stop"', 'docker("restart"',
+              'docker("network", "connect"', 'docker("run"', "pg_restore",
+              "db:migrate", "db:schema:load", "git reset --hard",
+              "os.unlink(", "shutil.rmtree(", "POSTGRES_PASSWORD=" + "secrets.",
+          ):
+              assert rejected not in source, rejected
+          required_functions = ("check", "create", "verify_created",
+                                "bootstrap", "verify_running", "source_baseline")
+          defs = {n.name for n in ast.parse(source).body
+                  if isinstance(n, ast.FunctionDef)}
+          assert set(required_functions).issubset(defs)
+          print("SYNTHETIC PG NO-SHARED-DATA / FAIL-CLOSED SOURCE PASS")
+          PY
+      - name: Real throwaway postgres16 SCRAM secret-file bootstrap (CI only)
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, tempfile, time, uuid
+          from pathlib import Path
+          suffix=uuid.uuid4().hex[:10]
+          network="ci-cafe-scram-net-"+suffix
+          name="ci-cafe-scram-pg-"+suffix
+          password="CIOnlyTest_" + suffix + "abcABC123"
+          def docker(*args, check=True):
+              x=subprocess.run(["docker", *args], capture_output=True, text=True)
+              if check and x.returncode:
+                  raise RuntimeError("Disposable Docker CI step failed: " + str(args[0]))
+              return x
+          with tempfile.TemporaryDirectory() as directory:
+              stage=Path(directory) / "private"
+              stage.mkdir(mode=0o700)
+              stage.chmod(0o700)
+              secret=stage/"password"
+              secret.write_text(password, encoding="ascii")
+              secret.chmod(0o644)
+              try:
+                  docker("pull", "postgres:16")
+                  docker("network", "create", "--internal", network)
+                  docker("create", "--name", name, "--network", network,
+                         "--network-alias", "cafe-synthetic-postgres",
+                         "--read-only", "--memory", "768m",
+                         "--pids-limit", "256", "--restart", "no",
+                         "--security-opt", "no-new-privileges",
+                         "--tmpfs", "/var/lib/postgresql/data:rw,size=512m,mode=700",
+                         "--tmpfs", "/var/run/postgresql:rw,size=16m,mode=3775",
+                         "--tmpfs", "/tmp:rw,size=64m,mode=1777",
+                         "--mount", "type=bind,source="+str(secret)+",target=/run/secrets/cafe_synthetic_postgres,readonly",
+                         "--env", "POSTGRES_PASSWORD_FILE=/run/secrets/cafe_synthetic_postgres",
+                         "--env", "POSTGRES_HOST_AUTH_METHOD=scram-sha-256",
+                         "--env", "POSTGRES_INITDB_ARGS=--auth-local=peer --auth-host=scram-sha-256",
+                         "--env", "POSTGRES_DB=cafe_synthetic", "postgres:16")
+                  info=json.loads(docker("inspect",name).stdout)[0]
+                  net=json.loads(docker("network","inspect",network).stdout)[0]
+                  assert info["State"]["Status"]=="created"
+                  assert info["HostConfig"]["ReadonlyRootfs"]
+                  assert not info["HostConfig"]["PortBindings"]
+                  assert not info.get("Mounts") or (
+                      len(info["Mounts"])==1
+                      and info["Mounts"][0]["Destination"]=="/run/secrets/cafe_synthetic_postgres"
+                      and info["Mounts"][0]["RW"] is False)
+                  assert net["Internal"] is True
+                  assert not any(x.startswith("POSTGRES_PASSWORD=") for x in info["Config"]["Env"])
+                  docker("start", name)
+                  for _ in range(65):
+                      ready=docker("exec","--user","postgres",name,"pg_isready",
+                                   "-U","postgres","-d","cafe_synthetic",check=False)
+                      if ready.returncode==0: break
+                      time.sleep(1)
+                  else: raise RuntimeError("Synthetic CI PG did not start")
+                  def query(q):
+                      return docker("exec","--user","postgres",name,"psql",
+                          "-X","-At","-v","ON_ERROR_STOP=1","-U","postgres",
+                          "-d","cafe_synthetic","-c",q).stdout.strip()
+                  assert query("SHOW password_encryption;")=="scram-sha-256"
+                  assert query("SELECT COUNT(*) FROM pg_hba_file_rules WHERE type IN ('host','hostssl','hostnossl') AND auth_method<>'scram-sha-256';")=="0"
+                  assert query("SELECT COUNT(*) FROM pg_tables WHERE schemaname='public';")=="0"
+                  assert query("SELECT system_identifier::text FROM pg_control_system();").isdigit()
+                  correct=docker("exec","-e","PGPASSWORD="+password,name,"psql",
+                      "-h","127.0.0.1","-At","-U","postgres","-d",
+                      "cafe_synthetic","-c","SELECT 1;")
+                  assert correct.stdout.strip()=="1"
+                  incorrect=docker("exec","-e","PGPASSWORD=IncorrectSyntheticPassword",name,"psql",
+                      "-h","127.0.0.1","-At","-U","postgres","-d",
+                      "cafe_synthetic","-c","SELECT 1;",check=False)
+                  assert incorrect.returncode!=0
+                  print("POSTGRES16 SCRAM CORRECT-PASSWORD / WRONG-PASSWORD REJECTION PASS")
+                  print("NO HOST PORT / READONLY ROOT / PRIVATE SECRET / EMPTY SYNTHETIC DB PASS")
+              finally:
+                  docker("rm","-f",name,check=False)
+                  docker("network","rm",network,check=False)
+          PY

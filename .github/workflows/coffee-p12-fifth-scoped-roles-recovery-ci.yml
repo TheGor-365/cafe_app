@@ -1,0 +1,131 @@
+name: Cafe P1.2 fifth SCRAM scoped roles recovery guard (no owner Docker)
+
+on:
+  push:
+    branches: [feature/cafe-p12-fifth-scoped-roles-recovery-20261106]
+  pull_request:
+    branches: [feature/cafe-p12-reboot-fifth-scram-20261106]
+
+permissions:
+  contents: read
+
+jobs:
+  fifth-scoped-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static role scope, exact sources, CLI and forbidden commands
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/cafe_p12_fifth_scoped_roles_recovery_20261106.py
+          python3 scripts/cafe_p12_fifth_scoped_roles_recovery_20261106.py --help | grep -F -- '--provision'
+          if python3 scripts/cafe_p12_fifth_scoped_roles_recovery_20261106.py --check --provision >/dev/null 2>&1; then
+            echo 'Mutually exclusive role modes failed' >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path("scripts/cafe_p12_fifth_scoped_roles_recovery_20261106.py").read_text()
+          t=ast.parse(s)
+          for must in (
+             "b9bd1df811d61e0e177e4c2f16f4d680248bb206",
+             "6c033b139ec9921c00c39e691010a44b55bf49bf",
+             "cafe_p12_fifth_scram_reboot_v1_20261106.py",
+             "cafe-upload-security-synthetic-pg-20261105",
+             "cafe-upload-security-synthetic-net-20261105",
+             "cafe_synth_owner","cafe_synth_app","os.O_EXCL",
+             "old.source_baseline()", 'old.check_new("running")',
+             "scram-sha-256", "sql_script.encode",
+             "login_test(password)", "not login_test",
+             "old_marker(boot)", "APP_SECRET.chmod(0o600)"
+          ):
+             assert must in s,must
+          for forbidden in ('db:prepare','db:drop','db:migrate',
+             'db:schema:load','pg_restore','pg_dump',
+             '"docker","start"','"docker","stop"','"docker","create"',
+             '"docker","run"','"docker","restart"','"docker","rm"',
+             '"docker","volume"','git reset','git checkout',
+             'shutil.rmtree'):
+             assert forbidden not in s,forbidden
+          assert s.count('"docker","exec"')==3
+          funcs={n.name for n in ast.walk(t) if isinstance(n,ast.FunctionDef)}
+          assert {"before","provision","verify","login_test","reviewed_sql",
+                  "secret_audit","old_marker","original"}<=funcs
+          print("P1.2 FIFTH SCOPED ROLES CODE/SHA/NO DESTRUCTIVE SQL/DOCKER PASS")
+          PY
+      - name: "Mock transaction: exclusive marker before fifth-only SQL; credential only on stdin"
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util,hashlib,json
+          from pathlib import Path
+          from subprocess import CompletedProcess
+          from tempfile import TemporaryDirectory
+          from unittest.mock import patch
+          spec=importlib.util.spec_from_file_location('gate','scripts/cafe_p12_fifth_scoped_roles_recovery_20261106.py')
+          gate=importlib.util.module_from_spec(spec);spec.loader.exec_module(gate)
+          calls=[]
+          with TemporaryDirectory() as tmp:
+            stage=Path(tmp)/'private'
+            marker=Path(tmp)/'roles_once.json'
+            def only_target(argv,stdin=None,**kwargs):
+              assert tuple(argv)==gate.SQL_ARGS, "SQL sent outside fifth"
+              assert marker.is_file(),"SQL executed before attempt marker"
+              assert stage.is_dir() and (stage/'app_password').is_file()
+              pwd=(stage/'app_password').read_bytes()
+              assert pwd in stdin, "secret not in stdin SQL"
+              assert pwd not in repr(argv).encode(), "credential leaked in Docker argv"
+              assert b"CIOnlySyntheticRolePass_20261105" not in stdin
+              calls.append(1)
+              return CompletedProcess(argv,0,b"",b"")
+            src="""BEGIN;
+              CREATE ROLE cafe_synth_owner NOLOGIN;
+              CREATE ROLE cafe_synth_app LOGIN PASSWORD 'CIOnlySyntheticRolePass_20261105';
+              COMMIT;
+            """
+            with patch.object(gate,'STAGE',stage), \
+                 patch.object(gate,'APP_SECRET',stage/'app_password'), \
+                 patch.object(gate,'MARKER',marker), \
+                 patch.object(gate,'before',return_value='12345678901234567890'), \
+                 patch.object(gate,'reviewed_sql',return_value=src), \
+                 patch.object(gate,'call',side_effect=only_target), \
+                 patch.object(gate,'verify'):
+              gate.provision()
+              assert calls==[1]
+              assert marker.stat().st_mode&0o077==0
+              assert stage.stat().st_mode&0o077==0
+              assert (stage/'app_password').stat().st_mode&0o077==0
+              record=json.loads(marker.read_text())
+              assert record['pg']==gate.PG and record['database']==gate.DB
+              assert hashlib.sha256((stage/'app_password').read_bytes()).hexdigest()==record['app_secret_sha256']
+              try:gate.provision()
+              except FileExistsError:pass
+              else:raise AssertionError('new scoped role attempt marker ignored')
+              assert calls==[1]
+              print('P1.2 MOCK EXACT FIFTH SQL / MARKER-FIRST / SECRET-STDIN / NO REPLAY PASS')
+          PY
+      - name: Mock positive and negative SCRAM login never passes credentials in Docker args
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from subprocess import CompletedProcess
+          from unittest.mock import patch
+          spec=importlib.util.spec_from_file_location('g','scripts/cafe_p12_fifth_scoped_roles_recovery_20261106.py')
+          g=importlib.util.module_from_spec(spec);spec.loader.exec_module(g)
+          correct=b'KeepThisOffArguments_123'
+          bad=b'WrongPass_987'
+          def fake(args,stdin=None,**kwargs):
+             assert args[:6]==('docker','exec','-i','--user','postgres',g.PG)
+             assert correct.decode() not in repr(args) and bad.decode() not in repr(args)
+             if stdin==correct+b'\n':
+                return CompletedProcess(args,0,g.APP.encode()+b'\n',b'')
+             return CompletedProcess(args,2,b'',b'authentication failed')
+          with patch.object(g,'call',side_effect=fake):
+             assert g.login_test(correct)
+             assert not g.login_test(bad)
+          print('P1.2 MOCK PRIVATE APP SCRAM LOGIN POSITIVE/NEGATIVE NO LEAK PASS')
+          PY

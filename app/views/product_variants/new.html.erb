@@ -1,0 +1,8 @@
+<% content_for :title, "New Size · Gor's Coffee" %>
+<main class="cafe-admin cafe-admin--form" aria-labelledby="size-form-title">
+  <header class="cafe-admin__hero"><h1 id="size-form-title">New size · <%= @product.name %></h1></header>
+  <div class="cafe-admin__panel cafe-admin__form-panel">
+    <%= render 'form' %>
+    <%= link_to 'Back to sizes', product_product_variants_path(@product) %>
+  </div>
+</main>

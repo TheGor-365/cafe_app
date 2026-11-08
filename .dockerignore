@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.env.*
+config/master.key
+log/*
+tmp/*
+node_modules/
+vendor/bundle/
+storage/*
+public/uploads/*
+*.sqlite3
+*.db

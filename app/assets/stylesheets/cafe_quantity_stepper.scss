@@ -1,0 +1,55 @@
+/* Quantity steppers are an enhancement; native number inputs remain when JS is off. */
+.coffee-quantity {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: .35rem;
+}
+.coffee-quantity__step {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.65rem;
+  min-width: 2.65rem;
+  height: 2.65rem;
+  padding: 0;
+  color: #40281b;
+  border: 1px solid #c5aa8f;
+  border-radius: .55rem;
+  background: #f5e7d1;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.coffee-quantity--enhanced .coffee-quantity__step { display: inline-flex; }
+.coffee-quantity__step:hover:not(:disabled) { background: #e9d4b4; }
+.coffee-quantity__step:disabled { cursor: not-allowed; opacity: .38; }
+.coffee-quantity__step:focus-visible,
+.coffee-quantity input:focus-visible {
+  outline: 3px solid #b27c40;
+  outline-offset: 2px;
+}
+.coffee-quantity--enhanced input[type="number"] {
+  box-sizing: border-box;
+  width: 3.9rem;
+  height: 2.65rem;
+  min-width: 0;
+  margin: 0;
+  padding: .3rem;
+  text-align: center;
+  font-weight: 700;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.coffee-quantity--enhanced input[type="number"]::-webkit-outer-spin-button,
+.coffee-quantity--enhanced input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.cafe-cart__update-form .coffee-quantity { flex: 0 0 auto; }
+@media (max-width: 640px) {
+  .coffee-quantity__step { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; }
+  .coffee-quantity--enhanced input[type="number"] { height: 2.75rem; }
+}

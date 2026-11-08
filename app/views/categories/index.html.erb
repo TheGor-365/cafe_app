@@ -1,29 +1,46 @@
-<h5 class="mt-5 mb-5">Categories list</h5>
-
-<table class="table table-striped table-bordered">
-  <thead>
-    <tr>
-      <th>Heading</th>
-      <th>Body</th>
-      <th>Display</th>
-      <th colspan="3">Controlls</th>
-    </tr>
-  </thead>
-
-  <tbody>
-    <% @categories.each do |category| %>
-      <tr>
-        <td><small><%= category.heading %></small></td>
-        <td><small><%= category.body %></small></td>
-        <td><small><%= category.display %></small></td>
-        <td><%= link_to 'Show', category %></td>
-        <td><%= link_to 'Edit', edit_category_path(category) %></td>
-        <td><%= link_to 'Destroy', category, method: :delete, data: { confirm: 'Are you sure?' } %></td>
-      </tr>
-    <% end %>
-  </tbody>
-</table>
-
-<br>
-
-<%= link_to 'New Category', new_category_path %>
+<% content_for :title, "Manage Categories · Gor's Coffee" %>
+<main class="cafe-admin" aria-labelledby="cafe-admin-title">
+  <header class="cafe-admin__hero">
+    <div>
+      <p class="cafe-admin__eyebrow">Restricted · Catalogue administration</p>
+      <h1 id="cafe-admin-title">Manage categories</h1>
+      <p>Organize the sample menu. Categories containing products cannot be deleted until their products are reassigned.</p>
+    </div>
+    <%= link_to 'New category', new_category_path, class: 'cafe-admin__button' %>
+  </header>
+  <nav class="cafe-admin__tabs" aria-label="Catalogue management">
+    <%= link_to 'Products', products_path %>
+    <%= link_to 'Categories', categories_path, 'aria-current': 'page' %>
+    <%= link_to 'Public demo menu', menu_path %>
+  </nav>
+  <%= tag.p(alert, class: 'cafe-admin__alert', role: 'alert') if alert.present? %>
+  <%= tag.p(notice, class: 'cafe-admin__notice', role: 'status') if notice.present? %>
+  <section class="cafe-admin__panel" aria-label="Category management table">
+    <div class="cafe-admin__table-wrap">
+      <table class="cafe-admin__table">
+        <thead><tr><th scope="col">Category</th><th scope="col">Description</th><th scope="col">Visible</th><th scope="col">Products</th><th scope="col">Actions</th></tr></thead>
+        <tbody>
+          <% @categories.each do |category| %>
+            <tr>
+              <th scope="row"><strong><%= category.heading %></strong></th>
+              <td><%= truncate(category.body.to_s, length: 115) %></td>
+              <td><%= category.display? ? 'Yes' : 'No' %></td>
+              <td><%= category.products.size %></td>
+              <td class="cafe-admin__actions">
+                <%= link_to 'View', category_path(category) %>
+                <%= link_to 'Edit', edit_category_path(category) %>
+                <% if category.products.empty? %>
+                  <%= link_to 'Delete', category_path(category), method: :delete,
+                        data: { confirm: 'Delete this empty category?' }, class: 'cafe-admin__danger-link' %>
+                <% else %>
+                  <span class="cafe-admin__disabled" title="Reassign products before deleting">In use</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+    <% if @categories.empty? %><p class="cafe-admin__empty">No categories yet.</p><% end %>
+  </section>
+</main>

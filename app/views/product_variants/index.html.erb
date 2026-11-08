@@ -1,0 +1,36 @@
+<% content_for :title, "Demo Sizes · Gor's Coffee" %>
+<main class="cafe-admin" aria-labelledby="sizes-title">
+  <header class="cafe-admin__hero">
+    <div><p class="cafe-admin__eyebrow">Admin · Demo drink configuration</p>
+      <h1 id="sizes-title">Sizes: <%= @product.name %></h1>
+      <p>Manage available sizes and server-authoritative sample prices. Existing saved basket prices are snapshots.</p>
+    </div>
+    <%= link_to 'New size', new_product_product_variant_path(@product), class: 'cafe-admin__button' %>
+  </header>
+  <nav class="cafe-admin__tabs" aria-label="Product configuration">
+    <%= link_to 'All products', products_path %>
+    <%= link_to 'Extras', product_product_modifier_options_path(@product) %>
+  </nav>
+  <section class="cafe-admin__panel">
+    <div class="cafe-admin__table-wrap">
+      <table class="cafe-admin__table"><thead><tr><th>Code</th><th>Label</th><th>Price</th><th>Available</th><th>Actions</th></tr></thead>
+        <tbody><% @variants.each do |size| %><tr>
+          <th scope="row"><%= size.code %></th>
+          <td><%= size.label %></td>
+          <td><%= number_to_currency(BigDecimal(size.price_cents.to_s) / 100) %></td>
+          <td><%= size.available? ? 'Yes' : 'No' %></td>
+          <td class="cafe-admin__actions">
+            <%= link_to 'Edit', edit_product_product_variant_path(@product, size) %>
+            <% if size.order_items.exists? %>
+              <span class="cafe-admin__disabled">In use — disable instead</span>
+            <% else %>
+              <%= button_to 'Delete', product_product_variant_path(@product, size),
+                    method: :delete, class: 'cafe-admin__danger-link' %>
+            <% end %>
+          </td>
+        </tr><% end %></tbody>
+      </table>
+    </div>
+    <% if @variants.empty? %><p>No custom sizes yet; the demo product uses its base price.</p><% end %>
+  </section>
+</main>

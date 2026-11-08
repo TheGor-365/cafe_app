@@ -1,0 +1,16 @@
+<%= form_with model: [@product, @variant], local: true, html: { class: 'cafe-admin__form' } do |form| %>
+  <% if @variant.errors.any? %>
+    <div class="cafe-admin__alert" role="alert">
+      <h2>Check the demo size</h2>
+      <ul><% @variant.errors.full_messages.each do |error| %><li><%= error %></li><% end %></ul>
+    </div>
+  <% end %>
+  <div class="cafe-admin__field"><%= form.label :code, 'Size code (S, M, L)' %>
+    <%= form.text_field :code, required: true, maxlength: 20, class: 'form-control' %></div>
+  <div class="cafe-admin__field"><%= form.label :label, 'Label and volume' %>
+    <%= form.text_field :label, required: true, maxlength: 100, class: 'form-control' %></div>
+  <div class="cafe-admin__field"><%= form.label :price_cents, 'Demo price in cents (e.g. 425 means $4.25)' %>
+    <%= form.number_field :price_cents, min: 0, step: 1, required: true, class: 'form-control' %></div>
+  <div class="cafe-admin__checkbox-group"><label><%= form.check_box :available %> Available in demo menu</label></div>
+  <%= form.submit class: 'cafe-admin__button' %>
+<% end %>

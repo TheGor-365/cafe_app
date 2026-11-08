@@ -16,4 +16,4 @@ test:
 
 production:
   <<: *default
-  database: cafe_production
+  url: <%= ENV.fetch('DATABASE_URL') %>

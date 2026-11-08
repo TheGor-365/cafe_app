@@ -1,0 +1,98 @@
+name: Cafe isolated Rails and real HTTP upload probe safety
+on:
+  push:
+    branches: [feature/cafe-upload-sandbox-http-20261104]
+  pull_request:
+    branches: [feature/cafe-sandbox-restore-20261104]
+permissions:
+  contents: read
+jobs:
+  sandbox-static-and-mount-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python and Ruby syntax
+        run: |
+          python3 -m py_compile scripts/cafe_sandbox_rails.py
+          python3 -m py_compile scripts/cafe_sandbox_upload_tests.py
+          python3 scripts/cafe_sandbox_rails.py --help
+          python3 scripts/cafe_sandbox_upload_tests.py --help
+          ruby -c qa/security/cafe_sandbox_multipart_probe.rb
+      - name: Sandbox clone mount and environment refusal unit tests
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          spec = importlib.util.spec_from_file_location(
+              "sandbox", "scripts/cafe_sandbox_rails.py")
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          source = {
+              "Mounts": [
+                  {"Destination": "/app", "Type": "bind",
+                   "Source": "/tmp/cafe-project", "RW": False},
+                  {"Destination": "/bundle", "Type": "bind",
+                   "Source": "/tmp/patched", "RW": False},
+                  {"Destination": "/app/public/uploads", "Type": "bind",
+                   "Source": "/tmp/qa-media", "RW": True},
+                  {"Destination": "/run/secrets/cafe_pg_password", "Type": "bind",
+                   "Source": "/tmp/secret", "RW": False},
+                  {"Destination": "/app/public/packs", "Type": "volume",
+                   "Name": "readonly-web-packs", "RW": False}
+              ],
+              "Config": {"Env": [
+                  "DATABASE_URL=postgresql://postgres@cafe-app-db:5432/cafe",
+                  "RAILS_ENV=development", "BUNDLE_PATH=/bundle"
+              ]}
+          }
+          result = m.mount_specs(source)
+          assert "/run/secrets/cafe_pg_password" not in " ".join(result)
+          assert "target=/app/public/uploads" in " ".join(result)
+          assert "source=" + str(m.MEDIA) in " ".join(result)
+          assert "type=volume,source=readonly-web-packs" in " ".join(result)
+          env = m.environ(source)
+          assert "DATABASE_URL=" + m.SANDBOX_URL in env
+          assert "RAILS_ENV=development" in env
+          source["Config"]["Env"].append("API_TOKEN=unsafe")
+          try:
+              m.environ(source)
+          except RuntimeError:
+              pass
+          else:
+              raise AssertionError("sandbox copied secret variable")
+          source["Mounts"][0]["RW"] = True
+          try:
+              m.mount_specs(source)
+          except RuntimeError:
+              pass
+          else:
+              raise AssertionError("sandbox accepted writable source bind")
+          print("SANDBOX MOUNT ISOLATION & SECRET REFUSAL PASS")
+          PY
+      - name: Regression guards for real HTTP tests
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a = Path("scripts/cafe_sandbox_rails.py").read_text()
+          b = Path("scripts/cafe_sandbox_upload_tests.py").read_text()
+          c = Path("qa/security/cafe_sandbox_multipart_probe.rb").read_text()
+          for expected in ["--check", "--create", "--smoke",
+                           "--read-only", "SANDBOX_NET",
+                           "SANDBOX RAILS READY"]:
+              assert expected in a, expected
+          for expected in ["SANDBOX HTTP TEST", "SANDBOX MULTIPART TEST COMMAND COMPLETE",
+                           "EXPECTED_SANDBOX_CLUSTER"]:
+              assert expected in b, expected
+          for expected in ["Net::HTTP::Post", "authenticity_token", "multipart/form-data",
+                           "REJECT", "ACCEPT", "truncated_jpeg",
+                           "wrong_declared_mime", "oversize_jpeg",
+                           "SANDBOX REAL HTTP MULTIPART SECURITY PASS"]:
+              assert expected in c, expected
+          for source in [a,b,c]:
+              for bad in ["db:drop", "db:reset", "docker stop", "docker rm",
+                          "git reset --hard", "docker volume rm"]:
+                  assert bad not in source, bad
+          print("REAL HTTP UPLOAD TEST STATIC SAFETY PASS")
+          PY

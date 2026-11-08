@@ -1,3 +1,66 @@
-<div class="col-8">
+<main class="cafe-home">
+  <section class="cafe-home__hero" aria-labelledby="cafe-home-heading">
+    <div class="cafe-home__hero-content">
+      <p class="cafe-home__eyebrow">Gor's Coffee · digital café demo</p>
+      <h1 id="cafe-home-heading">Good coffee. A better kind of break.</h1>
+      <p>Explore handcrafted coffee, iced drinks, fresh pastries and more in our interactive sample menu.</p>
+      <div class="cafe-home__actions">
+        <%= link_to 'Explore the menu', menu_path, class: 'cafe-home__primary-action' %>
+        <%= link_to 'View your cart', cart_path, class: 'cafe-home__secondary-action' %>
+      </div>
+      <p class="cafe-home__disclaimer">Portfolio demonstration. No live café, payments or order fulfilment.</p>
+    </div>
+    <div class="cafe-home__hero-art" aria-hidden="true">
+      <span class="cafe-home__cup">☕</span>
+      <span class="cafe-home__art-caption">Slow down. Sip well.</span>
+    </div>
+  </section>
 
-</div>
+  <section class="cafe-home__section" aria-labelledby="cafe-home-categories">
+    <div class="cafe-home__section-heading">
+      <div>
+        <p class="cafe-home__section-eyebrow">What are you craving?</p>
+        <h2 id="cafe-home-categories">Find your favourites</h2>
+      </div>
+      <%= link_to 'Entire menu', menu_path, class: 'cafe-home__inline-link' %>
+    </div>
+    <div class="cafe-home__category-grid">
+      <% @home_categories.each do |category| %>
+        <% count = @category_counts.fetch(category.id, 0) %>
+        <% next if count.zero? %>
+        <%= link_to menu_path(category_id: category.id), class: 'cafe-home__category-card' do %>
+          <strong><%= category.heading %></strong>
+          <span><%= pluralize(count, 'item') %> <span aria-hidden="true">→</span></span>
+        <% end %>
+      <% end %>
+    </div>
+  </section>
+
+  <% if @featured_products.any? %>
+    <section class="cafe-home__section" aria-labelledby="cafe-home-featured">
+      <div class="cafe-home__section-heading">
+        <div>
+          <p class="cafe-home__section-eyebrow">From the demo menu</p>
+          <h2 id="cafe-home-featured">Popular picks</h2>
+        </div>
+      </div>
+      <div class="cafe-home__featured-grid">
+        <% @featured_products.each do |product| %>
+          <article class="cafe-home__featured-card">
+            <div class="cafe-home__featured-art" aria-hidden="true">☕</div>
+            <div class="cafe-home__featured-content">
+              <p class="cafe-home__featured-category"><%= product.category.heading %></p>
+              <h3><%= product.name %></h3>
+              <p><%= truncate(product.description.to_s, length: 100) %></p>
+              <div class="cafe-home__featured-footer">
+                <strong><%= number_to_currency(product.price) %></strong>
+                <%= link_to 'View in menu', menu_path(category_id: product.category_id, search: product.name),
+                      class: 'cafe-home__inline-link' %>
+              </div>
+            </div>
+          </article>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+</main>

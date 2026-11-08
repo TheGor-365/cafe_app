@@ -1,8 +1,18 @@
 require 'test_helper'
 
 class CategoriesControllerTest < ActionDispatch::IntegrationTest
+  include Devise::Test::IntegrationHelpers
+
   setup do
-    @category = categories(:one)
+    # Test deletion against a category with no attached products.
+    @category = Category.create!(heading: "QA Category", display: true)
+    @admin = User.create!(
+      username: "categories_admin_test",
+      email: "categories_admin_test@example.test",
+      password: SecureRandom.hex(24),
+      admin: true
+    )
+    sign_in @admin
   end
 
   test "should get index" do
