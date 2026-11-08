@@ -1,0 +1,64 @@
+name: Cafe Rails modernization — isolated dependency bridge
+
+on:
+  push:
+    branches: [feature/cafe-rails-upgrade-bridge-20261108]
+permissions:
+  contents: read
+
+jobs:
+  bridge:
+    name: ${{ matrix.scenario }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    container:
+      image: ruby:2.7.8
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [ruby27_rails61]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_bridge_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      CI: "true"
+      DATABASE_URL: postgres://postgres:cafe_bridge_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-bridge-bundle
+      CAFE_CI_SCENARIO: ${{ matrix.scenario }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify isolated bridge script syntax and source state
+        run: |
+          ruby -v
+          bash -n scripts/cafe_rails_bridge_probe_20261108.sh
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git status --porcelain > /tmp/cafe-bridge-git-status
+          test ! -s /tmp/cafe-bridge-git-status
+      - name: Resolve only disposable bridge runtime dependencies
+        run: bash scripts/cafe_rails_bridge_probe_20261108.sh "$CAFE_CI_SCENARIO"
+      - name: Prepare ephemeral PostgreSQL test schema
+        run: |
+          bundle _2.2.13_ exec rails db:schema:load
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Run complete Rails regression suite
+        run: bundle _2.2.13_ exec rails test
+      - name: Export CI-only resolved dependencies
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cafe-${{ matrix.scenario }}-lockfile
+          path: bridge-artifacts/${{ matrix.scenario }}/
+          if-no-files-found: ignore
+          retention-days: 7
