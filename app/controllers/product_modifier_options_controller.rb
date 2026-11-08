@@ -18,7 +18,7 @@ class ProductModifierOptionsController < ApplicationController
     @page = 'admin'
     @option = @product.product_modifier_options.build(option_params)
     if @option.save
-      redirect_to product_product_modifier_options_path(@product), notice: 'Demo add-on created.'
+      redirect_to product_product_modifier_options_path(@product), notice: 'Add-on created.'
     else
       render :new, status: :unprocessable_entity
     end
@@ -31,7 +31,7 @@ class ProductModifierOptionsController < ApplicationController
   def update
     @page = 'admin'
     if @option.update(option_params)
-      redirect_to product_product_modifier_options_path(@product), notice: 'Demo add-on updated.'
+      redirect_to product_product_modifier_options_path(@product), notice: 'Add-on updated.'
     else
       render :edit, status: :unprocessable_entity
     end
@@ -42,7 +42,7 @@ class ProductModifierOptionsController < ApplicationController
       redirect_to product_product_modifier_options_path(@product),
                   alert: 'Add-on referenced by a saved basket: set Unavailable instead of deleting.'
     elsif @option.destroy
-      redirect_to product_product_modifier_options_path(@product), notice: 'Unused demo add-on deleted.'
+      redirect_to product_product_modifier_options_path(@product), notice: 'Unused add-on deleted.'
     else
       redirect_to product_product_modifier_options_path(@product), alert: 'Add-on could not be deleted.'
     end
