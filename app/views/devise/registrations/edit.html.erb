@@ -17,7 +17,8 @@
       </div>
       <div class="cafe-auth__field">
         <%= f.label :username %>
-        <%= f.text_field :username, autocomplete: 'username', class: 'form-control' %>
+        <%= f.text_field :username, autocomplete: 'username', required: true,
+              minlength: 3, maxlength: 40, pattern: '[A-Za-z0-9_]+', class: 'form-control' %>
       </div>
       <div class="cafe-auth__field">
         <%= f.label :password, 'New password' %>

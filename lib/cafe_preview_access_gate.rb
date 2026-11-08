@@ -9,6 +9,11 @@ require 'openssl'
 class CafePreviewAccessGate
   HEALTH_PATH = '/__cafe_health'.freeze
   LOGIN_PATH = '/__cafe_access'.freeze
+  LOGIN_DESTINATIONS = {
+    'register' => '/users/sign_up',
+    'sign_in' => '/users/sign_in',
+    'browse' => '/'
+  }.freeze
   SESSION_COOKIE = '__Host-cafe_preview'.freeze
   CSRF_COOKIE = '__Host-cafe_preview_csrf'.freeze
   SESSION_TTL = 8 * 60 * 60
@@ -83,14 +88,15 @@ class CafePreviewAccessGate
       return login_page(error: 'Session expired. Reload this page.', status: 403)
     end
 
+    intent = LOGIN_DESTINATIONS.key?(params['intent']) ? params['intent'] : 'browse'
     if valid_credentials?(params['username'], params['password'])
       return [303, security_headers.merge(
-        'Location' => '/',
+        'Location' => LOGIN_DESTINATIONS.fetch(intent),
         'Set-Cookie' => cookie(SESSION_COOKIE, new_token('session', SESSION_TTL), SESSION_TTL)
       ), []]
     end
 
-    login_page(error: 'Incorrect access credentials.', status: 401)
+    login_page(error: 'Incorrect preview credentials.', status: 401, intent: intent)
   rescue ArgumentError
     bad_request
   end
@@ -103,32 +109,64 @@ class CafePreviewAccessGate
     [413, security_headers.merge('Content-Type' => 'text/plain; charset=utf-8'), ['Request too large']]
   end
 
-  def login_page(error: nil, status: 200)
+  def login_page(error: nil, status: 200, intent: 'register')
     csrf = new_token('csrf', CSRF_TTL)
-    message = error ? "<p class=\"error\">#{Rack::Utils.escape_html(error)}</p>" : ''
+    message = error ? "<p class=\"error\" role=\"alert\">#{Rack::Utils.escape_html(error)}</p>" : ''
     html = <<~HTML
       <!doctype html>
-      <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>Gor's Coffee — Private preview</title>
-      <style>
-        *{box-sizing:border-box}body{margin:0;background:#16171b;color:#f7f6f2;font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;display:grid;min-height:100vh;place-items:center;padding:22px}
-        main{background:#202127;border:1px solid #3e3b36;max-width:420px;width:100%;border-radius:18px;padding:32px;box-shadow:0 20px 50px #0005}
-        h1{font-size:29px;margin:0 0 8px;color:#eac18a}p{color:#bbb8b2}label{display:block;font-weight:600;margin:20px 0 6px}
-        input{width:100%;background:#131418;border:1px solid #64615b;color:#fff;padding:13px;border-radius:9px;font:inherit}
-        button{width:100%;margin-top:26px;background:#dbac70;color:#211810;border:0;border-radius:9px;font-weight:700;font-size:16px;padding:14px;cursor:pointer}
-        .small{font-size:13px;margin:16px 0 0}.error{color:#ffaaa0}
-      </style></head><body><main>
-        <h1>Gor's Coffee</h1><p>Private portfolio preview / Закрытая демонстрация</p>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Private Preview Access | Gor's Coffee</title>
+        <style>
+          *{box-sizing:border-box}
+          body{margin:0;background:radial-gradient(circle at 10% 0%,#30251f 0,#17171b 47%,#131419 100%);
+            color:#f7f2eb;font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;
+            min-height:100vh;display:grid;place-items:center;padding:24px}
+          main{max-width:460px;width:100%;background:#242127;border:1px solid #504239;
+            border-radius:20px;padding:clamp(24px,5vw,38px);box-shadow:0 24px 75px #0007}
+          .eyebrow{margin:0;color:#e4b977;letter-spacing:.16em;text-transform:uppercase;
+            font-size:12px;font-weight:800}
+          h1{font-size:clamp(29px,5vw,36px);letter-spacing:-.04em;line-height:1.2;margin:13px 0 10px;color:#f6d4a3}
+          p{color:#d2c8bf;margin:0 0 18px}
+          .step{background:#342e2c;color:#e5d5c2;border-left:3px solid #daa866;
+            border-radius:7px;padding:11px 13px;font-size:14px;margin:24px 0}
+          label{display:block;font-weight:700;margin:19px 0 6px;font-size:14px}
+          input{width:100%;background:#141419;border:1px solid #766b62;color:#fff;
+            padding:13px 14px;border-radius:9px;font:inherit;min-height:48px}
+          input:focus-visible,button:focus-visible{outline:3px solid #f2c98b;outline-offset:3px}
+          .actions{display:grid;gap:10px;margin-top:23px}
+          button{min-height:48px;border:0;border-radius:9px;font:inherit;font-weight:750;cursor:pointer;padding:12px}
+          .primary{background:#e3b774;color:#22170f}
+          .primary:hover{background:#f0c78c}
+          .secondary{background:transparent;border:1px solid #af9583;color:#f5e8d5}
+          .secondary:hover{background:#392f2c}
+          .small{font-size:13px;color:#bbaea2;line-height:1.65;margin:19px 0 0}
+          .error{color:#ffbeb2;font-weight:600;margin:10px 0}
+          @media(max-width:420px){body{padding:12px}main{padding:25px 21px}}
+        </style>
+      </head>
+      <body><main>
+        <p class="eyebrow">Private portfolio preview</p>
+        <h1>Gor's Coffee</h1>
+        <p>Explore the coffee shop, create your own demo account, or sign in to an existing one.</p>
+        <div class="step"><strong>Step 1 of 2 — Unlock this private preview.</strong>
+          These are the preview access credentials configured in Railway, not your café account email and password.</div>
         #{message}
         <form method="post" action="#{LOGIN_PATH}" autocomplete="off">
           <input type="hidden" name="csrf" value="#{csrf}">
-          <label for="username">Username / Логин</label>
-          <input id="username" name="username" required autocomplete="username">
-          <label for="password">Password / Пароль</label>
-          <input id="password" type="password" name="password" required autocomplete="current-password">
-          <button type="submit">Enter preview / Войти</button>
+          <label for="username">Preview access username</label>
+          <input id="username" name="username" required autocomplete="off" maxlength="512">
+          <label for="password">Preview access password</label>
+          <input id="password" type="password" name="password" required autocomplete="off" maxlength="512">
+          <div class="actions">
+            <button class="primary" type="submit" name="intent" value="register">Create a demo account</button>
+            <button class="secondary" type="submit" name="intent" value="sign_in">Sign in to my account</button>
+            <button class="secondary" type="submit" name="intent" value="browse">Browse as a guest</button>
+          </div>
         </form>
-        <p class="small">Use access credentials configured for cafe-web in Railway. All orders are fictional.</p>
+        <p class="small"><strong>Step 2:</strong> After unlocking, you will go directly to registration, sign-in or the sample menu. For a new account, choose your own email and password. No real orders or payments.</p>
       </main></body></html>
     HTML
     [status, security_headers.merge(

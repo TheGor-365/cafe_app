@@ -13,8 +13,10 @@
         <%= f.email_field :email, autofocus: true, autocomplete: 'email', required: true, class: 'form-control' %>
       </div>
       <div class="cafe-auth__field">
-        <%= f.label :username %>
-        <%= f.text_field :username, autocomplete: 'username', class: 'form-control' %>
+        <%= f.label :username, 'Username' %>
+        <small class="cafe-auth__hint">3–40 letters, numbers or underscores. Required for your demo profile.</small>
+        <%= f.text_field :username, autocomplete: 'username', required: true,
+              minlength: 3, maxlength: 40, pattern: '[A-Za-z0-9_]+', class: 'form-control' %>
       </div>
       <div class="cafe-auth__field">
         <%= f.label :password %>

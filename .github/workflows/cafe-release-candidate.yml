@@ -2,7 +2,7 @@ name: Cafe Release Candidate — Rails and Docker
 
 on:
   push:
-    branches: [release/cafe-demo-20261108, fix/cafe-browser-preview-auth-20261108]
+    branches: [release/cafe-demo-20261108, fix/cafe-auth-onboarding-20261108]
   pull_request:
     branches: [master]
   workflow_dispatch:
