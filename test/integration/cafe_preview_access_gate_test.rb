@@ -98,6 +98,8 @@ class CafePreviewAccessGateTest < ActiveSupport::TestCase
     cookie = r['Set-Cookie'][/__Host-cafe_preview=[^;]+/]
     signed_out = @request.delete('/users/sign_out', 'HTTP_COOKIE' => cookie)
     assert_includes signed_out['Set-Cookie'], 'Max-Age=0'
+    post_override = @request.post('/users/sign_out', 'HTTP_COOKIE' => cookie, :input => '_method=delete')
+    assert_includes post_override['Set-Cookie'], 'Max-Age=0'
   end
 
   test 'health probe stays unauthenticated and queries database' do
