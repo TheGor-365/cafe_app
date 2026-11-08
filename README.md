@@ -4,7 +4,7 @@
 
 [Русский](#русский) · [English](#english) · [Source](https://github.com/TheGor-365/cafe_app) · [Release checklist](docs/CAFE_RELEASE_CHECKLIST.md)
 
-> **Release status · 8 November 2026:** the integrated candidate passed complete Rails CI and production Docker build. The isolated Railway `preview` deployment is **SUCCESS**, with HTTPS health endpoint returning `ok` externally. The application is protected by HTTP Basic authorization for private portfolio review. Full authenticated browser/E2E checks are pending. **This is not an unrestricted production service**: Ruby 2.7, Rails 6.1, and Node 14 are end-of-life. [Release candidate PR #77](https://github.com/TheGor-365/cafe_app/pull/77).
+> **Preview release · 9 November 2026:** integrated source on `master`, Railway `preview` environment with its own PostgreSQL, HTTPS healthcheck and automated Rails/Docker checks. Account creation and sign-in use one Devise flow, with no second shared preview password. Owner administration requires a one-time code configured in Railway only. This is a non-commercial portfolio app on **unsupported Ruby 2.7 / Rails 6.1 / Node 14**, not a supported public production service. Never use actual card data or customer information. Authenticated owner-browser QA is still required.
 
 ## Русский
 
@@ -52,7 +52,7 @@ RUBYOPT=-rlogger RAILS_ENV=test bundle _2.2.13_ exec rails test
 - Изолированный проект `gors-coffee-cafe-app`, окружение `preview`, сервис `cafe-web` + отдельный Postgres с томом.
 - Сборка из `Dockerfile`; `SECRET_KEY_BASE` задаётся через секреты Railway; `DATABASE_URL` — только приватное соединение.
 - Разрешённый demo-bootstrap ограничен конкретными Railway project ID, environment ID и `CAFE_PREVIEW_SEED_ALLOWED=YES`. Он не создаёт учетных записей и не должен переноситься в другие среды.
-- Docker/CI сборка, миграции, запуск Puma, внутренний healthcheck и внешняя HTTPS-проверка `GET /__cafe_health` подтверждены. Для просмотра требуется отдельный HTTP Basic логин; значения задаются только в Railway, никогда не публикуются в репозитории. Открытый доступ без пароля запрещён до обновления поддерживаемого стека и проверок безопасности/медиа.
+- Docker/CI сборка, миграции, запуск Puma, внутренний healthcheck и внешняя HTTPS-проверка `GET /__cafe_health` подтверждены. Вход и регистрация выполняются через Devise, без дополнительного общего пароля. Для назначения владельцу роли администратора используется отдельный однократный секрет в Railway; его нельзя публиковать или передавать в сообщениях. Открытая эксплуатация как реального бизнеса запрещена до обновления стека и проверок безопасности/медиа.
 
 ### Портфолио
 
@@ -68,8 +68,18 @@ Gor's Coffee is an **educational Rails coffee-shop demo**, not an operating busi
 
 **Reproducibility:** use only a clean disposable PostgreSQL database; never reset the owner's existing development or QA databases. Set `RUBYOPT=-rlogger` for this Rails 6.1 bridge. See the technical and release sections above.
 
-**Evidence:** [158 tests / 1328 assertions (PR #71 CI)](https://github.com/TheGor-365/cafe_app/actions/runs/42412310443); [Ruby 2.7/Rails 6.1 regression CI](https://github.com/TheGor-365/cafe_app/actions/runs/42428798391); [release Rails + Docker + Basic gate CI](https://github.com/TheGor-365/cafe_app/actions/runs/42519024703) **SUCCESS**. Railway preview: https://cafe-web-preview.up.railway.app (HTTP Basic restricted; external health verified). Authenticated browser proof and final screenshots are pending.
+**Evidence:** [158 tests / 1328 assertions (PR #71 CI)](https://github.com/TheGor-365/cafe_app/actions/runs/42412310443); [Ruby 2.7/Rails 6.1 regression CI](https://github.com/TheGor-365/cafe_app/actions/runs/42428798391); [release Rails + Docker + Basic gate CI](https://github.com/TheGor-365/cafe_app/actions/runs/42519024703) **SUCCESS**. Railway preview: https://cafe-web-preview.up.railway.app (Devise registration/sign-in; owner claim protected with Railway-only secret). Authenticated owner-browser proof and final screenshots are pending.
 
 ---
 
 Historical implementation notes: [pre-release README archive](docs/README_ARCHIVE_PRE_RELEASE_2026-11-07.md). Development documentation and handoff: [docs/](docs/).
+
+
+### Account and owner preview walkthrough (November 2026)
+
+1. Open the Railway preview URL. Choose **Sign in** or **Create account**. These are standard Devise forms; registration cannot assign `admin`.
+2. Sign in with the existing owner account. For the **first** owner activation only, open `/owner/access` and enter `CAFE_OWNER_CLAIM_TOKEN` from the Railway **cafe-web → Variables** panel. Access is restricted to the account matching `CAFE_OWNER_USERNAME`, to the specific Railway project/environment and to a database without an existing administrator.
+3. Once activated, **Manage products**, **Manage categories**, **Orders**, and drink size/add-on configuration appear in the owner navigation. These actions are still guarded on the server.
+4. Never paste the claim token, passwords, real customer information or payment data into chat or screenshots. Screenshot collection uses 10 desktop + 10 mobile views; keep originals unaltered.
+
+**Scope limit:** Marketing copy no longer repeats “demo” on every screen, but the footer retains a clear portfolio/no-payment disclosure. Email password-reset delivery and persistent uploads remain unverified; no live ordering or money movement is supported.
