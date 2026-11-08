@@ -1,7 +1,7 @@
 # Isolated pre-release preview. Ruby 2.7 / Rails 6.1 remain EOL; no direct public HTTP domain.
 FROM node:14-bullseye-slim AS node
 FROM ruby:2.7.8-bullseye
-RUN apt-get update -qq && apt-get install -y --no-install-recommends git libpq-dev libmagickwand-dev imagemagick ca-certificates && rm -rf /var/lib/apt/lists/*
+# Ruby 2.7 buildpack-deps base already ships build tools and git.\n# Avoid unavailable EOL Bullseye APT mirrors during isolated preview build.\n# ImageMagick upload processing remains unverified for release.
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN npm install -g yarn@1.22.22
