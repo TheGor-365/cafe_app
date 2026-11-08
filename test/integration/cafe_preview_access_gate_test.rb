@@ -130,7 +130,7 @@ class CafePreviewAccessGateTest < ActiveSupport::TestCase
       :input => Rack::Utils.build_query(csrf: csrf, username: 'portfolio', password: 'wrong'))
     assert_equal 401, response.status
     assert_nil response['WWW-Authenticate']
-    assert_includes response.body, 'Incorrect access credentials'
+    assert_includes response.body, 'Incorrect preview credentials'
   end
 
   test 'the DB health probe remains accessible without credentials' do
