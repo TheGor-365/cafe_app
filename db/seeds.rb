@@ -1,7 +1,12 @@
 # Local-only, repeatable, fictional coffee-shop catalog. Never provision user
 # accounts or execute this task outside development/test environments.
-unless Rails.env.development? || Rails.env.test?
-  raise 'Cafe demo seeds are intentionally disabled outside development/test'
+preview_allowed = Rails.env.production? &&
+  ENV['RAILWAY_PROJECT_ID'] == 'a6c48a67-c6f4-4f12-a5df-6d1de0f45d69' &&
+  ENV['RAILWAY_ENVIRONMENT_ID'] == 'e47229ba-6dd7-47ec-9155-a329bb2a963c' &&
+  ENV['CAFE_PREVIEW_SEED_ALLOWED'] == 'YES'
+
+unless Rails.env.development? || Rails.env.test? || preview_allowed
+  raise 'Cafe demo seeds are disabled outside development/test or isolated Railway preview'
 end
 
 # Preserve the legacy academic categories; never delete existing products.
