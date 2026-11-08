@@ -1,0 +1,38 @@
+name: Cafe external protected-preview HTTP smoke
+on:
+  push:
+    branches:
+      - qa/cafe-preview-http-smoke-20261108
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Verify anonymous browser flow and HTTPS health
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://cafe-web-preview.up.railway.app"
+          for attempt in $(seq 1 30); do
+            status="$(curl --silent --show-error --max-time 12 -D /tmp/preview-headers -o /tmp/preview-body -w '%{http_code}' "$url/" || true)"
+            echo "attempt=$attempt status=$status"
+            if [[ "$status" == "200" ]] && grep -q "Private portfolio preview" /tmp/preview-body && grep -qi '^set-cookie: __Host-cafe_preview_csrf=' /tmp/preview-headers && ! grep -qi '^www-authenticate:' /tmp/preview-headers; then
+              break
+            fi
+            if [[ "$attempt" == 30 ]]; then
+              echo "FAIL: public browser login not returned without HTTP Basic retry"
+              sed -n '1,20p' /tmp/preview-headers || true
+              exit 1
+            fi
+            sleep 7
+          done
+          grep -qi 'secure' /tmp/preview-headers
+          grep -qi 'httponly' /tmp/preview-headers
+          grep -qi 'samesite=strict' /tmp/preview-headers
+          health="$(curl --silent --show-error --max-time 15 "$url/__cafe_health")"
+          [[ "$health" == 'ok' ]] || { echo "FAIL health probe"; exit 1; }
+          bad_post="$(curl --silent --show-error --max-time 15 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data 'csrf=invalid' "$url/__cafe_access")"
+          [[ "$bad_post" == '403' ]] || { echo "FAIL: forged form accepted or incorrect status $bad_post"; exit 1; }
+          echo "PASS: HTTPS health, private browser login, signed CSRF cookie and denial of forged login. No credentials used."
