@@ -49,7 +49,7 @@ class CafePreviewAccessGate
   def pass_authenticated(env, request)
     status, response_headers, body = @app.call(env)
     # Signing out invalidates the browser preview authorization too.
-    if request.path_info == '/users/sign_out' && request.request_method == 'DELETE'
+    if request.path_info == '/users/sign_out' && %w[POST DELETE].include?(request.request_method)
       return [status, append_cookie(response_headers, expired_cookie), body]
     end
     [status, response_headers, body]
