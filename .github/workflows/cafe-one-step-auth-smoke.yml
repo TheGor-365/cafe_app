@@ -1,0 +1,49 @@
+name: Cafe one-step authentication live smoke
+on:
+  push:
+    branches: [master]
+    paths:
+      - lib/cafe_preview_access_gate.rb
+      - config.ru
+      - app/controllers/owner_access_controller.rb
+      - app/views/devise/**
+      - app/views/owner_access/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  http-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Verify single-step registration and protected admin over HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://cafe-web-preview.up.railway.app"
+          for attempt in $(seq 1 32); do
+            code="$(curl -sS --max-time 15 -D /tmp/home_headers -o /tmp/home -w '%{http_code}' "$url/" || true)"
+            if [[ "$code" == "200" ]] &&
+               grep -q 'href="/users/sign_in"' /tmp/home &&
+               grep -q 'href="/users/sign_up"' /tmp/home &&
+               ! grep -qi '^www-authenticate:' /tmp/home_headers; then
+              echo "PASS: English single-step authentication landing"
+              break
+            fi
+            [[ "$attempt" == "32" ]] && { echo "FAIL: one-step auth landing was not deployed"; exit 1; }
+            sleep 8
+          done
+          sign_in_status="$(curl -sS --max-time 15 -o /tmp/sign_in -w '%{http_code}' "$url/users/sign_in")"
+          [[ "$sign_in_status" == "200" ]] && grep -q 'name="user\[email\]"' /tmp/sign_in || { echo "FAIL: Devise sign-in not reachable"; exit 1; }
+          sign_up_status="$(curl -sS --max-time 15 -o /tmp/sign_up -w '%{http_code}' "$url/users/sign_up")"
+          [[ "$sign_up_status" == "200" ]] && grep -q 'name="user\[username\]"' /tmp/sign_up || { echo "FAIL: Devise registration not reachable"; exit 1; }
+          ! grep -q 'name="user\[admin\]"' /tmp/sign_up || { echo "FAIL: admin in sign-up form"; exit 1; }
+          admin_page="$(curl -sS --max-time 15 "$url/admin/demo_orders")"
+          [[ "$admin_page" == *"Create account"* ]] || { echo "FAIL: anonymous admin screen exposed"; exit 1; }
+          forbidden="$(curl -sS -o /dev/null --max-time 15 -w '%{http_code}' -X POST "$url/owner/access")"
+          [[ "$forbidden" == "403" ]] || { echo "FAIL: anonymous owner claim not blocked"; exit 1; }
+          health="$(curl -sS --max-time 15 "$url/__cafe_health")"
+          [[ "$health" == "ok" ]] || { echo "FAIL: PostgreSQL health"; exit 1; }
+          echo "PASS: login, signup, signup role restrictions, anonymous admin denial, owner claim denial and PostgreSQL health"
