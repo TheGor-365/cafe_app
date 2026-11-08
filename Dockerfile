@@ -1,12 +1,14 @@
 # Isolated pre-release preview. Ruby 2.7 / Rails 6.1 remain EOL; no direct public HTTP domain.
 FROM node:14-bullseye-slim AS node
 FROM ruby:2.7.8-bullseye
-# Ruby 2.7 buildpack-deps base already ships build tools and git.\n# Avoid unavailable EOL Bullseye APT mirrors during isolated preview build.\n# ImageMagick upload processing remains unverified for release.
+# Ruby 2.7 buildpack-deps base already ships build tools and git.
+# Avoid unavailable EOL Bullseye APT mirrors during isolated preview build.
+# ImageMagick upload processing remains unverified for release.
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN node /usr/local/lib/node_modules/npm/bin/npm-cli.js install -g yarn@1.22.22
 WORKDIR /app
-ENV RAILS_ENV=production RAILS_SERVE_STATIC_FILES=true RAILS_LOG_TO_STDOUT=true BUNDLE_WITHOUT=development:test
+ENV RAILS_ENV=production RAILS_SERVE_STATIC_FILES=true RAILS_LOG_TO_STDOUT=true BUNDLE_WITHOUT=development:test RUBYOPT=-rlogger
 COPY Gemfile Gemfile.lock ./
 RUN gem install bundler -v 2.2.13 --no-document && bundle _2.2.13_ config set deployment true && bundle _2.2.13_ install --jobs 4 --retry 3
 COPY package.json yarn.lock ./
