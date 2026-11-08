@@ -148,7 +148,7 @@ class CafePreviewAccessGate
         </style>
       </head>
       <body><main>
-        <p class="eyebrow">Portfolio demo · Private access</p>
+        <p class="eyebrow">Private portfolio preview</p>
         <h1>Gor's Coffee</h1>
         <p>Explore the coffee shop, create your own demo account, or sign in to an existing one.</p>
         <div class="step"><strong>Step 1 of 2 — Unlock this private preview.</strong>
