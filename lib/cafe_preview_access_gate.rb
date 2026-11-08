@@ -13,7 +13,6 @@ class CafePreviewAccessGate
   SESSION_TTL = 8 * 60 * 60
 
   PUBLIC_PAGES = {
-    '/' => ['GET', 'HEAD'],
     '/users/sign_in' => ['GET', 'HEAD', 'POST'],
     '/users/sign_up' => ['GET', 'HEAD'],
     '/users' => ['POST'],
