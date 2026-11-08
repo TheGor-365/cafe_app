@@ -19,3 +19,5 @@ copy uploads, or create public cloud resources.
 After artifact promotion, verify full Rails suite again using the locked
 files in GitHub CI on a fresh, disposable PostgreSQL 16 instance.
 Do not claim Rails 8 compatibility or supported public readiness.
+
+Promotion retry: the initial GitHub Actions attempt stopped before any Git write because the downloaded, digest-pinned artifact appeared as an untracked directory. Only tracked-source cleanliness is checked on retry; artifact contents remain SHA-256 pinned. No original source, DB or deployed service is touched.
