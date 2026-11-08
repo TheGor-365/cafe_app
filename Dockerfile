@@ -4,7 +4,7 @@ FROM ruby:2.7.8-bullseye
 # Ruby 2.7 buildpack-deps base already ships build tools and git.\n# Avoid unavailable EOL Bullseye APT mirrors during isolated preview build.\n# ImageMagick upload processing remains unverified for release.
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN npm install -g yarn@1.22.22
+RUN node /usr/local/lib/node_modules/npm/bin/npm-cli.js install -g yarn@1.22.22
 WORKDIR /app
 ENV RAILS_ENV=production RAILS_SERVE_STATIC_FILES=true RAILS_LOG_TO_STDOUT=true BUNDLE_WITHOUT=development:test
 COPY Gemfile Gemfile.lock ./
