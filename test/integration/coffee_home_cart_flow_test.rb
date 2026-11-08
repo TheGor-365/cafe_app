@@ -15,7 +15,7 @@ class CoffeeHomeCartFlowTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{menu_path}']", minimum: 1
     assert_select "a[href='#{cart_path}']", minimum: 1
     assert_includes response.body, @product.name
-    assert_includes response.body, 'No live café'
+    assert_includes response.body, 'Portfolio project'
   end
 
   test 'new guest sees useful empty cart' do
