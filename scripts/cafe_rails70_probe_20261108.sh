@@ -19,8 +19,14 @@ grep -Fx "gem 'logger', '= 1.4.2'" Gemfile >/dev/null
 # from Rails' default gem dependencies in Rails7, so retain it explicitly.
 sed -i "s/gem 'rails', '~> 6.1.7', '>= 6.1.7.10'/gem 'rails', '~> 7.0.10', '>= 7.0.10'/" Gemfile
 echo "gem 'sprockets-rails', '~> 3.4'" >> Gemfile
+# The old 2021 Devise Git revision calls AS::Dependencies.reference,
+# removed by Rails 7. Devise 5.0.4 has both Rails7 support and 2026
+# security patches. Only change the disposable CI Gemfile.
+grep -Fx "gem 'devise', github: 'heartcombo/devise', branch: 'ca-omniauth-2'" Gemfile >/dev/null
+sed -i "s/gem 'devise', github: 'heartcombo\/devise', branch: 'ca-omniauth-2'/gem 'devise', '= 5.0.4'/" Gemfile
+grep -Fx "gem 'devise', '= 5.0.4'" Gemfile >/dev/null
 gem install bundler -v 2.2.13 --no-document
-bundle _2.2.13_ update rails sprockets-rails
+bundle _2.2.13_ update rails sprockets-rails devise
 bundle _2.2.13_ lock --add-platform x86_64-linux
 bundle _2.2.13_ exec ruby -e '
   require "rails"
