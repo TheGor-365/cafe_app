@@ -3,14 +3,14 @@
     <div class="cafe-site-footer__brand">
       <%= link_to "Gor's Coffee", root_path, class: 'cafe-site-footer__name' %>
       <p>Good coffee, thoughtful web experiences.</p>
-      <p class="cafe-site-footer__disclaimer">Portfolio demonstration only. No physical café, payment, delivery or real orders.</p>
+      <p class="cafe-site-footer__disclaimer">Portfolio project · No real purchases or payments.</p>
     </div>
     <nav aria-label="Footer navigation" class="cafe-site-footer__nav">
       <div>
         <h2>Explore</h2>
         <%= link_to 'Home', root_path %>
         <%= link_to 'Full menu', menu_path %>
-        <%= link_to 'Demo cart', cart_path %>
+        <%= link_to 'Cart', cart_path %>
         <%= link_to 'Catering concept', catering_path %>
       </div>
       <div>
@@ -23,7 +23,7 @@
     </nav>
   </div>
   <div class="cafe-site-footer__bottom">
-    <small>© <%= Time.current.year %> Gor's Coffee · Fictional portfolio demo</small>
+    <small>© <%= Time.current.year %> Gor's Coffee · Portfolio project</small>
     <a href="https://github.com/TheGor-365/cafe_app" target="_blank" rel="noopener noreferrer">Source project</a>
   </div>
 </footer>
