@@ -1,0 +1,69 @@
+name: Cafe Release Candidate — Rails and Docker
+
+on:
+  push:
+    branches: [release/cafe-demo-20261108]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rails-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container:
+      image: ruby:2.7.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_release_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_release_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-release-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify runtime bridge and lockfile
+        run: |
+          grep -Fx "ruby '2.7.8'" Gemfile
+          grep -Fx "gem 'rails', '~> 6.1.7', '>= 6.1.7.10'" Gemfile
+          grep -Fx '    rails (6.1.7.10)' Gemfile.lock
+      - name: Install pinned gems only
+        run: |
+          gem install bundler -v 2.2.13 --no-document
+          bundle _2.2.13_ config set --local frozen true
+          bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Build isolated PostgreSQL schema and stub test packs
+        run: |
+          bundle _2.2.13_ exec rails db:schema:load
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Full Rails Minitest
+        run: bundle _2.2.13_ exec rails test
+
+  docker-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build exact image without Railway secrets
+        run: |
+          set -o pipefail
+          DOCKER_BUILDKIT=1 docker build --progress=plain -t cafe-release-rc:local . 2>&1 | tee /tmp/cafe-release-build.log
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cafe-release-docker-log
+          path: /tmp/cafe-release-build.log
+          retention-days: 3
