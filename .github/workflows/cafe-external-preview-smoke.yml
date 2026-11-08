@@ -18,7 +18,7 @@ jobs:
           for attempt in $(seq 1 30); do
             status="$(curl --silent --show-error --max-time 12 -D /tmp/preview-headers -o /tmp/preview-body -w '%{http_code}' "$url/" || true)"
             echo "attempt=$attempt status=$status"
-            if [[ "$status" == "200" ]] && grep -q "Private portfolio preview" /tmp/preview-body && grep -qi '^set-cookie: __Host-cafe_preview_csrf=' /tmp/preview-headers && ! grep -qi '^www-authenticate:' /tmp/preview-headers; then
+            if [[ "$status" == "200" ]] && grep -q "Private portfolio preview" /tmp/preview-body && grep -q "Create a demo account" /tmp/preview-body && grep -q "Sign in to my account" /tmp/preview-body && grep -q "Browse as a guest" /tmp/preview-body && grep -qi '^set-cookie: __Host-cafe_preview_csrf=' /tmp/preview-headers && ! grep -qi '^www-authenticate:' /tmp/preview-headers; then
               break
             fi
             if [[ "$attempt" == 30 ]]; then
@@ -35,4 +35,4 @@ jobs:
           [[ "$health" == 'ok' ]] || { echo "FAIL health probe"; exit 1; }
           bad_post="$(curl --silent --show-error --max-time 15 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data 'csrf=invalid' "$url/__cafe_access")"
           [[ "$bad_post" == '403' ]] || { echo "FAIL: forged form accepted or incorrect status $bad_post"; exit 1; }
-          echo "PASS: HTTPS health, private browser login, signed CSRF cookie and denial of forged login. No credentials used."
+          echo "PASS: HTTPS health, English registration/sign-in/guest entry, signed CSRF cookie and forged login denied. No credentials used."
