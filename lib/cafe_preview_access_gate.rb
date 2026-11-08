@@ -48,10 +48,10 @@ class CafePreviewAccessGate
   def valid_basic?(header)
     return false unless header.to_s.start_with?('Basic ')
     encoded = header.split(' ', 2)[1]
-    return false if encoded.to_s.bytesize > 2048
+    return false if encoded.to_s.empty? || encoded.to_s.bytesize > 2048
     user, pass = Base64.strict_decode64(encoded).split(':', 2)
     valid_credentials?(user, pass)
-  rescue ArgumentError
+  rescue ArgumentError, TypeError
     false
   end
 
