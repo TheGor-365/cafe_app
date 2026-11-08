@@ -1,9 +1,9 @@
 <% content_for :title, "Sign In · Gor's Coffee" %>
 <main class="cafe-auth" aria-labelledby="cafe-auth-title">
   <header class="cafe-auth__intro">
-    <p class="cafe-auth__eyebrow">Welcome back · Demo café</p>
+    <p class="cafe-auth__eyebrow">Welcome back</p>
     <h1 id="cafe-auth-title">Sign in</h1>
-    <p>Access your demo profile and return to your sample basket.</p>
+    <p>Access your account and return to your basket.</p>
   </header>
   <section class="cafe-auth__card">
     <%= form_for(resource, as: resource_name, url: session_path(resource_name)) do |f| %>
@@ -27,5 +27,5 @@
       <%= render 'devise/shared/links' %>
     </nav>
   </section>
-  <p class="cafe-auth__disclaimer">Demo account only. No purchases, payments or real café reservations.</p>
+  <p class="cafe-auth__disclaimer">Portfolio project · No real purchases or payments.</p>
 </main>
