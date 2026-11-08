@@ -13,7 +13,7 @@ class OrderItemsController < ApplicationController
         @order_item = CartLineConsolidator.new(@order).add!(candidate)
         session[:order_id] = @order.id
         respond_to do |format|
-          format.html { redirect_to cart_path, notice: 'Added to your demo cart.' }
+          format.html { redirect_to cart_path, notice: 'Added to your cart.' }
           format.js
         end
       rescue CartLineConsolidator::QuantityLimitExceeded
