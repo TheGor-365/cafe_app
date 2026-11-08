@@ -1,0 +1,93 @@
+name: Cafe Rails 6.1 pinned bridge and full regression
+
+on:
+  push:
+    branches: [feature/cafe-rails61-stage1-20261108]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  promote:
+    if: github.event.head_commit.message == 'ci(cafe): prepare one-shot Rails 6.1 lock promotion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact green CI dependency artifact from same repository
+        uses: actions/download-artifact@v4
+        with:
+          name: cafe-ruby27_rails61-lockfile
+          run-id: 42427952297
+          github-token: ${{ github.token }}
+          path: verified-lock
+      - name: Guard artifact digest, branch and source before promotion
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "feature/cafe-rails61-stage1-20261108"
+          test "$(git log -1 --format=%s)" = "ci(cafe): prepare one-shot Rails 6.1 lock promotion"
+          test -z "$(git status --porcelain)"
+          printf '%s\n' \
+            '7d059de9e1bb03c178ba7b2ff9c7947fba3c067b92d8d5c040c6142b0743b544  verified-lock/Gemfile' \
+            'f5803e40308ac3ab519f886f6afff84cebffd9534616dc30e81f4537e7f7e1ff  verified-lock/Gemfile.lock' \
+            | sha256sum --check --status
+          grep -Fx "ruby '2.7.8'" verified-lock/Gemfile
+          grep -Fx "gem 'rails', '~> 6.1.7', '>= 6.1.7.10'" verified-lock/Gemfile
+          grep -Fx "gem 'logger', '= 1.4.2'" verified-lock/Gemfile
+          grep -Fx '    rails (6.1.7.10)' verified-lock/Gemfile.lock
+          cp verified-lock/Gemfile Gemfile
+          cp verified-lock/Gemfile.lock Gemfile.lock
+          printf 'ruby-2.7.8\n' > .ruby-version
+          git add -- Gemfile Gemfile.lock .ruby-version
+          git diff --cached --check
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore(cafe): pin verified Rails 6.1.7.10 Ruby 2.7 lock'
+          git push origin HEAD:feature/cafe-rails61-stage1-20261108
+
+  regression:
+    if: github.event.head_commit.message != 'ci(cafe): prepare one-shot Rails 6.1 lock promotion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ruby:2.7.8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: cafe_stage1_ci_only
+          POSTGRES_DB: cafe_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cafe_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      RUBYOPT: -rlogger
+      DATABASE_URL: postgres://postgres:cafe_stage1_ci_only@postgres:5432/cafe_test
+      BUNDLE_PATH: /tmp/cafe-stage1-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source now pins the resolved intermediate dependencies
+        run: |
+          grep -Fx "ruby '2.7.8'" Gemfile
+          grep -Fx "gem 'rails', '~> 6.1.7', '>= 6.1.7.10'" Gemfile
+          grep -Fx "gem 'logger', '= 1.4.2'" Gemfile
+          grep -Fx '    rails (6.1.7.10)' Gemfile.lock
+          grep -Fx 'ruby-2.7.8' .ruby-version
+      - name: Bundle install from tracked locked versions only
+        run: |
+          gem install bundler -v 2.2.13 --no-document
+          bundle _2.2.13_ config set --local frozen true
+          bundle _2.2.13_ install --jobs 2 --retry 2
+      - name: Prepare only temporary CI database and stub webpack packs
+        run: |
+          bundle _2.2.13_ exec rails db:schema:load
+          mkdir -p public/packs-test
+          printf '%s\n' '{"application.js":"/packs-test/js/application-test.js","application.css":"/packs-test/css/application-test.css"}' > public/packs-test/manifest.json
+      - name: Run complete Rails Minitest regression suite
+        run: bundle _2.2.13_ exec rails test
