@@ -8,14 +8,14 @@ class CoffeeHomeCartFlowTest < ActionDispatch::IntegrationTest
                                available: true, featured: true)
   end
 
-  test 'home has demo messaging, featured product and working menu CTA' do
+  test 'home has clear brand, featured product and working menu CTA' do
     get root_path
     assert_response :success
     assert_select 'h1#cafe-home-heading', text: /Good coffee/
     assert_select "a[href='#{menu_path}']", minimum: 1
     assert_select "a[href='#{cart_path}']", minimum: 1
     assert_includes response.body, @product.name
-    assert_includes response.body, 'No live café'
+    assert_includes response.body, 'No real orders, payments or deliveries.'
   end
 
   test 'new guest sees useful empty cart' do

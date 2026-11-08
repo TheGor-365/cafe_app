@@ -1,10 +1,10 @@
 <% content_for :title, "About & FAQ · Gor's Coffee" %>
 <main class="cafe-content-page" id="cafe-about" aria-labelledby="cafe-about-title">
   <header class="cafe-content-page__hero">
-    <p class="cafe-content-page__eyebrow">Our story · Portfolio demonstration</p>
+    <p class="cafe-content-page__eyebrow">Our story</p>
     <h1 id="cafe-about-title">A coffee experience, built for the web.</h1>
-    <p>Gor's Coffee is an interactive demonstration of a modern café storefront. Explore the menu, customize a drink and build a sample basket — without placing a real order.</p>
-    <%= link_to 'Explore the demo menu', menu_path, class: 'cafe-content-page__button' %>
+    <p>Explore our coffee shop website: browse the menu, customize your drink and manage your basket.</p>
+    <%= link_to 'Explore the menu', menu_path, class: 'cafe-content-page__button' %>
   </header>
 
   <section class="cafe-content-page__section" aria-labelledby="cafe-story-heading">
@@ -12,15 +12,15 @@
     <div class="cafe-content-page__grid">
       <article class="cafe-content-page__card">
         <h3>Browse</h3>
-        <p>Search by product, explore categories and filter products using their demo catalogue attributes.</p>
+        <p>Search by product, explore categories and filter products using their product attributes.</p>
       </article>
       <article class="cafe-content-page__card">
         <h3>Customize</h3>
-        <p>Choose available sizes and extras. A live estimate updates, while the server calculates the final demo basket price.</p>
+        <p>Choose available sizes and extras. A live estimate updates, while the server calculates the final basket price.</p>
       </article>
       <article class="cafe-content-page__card">
         <h3>Review</h3>
-        <p>Update quantities and review a session-based basket. No checkout, payment or real fulfilment is available.</p>
+        <p>Update quantities and review a session-based basket. Checkout records an order, but does not process real payment or fulfilment.</p>
       </article>
     </div>
   </section>
@@ -30,11 +30,11 @@
     <div class="cafe-content-page__faq">
       <details>
         <summary>Can I place a real order?</summary>
-        <p>No. This is a portfolio demonstration. Items placed in the basket are samples, and no real café receives an order.</p>
+        <p>No. Orders are illustrative and are not sent to a physical café.</p>
       </details>
       <details>
         <summary>Are these actual café prices?</summary>
-        <p>No. Prices, sizes and extras are fictional demonstration data. They are not offers from a physical business.</p>
+        <p>No. Prices, sizes and extras are illustrative catalogue data. They are not offers from a physical business.</p>
       </details>
       <details>
         <summary>How are prices calculated?</summary>
@@ -42,11 +42,11 @@
       </details>
       <details>
         <summary>Can I use this site without an account?</summary>
-        <p>Yes. You can explore the menu and try the demo basket in a guest session. The basket belongs to that browser session.</p>
+        <p>Yes. You can explore the menu and try the basket in a guest session. The basket belongs to that browser session.</p>
       </details>
       <details>
         <summary>Do you offer delivery or catering?</summary>
-        <p>Not through this demo. The <%= link_to 'Catering concept', catering_path %> describes a potential website feature, not a live service.</p>
+        <p>Not currently. The <%= link_to 'Catering concept', catering_path %> describes a potential website feature, not a live service.</p>
       </details>
     </div>
   </section>
@@ -56,7 +56,7 @@
     <div class="cafe-content-page__location">
       <div class="cafe-content-page__map-placeholder" role="img" aria-label="Decorative conceptual street map; no real location or address is provided">
         <span class="cafe-content-page__map-mark" aria-hidden="true">GC</span>
-        <span class="cafe-content-page__map-caption">Location not published · demo only</span>
+        <span class="cafe-content-page__map-caption">Location not available</span>
       </div>
       <div>
         <h3>No physical café address</h3>
@@ -69,7 +69,7 @@
   <section class="cafe-content-page__section" id="contact" aria-labelledby="cafe-contact-heading">
     <h2 id="cafe-contact-heading">Contact & feedback</h2>
     <div class="cafe-content-page__card">
-      <p>This demo does not have a public café phone number, mailbox or customer service desk. For technical project feedback, visit the public source repository.</p>
+      <p>This site does not publish a café phone number, mailbox or customer service desk. For technical project feedback, visit the public source repository.</p>
       <a class="cafe-content-page__button" href="https://github.com/TheGor-365/cafe_app" target="_blank" rel="noopener noreferrer">View the project on GitHub</a>
       <p class="cafe-content-page__fineprint">No real reservations, orders or support requests are handled here.</p>
     </div>

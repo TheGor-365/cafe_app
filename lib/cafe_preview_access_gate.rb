@@ -16,7 +16,7 @@ class CafePreviewAccessGate
   }.freeze
   SESSION_COOKIE = '__Host-cafe_preview'.freeze
   CSRF_COOKIE = '__Host-cafe_preview_csrf'.freeze
-  SESSION_TTL = 8 * 60 * 60
+  SESSION_TTL = 7 * 24 * 60 * 60
   CSRF_TTL = 10 * 60
   MAX_BODY_BYTES = 4096
 
@@ -150,9 +150,8 @@ class CafePreviewAccessGate
       <body><main>
         <p class="eyebrow">Private portfolio preview</p>
         <h1>Gor's Coffee</h1>
-        <p>Explore the coffee shop, create your own demo account, or sign in to an existing one.</p>
-        <div class="step"><strong>Step 1 of 2 — Unlock this private preview.</strong>
-          These are the preview access credentials configured in Railway, not your café account email and password.</div>
+        <p>Sign in or create an account to explore the coffee shop.</p>
+        <div class="step">Private preview access · Enter the access details saved in Railway.</div>
         #{message}
         <form method="post" action="#{LOGIN_PATH}" autocomplete="off">
           <input type="hidden" name="csrf" value="#{csrf}">
@@ -161,12 +160,12 @@ class CafePreviewAccessGate
           <label for="password">Preview access password</label>
           <input id="password" type="password" name="password" required autocomplete="off" maxlength="512">
           <div class="actions">
-            <button class="primary" type="submit" name="intent" value="register">Create a demo account</button>
-            <button class="secondary" type="submit" name="intent" value="sign_in">Sign in to my account</button>
-            <button class="secondary" type="submit" name="intent" value="browse">Browse as a guest</button>
+            <button class="primary" type="submit" name="intent" value="register">Create account</button>
+            <button class="secondary" type="submit" name="intent" value="sign_in">Sign in</button>
+            <button class="secondary" type="submit" name="intent" value="browse">Continue as guest</button>
           </div>
         </form>
-        <p class="small"><strong>Step 2:</strong> After unlocking, you will go directly to registration, sign-in or the sample menu. For a new account, choose your own email and password. No real orders or payments.</p>
+        <p class="small">You only need to unlock this private preview once per browser session period. Account credentials are separate.</p>
       </main></body></html>
     HTML
     [status, security_headers.merge(

@@ -1,18 +1,18 @@
-<% content_for :title, "Demo Checkout · Gor's Coffee" %>
+<% content_for :title, "Checkout · Gor's Coffee" %>
 <main class="cafe-checkout" aria-labelledby="checkout-title">
   <header class="cafe-checkout__hero">
-    <p class="cafe-checkout__eyebrow">Portfolio demonstration only</p>
-    <h1 id="checkout-title">Demo checkout</h1>
-    <p>No payment, live reservation, delivery or preparation takes place. Use fictional sample details only.</p>
+    <p class="cafe-checkout__eyebrow">Your order</p>
+    <h1 id="checkout-title">Checkout</h1>
+    <p>Orders are for portfolio testing; no payment, delivery or food preparation takes place.</p>
   </header>
   <% if @order.errors.any? %>
     <div class="cafe-checkout__errors" role="alert">
-      <strong>Check the sample details:</strong>
+      <strong>Review your order:</strong>
       <ul><% @order.errors.full_messages.each do |message| %><li><%= message %></li><% end %></ul>
     </div>
   <% end %>
   <section aria-labelledby="checkout-summary">
-    <h2 id="checkout-summary">Your demo basket</h2>
+    <h2 id="checkout-summary">Your basket</h2>
     <ul class="cafe-checkout__items">
       <% @order.order_items.includes(:product).each do |item| %>
         <li><span><%= item.product.name %> × <%= item.quantity %></span>
@@ -22,21 +22,21 @@
     <p class="cafe-checkout__total">Total <strong><%= number_to_currency(@order.order_items.sum { |item| item.total || 0 }) %></strong></p>
   </section>
   <section aria-labelledby="pickup-details">
-    <h2 id="pickup-details">Fictional pickup details</h2>
+    <h2 id="pickup-details">Pickup details</h2>
     <%= form_with url: demo_orders_path, scope: :demo_order, local: true, class: 'cafe-checkout__form' do |form| %>
-      <%= form.label :pickup_name, 'Sample pickup name (not your real name)' %>
+      <%= form.label :pickup_name, 'Pickup name (use a fictional name)' %>
       <%= form.text_field :pickup_name, value: @order.pickup_name, required: true, minlength: 2, maxlength: 60,
-            placeholder: 'Demo Guest', autocomplete: 'off' %>
-      <%= form.label :pickup_slot, 'Sample pickup time' %>
-      <%= form.select :pickup_slot, [['Right away (demo)', 'asap'],
-             ['After 15 minutes (demo)', 'fifteen_minutes'],
-             ['After 30 minutes (demo)', 'thirty_minutes']],
+            placeholder: 'Guest', autocomplete: 'off' %>
+      <%= form.label :pickup_slot, 'Pickup time' %>
+      <%= form.select :pickup_slot, [['Right away', 'asap'],
+             ['After 15 minutes', 'fifteen_minutes'],
+             ['After 30 minutes', 'thirty_minutes']],
             { selected: @order.pickup_slot || 'asap' }, { required: true } %>
-      <%= form.label :pickup_note, 'Optional fictional note' %>
+      <%= form.label :pickup_note, 'Optional note' %>
       <%= form.text_area :pickup_note, value: @order.pickup_note, maxlength: 200, rows: 3,
-            placeholder: 'For portfolio testing only' %>
-      <p>By submitting, you acknowledge that this is a fictional demonstration and no café will receive or fulfil this order.</p>
-      <%= form.submit 'Place demo order', class: 'cafe-checkout__submit' %>
+            placeholder: 'Notes for your order' %>
+      <p>This order is not sent to a real café.</p>
+      <%= form.submit 'Submit order', class: 'cafe-checkout__submit' %>
     <% end %>
     <%= link_to 'Back to cart', cart_path, class: 'cafe-checkout__back' %>
   </section>

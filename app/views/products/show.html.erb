@@ -10,10 +10,10 @@
 
   <header class="coffee-product-detail__heading">
     <div>
-      <p class="coffee-product-detail__eyebrow"><%= @product.category.heading %> · Demo menu</p>
+      <p class="coffee-product-detail__eyebrow"><%= @product.category.heading %> · Menu</p>
       <h1 id="coffee-detail-title"><%= @product.name %></h1>
-      <p><%= @product.description.presence || 'A sample item from our demo menu.' %></p>
-      <div class="coffee-product-detail__badges" aria-label="Demo catalogue attributes">
+      <p><%= @product.description.presence || 'A favourite from our menu.' %></p>
+      <div class="coffee-product-detail__badges" aria-label="Product attributes">
         <% if @product.vegan? %><span>Vegan</span><% end %>
         <% if @product.dairy_free? %><span>Dairy free</span><% end %>
         <% if @product.gluten_free? %><span>Gluten free</span><% end %>
@@ -23,10 +23,10 @@
   </header>
 
   <% if @product.available? %>
-    <section class="coffee-product-detail__purchase" aria-label="Configure and add <%= @product.name %> to demo cart">
+    <section class="coffee-product-detail__purchase" aria-label="Configure and add <%= @product.name %> to cart">
       <div class="coffee-product-detail__intro">
         <h2>Make it yours</h2>
-        <p>Choose available options, review the price and add this sample item to your demo basket.</p>
+        <p>Choose available options, review the price and add this item to your basket.</p>
       </div>
       <%# Reuse the exact server-backed menu form, including its no-JavaScript fallback. %>
       <div class="coffee-product-detail__catalog-form">
@@ -36,7 +36,7 @@
   <% else %>
     <section class="coffee-product-detail__unavailable" role="status">
       <h2>Temporarily unavailable</h2>
-      <p>This sample product cannot be added to the demo basket right now.</p>
+      <p>This product cannot be added to the basket right now.</p>
       <%= link_to 'See available items', menu_path, class: 'coffee-product-detail__back' %>
     </section>
   <% end %>
@@ -47,18 +47,18 @@
 
   <section class="coffee-product-detail__information" aria-labelledby="coffee-detail-facts-title">
     <h2 id="coffee-detail-facts-title">A closer look at this item</h2>
-    <p class="coffee-product-detail__section-intro">The details below come from the sample catalogue, beyond the short menu card. Prices and dietary labels are for demonstration.</p>
+    <p class="coffee-product-detail__section-intro">The details below come from the catalogue, beyond the short menu card. Prices and dietary labels are for demonstration.</p>
     <dl class="coffee-product-detail__facts">
       <div>
         <dt>Menu category</dt>
         <dd><%= @product.category.heading %></dd>
       </div>
       <div>
-        <dt>Demo availability</dt>
-        <dd><%= @product.available? ? 'Available for the demo basket' : 'Currently unavailable' %></dd>
+        <dt>Availability</dt>
+        <dd><%= @product.available? ? 'Available to order' : 'Currently unavailable' %></dd>
       </div>
       <div>
-        <dt>Starting sample price</dt>
+        <dt>Starting price</dt>
         <dd>
           <% if @product.product_variants.any? %>
             <%= available_sizes.any? ? number_to_currency(BigDecimal(available_sizes.first.price_cents.to_s) / 100) : 'No size currently available' %>
@@ -79,9 +79,9 @@
             <% end %>
           </ul>
         <% elsif @product.product_variants.any? %>
-          <p>Size options are currently unavailable in this demo.</p>
+          <p>Size options are currently unavailable for this product.</p>
         <% else %>
-          <p>This item has one standard sample price and no separate size options.</p>
+          <p>This item has one standard price and no separate size options.</p>
         <% end %>
       </div>
       <div class="coffee-product-detail__info-card">
@@ -97,7 +97,7 @@
             </ul>
           <% end %>
         <% else %>
-          <p>No additional customizations are listed for this sample item.</p>
+          <p>No additional customizations are listed for this item.</p>
         <% end %>
       </div>
       <div class="coffee-product-detail__info-card">
@@ -105,12 +105,12 @@
         <% labels = { vegan: 'Vegan', vegetarian: 'Vegetarian', dairy_free: 'Dairy free', gluten_free: 'Gluten free', peanut_free: 'Peanut free', kosher: 'Kosher' } %>
         <% present_labels = labels.select { |flag, _| @product.public_send(flag) }.values %>
         <% if present_labels.any? %>
-          <p>Catalogued demo attributes:</p>
+          <p>Product attributes:</p>
           <ul class="coffee-product-detail__dietary-list">
             <% present_labels.each do |label| %><li><%= label %></li><% end %>
           </ul>
         <% else %>
-          <p>No dietary suitability attributes are listed for this sample.</p>
+          <p>No dietary suitability attributes are listed for this item.</p>
         <% end %>
         <p class="coffee-product-detail__caution">Ingredients, allergens and preparation practices have not been independently verified. A missing label does not establish that an ingredient is present or absent.</p>
       </div>
@@ -122,7 +122,7 @@
       <div class="coffee-product-detail__related-heading">
         <div>
           <h2 id="coffee-detail-related-title">More from <%= @product.category.heading %></h2>
-          <p>Discover other currently available sample items in the same category.</p>
+          <p>Discover other currently available items in the same category.</p>
         </div>
         <%= link_to 'See this category', menu_path(category_id: @product.category_id), class: 'coffee-product-detail__back' %>
       </div>
@@ -148,6 +148,6 @@
   <% end %>
 
   <aside class="coffee-product-detail__disclaimer">
-    <strong>Demo only.</strong> Sample pricing and catalogue information; no real order or payment is placed. Product dietary flags are demonstration attributes, not food-safety guarantees.
+    No payment or fulfilment is provided. Prices and product information are illustrative. Product dietary flags are demonstration attributes, not food-safety guarantees.
   </aside>
 </main>

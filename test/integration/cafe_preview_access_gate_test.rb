@@ -17,7 +17,7 @@ class CafePreviewAccessGateTest < ActiveSupport::TestCase
   test 'anonymous browser gets a login page, not a repeated 401 Basic challenge' do
     response = @request.get('/')
     assert_equal 200, response.status
-    assert_includes response.body, 'Create a demo account'
+    assert_includes response.body, 'Create account'
     assert_includes response.body, 'name="csrf"'
     assert_nil response['WWW-Authenticate']
     assert_includes response['Set-Cookie'], 'Secure'
@@ -70,10 +70,9 @@ class CafePreviewAccessGateTest < ActiveSupport::TestCase
   test 'preview access clearly offers registration, sign in and guest browsing in English' do
     response = @request.get('/')
     assert_equal 200, response.status
-    assert_includes response.body, 'Create a demo account'
-    assert_includes response.body, 'Sign in to my account'
-    assert_includes response.body, 'Browse as a guest'
-    assert_includes response.body, 'Step 1 of 2'
+    assert_includes response.body, 'Create account'
+    assert_includes response.body, 'Sign in'
+    assert_includes response.body, 'Continue as guest'
     assert_includes response.body, 'Preview access username'
     assert_not_includes response.body, 'Закрытая'
     assert_not_includes response.body, 'Войти'

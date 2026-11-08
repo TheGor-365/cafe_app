@@ -62,7 +62,7 @@ class CoffeeRichDetailsAndFaqMotionTest < ActionDispatch::IntegrationTest
     get product_path(@related)
     assert_response :success
     assert_select 'section.coffee-product-detail__information' do
-      assert_select '.coffee-product-detail__info-card', text: /one standard sample price/
+      assert_select '.coffee-product-detail__info-card', text: /one standard price/
       assert_select '.coffee-product-detail__info-card', text: /No additional customizations/
       assert_select '.coffee-product-detail__info-card', text: /No dietary suitability attributes/
     end
