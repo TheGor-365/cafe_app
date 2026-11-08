@@ -18,7 +18,7 @@ class ProductVariantsController < ApplicationController
     @page = 'admin'
     @variant = @product.product_variants.build(variant_params)
     if @variant.save
-      redirect_to product_product_variants_path(@product), notice: 'Demo size created.'
+      redirect_to product_product_variants_path(@product), notice: 'Size created.'
     else
       render :new, status: :unprocessable_entity
     end
@@ -31,7 +31,7 @@ class ProductVariantsController < ApplicationController
   def update
     @page = 'admin'
     if @variant.update(variant_params)
-      redirect_to product_product_variants_path(@product), notice: 'Demo size updated.'
+      redirect_to product_product_variants_path(@product), notice: 'Size updated.'
     else
       render :edit, status: :unprocessable_entity
     end
@@ -42,7 +42,7 @@ class ProductVariantsController < ApplicationController
       redirect_to product_product_variants_path(@product),
                   alert: 'Size referenced by a saved basket: set Unavailable instead of deleting.'
     elsif @variant.destroy
-      redirect_to product_product_variants_path(@product), notice: 'Unused demo size deleted.'
+      redirect_to product_product_variants_path(@product), notice: 'Unused size deleted.'
     else
       redirect_to product_product_variants_path(@product), alert: 'Size could not be deleted.'
     end
