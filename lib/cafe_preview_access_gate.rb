@@ -1,5 +1,6 @@
-# Browser-friendly authentication for the isolated, private Railway preview.
-# The unsupported legacy Rails stack must not be exposed without this gate.
+# One-step browser authentication for the isolated Railway portfolio preview.
+# Devise remains the source of truth for user credentials and sessions.
+# No second shared preview password or HTTP Basic challenge is presented.
 require 'rack/request'
 require 'rack/utils'
 require 'base64'
@@ -8,205 +9,161 @@ require 'openssl'
 
 class CafePreviewAccessGate
   HEALTH_PATH = '/__cafe_health'.freeze
-  LOGIN_PATH = '/__cafe_access'.freeze
-  LOGIN_DESTINATIONS = {
-    'register' => '/users/sign_up',
-    'sign_in' => '/users/sign_in',
-    'browse' => '/'
-  }.freeze
   SESSION_COOKIE = '__Host-cafe_preview'.freeze
-  CSRF_COOKIE = '__Host-cafe_preview_csrf'.freeze
   SESSION_TTL = 8 * 60 * 60
-  CSRF_TTL = 10 * 60
-  MAX_BODY_BYTES = 4096
 
-  def initialize(app, username:, password:, secret:)
-    unless password.to_s.bytesize >= 24 && secret.to_s.bytesize >= 32
-      raise ArgumentError, 'Private preview requires a 24+ byte password and a 32+ byte signing secret'
-    end
+  PUBLIC_PAGES = {
+    '/users/sign_in' => ['GET', 'HEAD', 'POST'],
+    '/users/sign_up' => ['GET', 'HEAD'],
+    '/users' => ['POST'],
+    '/users/password/new' => ['GET', 'HEAD'],
+    '/users/password/edit' => ['GET', 'HEAD'],
+    '/users/password' => ['POST', 'PUT', 'PATCH']
+  }.freeze
+  PUBLIC_ASSETS = %r{\A/(?:assets|packs)/[a-zA-Z0-9_./%+-]+\z}.freeze
+  STATIC_PATHS = %w[/favicon.svg /favicon.ico /robots.txt].freeze
+
+  def initialize(app, secret:)
+    raise ArgumentError, 'A 32+ byte preview signing secret is required' if secret.to_s.bytesize < 32
     @app = app
-    @username = username.to_s
-    @password = password.to_s
-    # A password rotation invalidates all previously issued preview cookies.
-    @key = OpenSSL::HMAC.digest('SHA256', secret.to_s, "cafe-preview-session-v1:#{@password}")
+    @key = OpenSSL::HMAC.digest('SHA256', secret.to_s, 'cafe-browser-preview-v2')
   end
 
   def call(env)
     request = Rack::Request.new(env)
     return healthcheck if request.get? && request.path_info == HEALTH_PATH
-    return @app.call(env) if authorized?(request)
-    return login(request) if request.post? && request.path_info == LOGIN_PATH
 
-    # No WWW-Authenticate challenge: Chrome was repeatedly retrying HTTP 401.
-    return login_page if request.get? || request.head?
+    # Existing signed-in users can visit their app without another gate.
+    # Devise continues to authorize every admin and account action.
+    return pass_authenticated(env, request) if valid_token?(request.cookies[SESSION_COOKIE])
 
-    [403, security_headers.merge('Content-Type' => 'text/plain; charset=utf-8'), ['Forbidden']]
+    return @app.call(env) if public_asset?(request)
+    return route_to_devise(env, request) if public_devise?(request)
+    return landing if request.get? || request.head?
+
+    [403, headers('text/plain; charset=utf-8'), ['Sign in required']]
   end
 
   private
 
-  def authorized?(request)
-    valid_token?(request.cookies[SESSION_COOKIE], 'session') ||
-      valid_basic?(request.get_header('HTTP_AUTHORIZATION'))
+  def pass_authenticated(env, request)
+    status, response_headers, body = @app.call(env)
+    # Signing out invalidates the browser preview authorization too.
+    if request.path_info == '/users/sign_out' && %w[POST DELETE].include?(request.request_method)
+      return [status, append_cookie(response_headers, expired_cookie), body]
+    end
+    [status, response_headers, body]
   end
 
-  def valid_basic?(header)
-    return false unless header.to_s.start_with?('Basic ')
-    encoded = header.split(' ', 2)[1]
-    return false if encoded.to_s.empty? || encoded.to_s.bytesize > 2048
-    user, pass = Base64.strict_decode64(encoded).split(':', 2)
-    valid_credentials?(user, pass)
-  rescue ArgumentError, TypeError
-    false
-  end
+  def route_to_devise(env, request)
+    status, response_headers, body = @app.call(env)
+    warden = env['warden']
 
-  def valid_credentials?(user, pass)
-    return false unless user.is_a?(String) && pass.is_a?(String)
-    return false if user.bytesize > 512 || pass.bytesize > 512
-    equal?(user, @username) && equal?(pass, @password)
-  end
-
-  def equal?(a, b)
-    Rack::Utils.secure_compare(
-      OpenSSL::Digest::SHA256.digest(a.to_s),
-      OpenSSL::Digest::SHA256.digest(b.to_s)
-    )
-  end
-
-  def login(request)
-    return too_large if request.content_length.to_i > MAX_BODY_BYTES
-    return bad_request unless request.media_type == 'application/x-www-form-urlencoded'
-
-    body = request.body.read(MAX_BODY_BYTES + 1)
-    return too_large if body.bytesize > MAX_BODY_BYTES
-    params = Rack::Utils.parse_nested_query(body)
-
-    csrf = params['csrf']
-    cookie_token = request.cookies[CSRF_COOKIE]
-    unless csrf.is_a?(String) && cookie_token.is_a?(String) &&
-           valid_token?(cookie_token, 'csrf') && equal?(csrf, cookie_token)
-      return login_page(error: 'Session expired. Reload this page.', status: 403)
+    # Issue the preview cookie only AFTER Devise authenticates the user's
+    # actual account. Failed sign-in, invalid CSRF and invalid signup never pass.
+    if warden && warden.authenticated?(:user)
+      return [status, append_cookie(response_headers, session_cookie), body]
     end
 
-    intent = LOGIN_DESTINATIONS.key?(params['intent']) ? params['intent'] : 'browse'
-    if valid_credentials?(params['username'], params['password'])
-      return [303, security_headers.merge(
-        'Location' => LOGIN_DESTINATIONS.fetch(intent),
-        'Set-Cookie' => cookie(SESSION_COOKIE, new_token('session', SESSION_TTL), SESSION_TTL)
-      ), []]
-    end
-
-    login_page(error: 'Incorrect preview credentials.', status: 401, intent: intent)
-  rescue ArgumentError
-    bad_request
+    [status, response_headers, body]
   end
 
-  def bad_request
-    [400, security_headers.merge('Content-Type' => 'text/plain; charset=utf-8'), ['Invalid request']]
+  def public_devise?(request)
+    (PUBLIC_PAGES[request.path_info] || []).include?(request.request_method)
   end
 
-  def too_large
-    [413, security_headers.merge('Content-Type' => 'text/plain; charset=utf-8'), ['Request too large']]
+  def public_asset?(request)
+    return false unless request.get? || request.head?
+    STATIC_PATHS.include?(request.path_info) || PUBLIC_ASSETS.match?(request.path_info)
   end
 
-  def login_page(error: nil, status: 200, intent: 'register')
-    csrf = new_token('csrf', CSRF_TTL)
-    message = error ? "<p class=\"error\" role=\"alert\">#{Rack::Utils.escape_html(error)}</p>" : ''
+  def landing
     html = <<~HTML
       <!doctype html>
       <html lang="en">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Private Preview Access | Gor's Coffee</title>
+        <meta name="theme-color" content="#211b17">
+        <title>Welcome | Gor's Coffee</title>
         <style>
           *{box-sizing:border-box}
-          body{margin:0;background:radial-gradient(circle at 10% 0%,#30251f 0,#17171b 47%,#131419 100%);
-            color:#f7f2eb;font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;
-            min-height:100vh;display:grid;place-items:center;padding:24px}
-          main{max-width:460px;width:100%;background:#242127;border:1px solid #504239;
-            border-radius:20px;padding:clamp(24px,5vw,38px);box-shadow:0 24px 75px #0007}
-          .eyebrow{margin:0;color:#e4b977;letter-spacing:.16em;text-transform:uppercase;
-            font-size:12px;font-weight:800}
-          h1{font-size:clamp(29px,5vw,36px);letter-spacing:-.04em;line-height:1.2;margin:13px 0 10px;color:#f6d4a3}
-          p{color:#d2c8bf;margin:0 0 18px}
-          .step{background:#342e2c;color:#e5d5c2;border-left:3px solid #daa866;
-            border-radius:7px;padding:11px 13px;font-size:14px;margin:24px 0}
-          label{display:block;font-weight:700;margin:19px 0 6px;font-size:14px}
-          input{width:100%;background:#141419;border:1px solid #766b62;color:#fff;
-            padding:13px 14px;border-radius:9px;font:inherit;min-height:48px}
-          input:focus-visible,button:focus-visible{outline:3px solid #f2c98b;outline-offset:3px}
-          .actions{display:grid;gap:10px;margin-top:23px}
-          button{min-height:48px;border:0;border-radius:9px;font:inherit;font-weight:750;cursor:pointer;padding:12px}
-          .primary{background:#e3b774;color:#22170f}
-          .primary:hover{background:#f0c78c}
-          .secondary{background:transparent;border:1px solid #af9583;color:#f5e8d5}
-          .secondary:hover{background:#392f2c}
-          .small{font-size:13px;color:#bbaea2;line-height:1.65;margin:19px 0 0}
-          .error{color:#ffbeb2;font-weight:600;margin:10px 0}
-          @media(max-width:420px){body{padding:12px}main{padding:25px 21px}}
+          body{margin:0;background:radial-gradient(circle at 15% 10%,#463125 0,#1b1819 53%,#121316 100%);
+            color:#f5f0e9;font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh;
+            display:grid;place-items:center;padding:20px}
+          main{max-width:460px;width:100%;background:#272021;border:1px solid #6a4c37;
+            border-radius:22px;padding:clamp(25px,5vw,39px);box-shadow:0 20px 65px #0008}
+          .brand{display:flex;align-items:center;gap:12px;color:#f2ce99}
+          .mark{display:grid;place-items:center;background:#af7c48;border-radius:10px;color:white;
+            width:44px;height:44px;font-size:14px;font-weight:800}
+          .brand h1{font-size:27px;letter-spacing:-.03em;margin:0}
+          h2{font-size:32px;letter-spacing:-.035em;line-height:1.15;margin:35px 0 15px}
+          p{color:#d3c6b8;margin:0 0 22px}
+          .choices{display:grid;gap:12px;margin:26px 0}
+          a{display:flex;min-height:53px;align-items:center;justify-content:center;text-decoration:none;
+            border-radius:10px;font-weight:750;font-size:16px}
+          .primary{background:#ecc18a;color:#28190f}
+          .secondary{border:1px solid #b39276;color:#f4dfc5}
+          a:focus-visible{outline:3px solid #ecc18a;outline-offset:4px}
+          .note{font-size:12px;color:#b9aca0;border-top:1px solid #55483f;padding-top:18px;margin:0}
         </style>
       </head>
       <body><main>
-        <p class="eyebrow">Private portfolio preview</p>
-        <h1>Gor's Coffee</h1>
-        <p>Explore the coffee shop, create your own demo account, or sign in to an existing one.</p>
-        <div class="step"><strong>Step 1 of 2 — Unlock this private preview.</strong>
-          These are the preview access credentials configured in Railway, not your café account email and password.</div>
-        #{message}
-        <form method="post" action="#{LOGIN_PATH}" autocomplete="off">
-          <input type="hidden" name="csrf" value="#{csrf}">
-          <label for="username">Preview access username</label>
-          <input id="username" name="username" required autocomplete="off" maxlength="512">
-          <label for="password">Preview access password</label>
-          <input id="password" type="password" name="password" required autocomplete="off" maxlength="512">
-          <div class="actions">
-            <button class="primary" type="submit" name="intent" value="register">Create a demo account</button>
-            <button class="secondary" type="submit" name="intent" value="sign_in">Sign in to my account</button>
-            <button class="secondary" type="submit" name="intent" value="browse">Browse as a guest</button>
-          </div>
-        </form>
-        <p class="small"><strong>Step 2:</strong> After unlocking, you will go directly to registration, sign-in or the sample menu. For a new account, choose your own email and password. No real orders or payments.</p>
+        <header class="brand"><span class="mark">GC</span><h1>Gor's Coffee</h1></header>
+        <h2>Your coffee corner.</h2>
+        <p>Sign in to continue, or create an account to explore the menu and manage your orders.</p>
+        <nav class="choices" aria-label="Account access">
+          <a class="primary" href="/users/sign_in">Sign in</a>
+          <a class="secondary" href="/users/sign_up">Create account</a>
+        </nav>
+        <p class="note">Portfolio project. No real purchases or payments.</p>
       </main></body></html>
     HTML
-    [status, security_headers.merge(
-      'Content-Type' => 'text/html; charset=utf-8',
-      'Set-Cookie' => cookie(CSRF_COOKIE, csrf, CSRF_TTL)
-    ), [html]]
+    [200, headers('text/html; charset=utf-8'), [html]]
   end
 
-  def new_token(purpose, ttl)
-    data = "#{Time.now.to_i + ttl}:#{SecureRandom.hex(20)}"
-    encoded = Base64.urlsafe_encode64(data, padding: false)
-    mac = OpenSSL::HMAC.hexdigest('SHA256', @key, "#{purpose}:#{encoded}")
-    "#{encoded}.#{mac}"
-  end
-
-  def valid_token?(token, purpose)
-    return false unless token.is_a?(String) && token.bytesize.between?(70, 256)
-    encoded, mac = token.split('.', 2)
-    return false unless encoded && mac && mac.match?(/\A[0-9a-f]{64}\z/)
-    expected = OpenSSL::HMAC.hexdigest('SHA256', @key, "#{purpose}:#{encoded}")
-    return false unless Rack::Utils.secure_compare(mac, expected)
-    expires, nonce = Base64.urlsafe_decode64(encoded).split(':', 2)
-    return false unless expires && nonce &&
-                        expires.match?(/\A\d{10}\z/) && nonce.match?(/\A[0-9a-f]{40}\z/)
-    expires.to_i > Time.now.to_i
-  rescue ArgumentError
-    false
-  end
-
-  def cookie(name, value, ttl)
-    "#{name}=#{value}; Path=/; Max-Age=#{ttl}; Secure; HttpOnly; SameSite=Strict"
-  end
-
-  def security_headers
+  def headers(content_type)
     {
+      'Content-Type' => content_type,
       'Cache-Control' => 'no-store',
       'Referrer-Policy' => 'no-referrer',
       'X-Content-Type-Options' => 'nosniff',
-      'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+      'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"
     }
+  end
+
+  def session_cookie
+    expiry = Time.now.to_i + SESSION_TTL
+    data = Base64.urlsafe_encode64("#{expiry}:#{SecureRandom.hex(20)}", padding: false)
+    mac = OpenSSL::HMAC.hexdigest('SHA256', @key, "session:#{data}")
+    "#{SESSION_COOKIE}=#{data}.#{mac}; Path=/; Max-Age=#{SESSION_TTL}; Secure; HttpOnly; SameSite=Lax"
+  end
+
+  def expired_cookie
+    "#{SESSION_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax"
+  end
+
+  def append_cookie(original, cookie)
+    h = original.dup
+    k = h.keys.find { |key| key.to_s.downcase == 'set-cookie' } || 'Set-Cookie'
+    existing = h[k]
+    h[k] = existing.nil? || existing.to_s.empty? ? cookie : "#{existing}\n#{cookie}"
+    h
+  end
+
+  def valid_token?(token)
+    return false unless token.is_a?(String) && token.bytesize.between?(70, 256)
+    data, mac = token.split('.', 2)
+    return false unless data && mac && mac.match?(/\A[0-9a-f]{64}\z/)
+
+    expected = OpenSSL::HMAC.hexdigest('SHA256', @key, "session:#{data}")
+    return false unless Rack::Utils.secure_compare(mac, expected)
+
+    expiry, nonce = Base64.urlsafe_decode64(data).split(':', 2)
+    expiry.to_s.match?(/\A\d{10}\z/) &&
+      nonce.to_s.match?(/\A[0-9a-f]{40}\z/) && expiry.to_i > Time.now.to_i
+  rescue ArgumentError
+    false
   end
 
   def healthcheck

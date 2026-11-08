@@ -9,7 +9,7 @@ class DemoOrdersController < ApplicationController
     @page = 'cart'
     @order = current_order
     unless @order.persisted? && @order.order_items.exists?
-      redirect_to cart_path, alert: 'Add something to your cart before demo checkout.'
+      redirect_to cart_path, alert: 'Add something to your cart before checkout.'
     end
   end
 
@@ -17,7 +17,7 @@ class DemoOrdersController < ApplicationController
     @page = 'cart'
     @order = current_order
     unless @order.persisted?
-      redirect_to cart_path, alert: 'Your demo cart is empty.'
+      redirect_to cart_path, alert: 'Your cart is empty.'
       return
     end
 
@@ -37,11 +37,11 @@ class DemoOrdersController < ApplicationController
       end
       session.delete(:order_id)
       session[:last_demo_order_id] = @order.id
-      redirect_to demo_order_path(@order), notice: 'Demo order recorded — no payment or real preparation.'
+      redirect_to demo_order_path(@order), notice: 'Order recorded. No payment was made.'
     rescue ActiveRecord::RecordInvalid
       render :new, status: :unprocessable_entity
     rescue InvalidCheckout
-      redirect_to cart_path, alert: 'Demo checkout could not be completed. Review the cart.'
+      redirect_to cart_path, alert: 'Checkout could not be completed. Review your cart.'
     end
   end
 
@@ -74,7 +74,7 @@ class DemoOrdersController < ApplicationController
         raise InvalidTransition unless @order.allowed_next_statuses.include?(new_status)
         @order.update!(status: new_status)
       end
-      redirect_to admin_demo_orders_path, notice: 'Demo order status updated.'
+      redirect_to admin_demo_orders_path, notice: 'Order status updated.'
     rescue InvalidTransition
       redirect_to admin_demo_orders_path, alert: 'Invalid status transition.'
     end

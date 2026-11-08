@@ -7,7 +7,7 @@
     <%= link_to 'View the full menu', menu_path, class: 'coffee-menu__reset-link' %>
   </div>
 <% else %>
-  <p class="coffee-menu__result-count"><%= pluralize(@products.size, 'item') %> available in this demo menu</p>
+  <p class="coffee-menu__result-count"><%= pluralize(@products.size, 'item') %> available</p>
   <% @cats.each do |category| %>
     <% items = products_by_category.fetch(category.id, []) %>
     <% next if items.empty? %>
@@ -60,7 +60,7 @@
                      aria-labelledby="coffee-config-title-<%= product.id %>">
                   <div class="coffee-config__header">
                     <div>
-                      <p class="coffee-config__eyebrow">Gor's Coffee · Demo order</p>
+                      <p class="coffee-config__eyebrow">Gor's Coffee · Order</p>
                       <h4 id="coffee-config-title-<%= product.id %>"><%= product.name %></h4>
                       <p><%= truncate(product.description.to_s, length: 170) %></p>
                     </div>
@@ -121,7 +121,7 @@
                 <%= form.submit 'Add to cart', class: 'coffee-product-card__add',
                       disabled: configurable && variants.empty? %>
               <% end %>
-                  <p class="coffee-config__disclaimer">Demo basket only · No payment or actual order is placed.</p>
+                  <p class="coffee-config__disclaimer">No payment is required.</p>
                 </div>
               </details>
             </div>

@@ -1,23 +1,23 @@
-<% content_for :title, "Demo Orders · Gor's Coffee" %>
+<% content_for :title, "Orders · Gor's Coffee" %>
 <main class="cafe-admin" aria-labelledby="demo-admin-title">
   <header class="cafe-admin__hero">
     <div>
-      <p class="cafe-admin__eyebrow">Demo catalogue administration · no payments</p>
-      <h1 id="demo-admin-title">Demo order queue</h1>
-      <p>Sample orders only. Status transitions are constrained on the server.</p>
+      <p class="cafe-admin__eyebrow">Order administration</p>
+      <h1 id="demo-admin-title">Order queue</h1>
+      <p>Review orders and update their statuses.</p>
     </div>
     <%= link_to 'Manage products', products_path, class: 'cafe-admin__button' %>
   </header>
   <nav class="cafe-admin__tabs" aria-label="Admin management">
-    <%= link_to 'Demo orders', admin_demo_orders_path, 'aria-current': 'page' %>
+    <%= link_to 'Orders', admin_demo_orders_path, 'aria-current': 'page' %>
     <%= link_to 'Products', products_path %>
     <%= link_to 'Categories', categories_path %>
   </nav>
-  <% if @orders.empty? %><p class="cafe-admin__empty">No demo orders submitted yet.</p><% end %>
-  <section class="cafe-admin__panel" aria-label="Recent demo orders">
+  <% if @orders.empty? %><p class="cafe-admin__empty">No orders yet.</p><% end %>
+  <section class="cafe-admin__panel" aria-label="Recent orders">
     <div class="cafe-admin__table-wrap">
       <table class="cafe-admin__table">
-        <thead><tr><th scope="col">Demo order</th><th scope="col">Status</th><th scope="col">Items</th><th scope="col">Total</th><th scope="col">Next step</th></tr></thead>
+        <thead><tr><th scope="col">Order</th><th scope="col">Status</th><th scope="col">Items</th><th scope="col">Total</th><th scope="col">Next step</th></tr></thead>
         <tbody>
           <% @orders.each do |order| %>
             <tr>
@@ -41,6 +41,6 @@
         </tbody>
       </table>
     </div>
-    <p class="cafe-checkout__note">Latest 100 submitted demo orders only; cart drafts are excluded.</p>
+    <p class="cafe-checkout__note">Showing up to 100 submitted orders; unfinished carts are excluded.</p>
   </section>
 </main>

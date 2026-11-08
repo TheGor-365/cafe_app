@@ -1,7 +1,7 @@
 <% content_for :title, "Edit Profile · Gor's Coffee" %>
 <main class="cafe-auth" aria-labelledby="cafe-auth-title">
   <header class="cafe-auth__intro">
-    <p class="cafe-auth__eyebrow">My demo account</p>
+    <p class="cafe-auth__eyebrow">My account</p>
     <h1 id="cafe-auth-title">Edit your profile</h1>
     <p>Change your account details. Your current password is required to save changes.</p>
   </header>
@@ -42,10 +42,10 @@
     </div>
   </section>
   <section class="cafe-auth__danger" aria-labelledby="cafe-auth-danger-title">
-    <h2 id="cafe-auth-danger-title">Close your demo account</h2>
+    <h2 id="cafe-auth-danger-title">Close your account</h2>
     <p>This removes your account record. Your session basket is not a purchase history.</p>
     <%= link_to 'Cancel my account', registration_path(resource_name),
-          method: :delete, data: { confirm: 'Permanently delete this demo account?' },
+          method: :delete, data: { confirm: 'Permanently delete this account?' },
           class: 'cafe-auth__delete' %>
   </section>
 </main>

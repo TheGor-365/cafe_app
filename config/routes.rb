@@ -2,6 +2,8 @@ Rails.application.routes.draw do
 
   devise_for :users
   get 'account', to: 'account#show', as: :account
+  get 'owner/access', to: 'owner_access#new', as: :new_owner_access
+  post 'owner/access', to: 'owner_access#create', as: :owner_access
 
   root to: 'pages#home'
 

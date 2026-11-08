@@ -1,10 +1,19 @@
 <% content_for :title, "My Account · Gor's Coffee" %>
 <main class="cafe-account" aria-labelledby="cafe-account-heading">
   <header class="cafe-account__hero">
-    <p class="cafe-account__eyebrow">Your space · Demo account</p>
+    <p class="cafe-account__eyebrow">Your account</p>
     <h1 id="cafe-account-heading">Welcome<%= ", #{current_user.username}" if current_user.username.present? %>.</h1>
-    <p>Manage your demo profile and return to the coffee menu. No real orders or payments are processed.</p>
+    <p>Manage your profile, browse the menu and review your orders.</p>
   </header>
+
+  <% if !current_user.admin? && ENV['CAFE_OWNER_CLAIM_TOKEN'].to_s.bytesize >= 48 &&
+        current_user.username.to_s.casecmp(ENV.fetch('CAFE_OWNER_USERNAME', '')).zero? %>
+    <section class="cafe-auth__notice" aria-label="Owner permissions">
+      <strong>Owner permissions</strong>
+      <p>Activate your management tools using the one-time code stored in Railway.</p>
+      <%= link_to 'Activate owner access', new_owner_access_path, class: 'cafe-account__action' %>
+    </section>
+  <% end %>
 
   <section class="cafe-account__grid" aria-label="Account shortcuts">
     <article class="cafe-account__card">
@@ -17,33 +26,33 @@
       <p class="cafe-account__note">Update your email, username or password. Changing a password requires your current password.</p>
     </article>
     <article class="cafe-account__card">
-      <h2>Your demo basket</h2>
-      <p class="cafe-account__metric"><%= pluralize(@demo_cart_count, 'sample item') %></p>
+      <h2>Your cart</h2>
+      <p class="cafe-account__metric"><%= pluralize(@demo_cart_count, 'item') %></p>
       <p>The basket belongs to this browser session; it is not linked to your account or synchronized between devices.</p>
-      <%= link_to 'Review demo basket', cart_path, class: 'cafe-account__action' %>
+      <%= link_to 'Review cart', cart_path, class: 'cafe-account__action' %>
     </article>
     <article class="cafe-account__card">
       <h2>Explore the café</h2>
-      <p>Discover categories, customize available drinks and calculate sample prices.</p>
-      <%= link_to 'Explore sample menu', menu_path, class: 'cafe-account__action' %>
-      <p class="cafe-account__note">This is a portfolio project, not a live café or ordering service.</p>
+      <p>Discover categories, customize available drinks and review prices.</p>
+      <%= link_to 'Explore menu', menu_path, class: 'cafe-account__action' %>
+      <p class="cafe-account__note">Orders are not fulfilled in this portfolio project.</p>
     </article>
   </section>
 
 
   <section class="cafe-checkout__history" aria-labelledby="account-demo-orders">
-    <h2 id="account-demo-orders">Your demo orders</h2>
+    <h2 id="account-demo-orders">Your orders</h2>
     <% if @demo_orders.empty? %>
-      <p>No fictional orders submitted from this account yet.</p>
+      <p>No orders placed from this account yet.</p>
     <% else %>
       <ul class="cafe-checkout__items">
         <% @demo_orders.each do |order| %>
-          <li><%= link_to "Demo order ##{order.id}", demo_order_path(order) %>
+          <li><%= link_to "Order ##{order.id}", demo_order_path(order) %>
             <span><%= order.status.humanize %> · <%= number_to_currency(order.total) %></span>
           </li>
         <% end %>
       </ul>
     <% end %>
   </section>
-  <p class="cafe-account__privacy">Your cart is browser-session scoped. Demo orders submitted while signed in are visible to this account. No real purchases, payments, loyalty balance or delivery.</p>
+  <p class="cafe-account__privacy">Your cart is stored in this browser session. Orders placed while signed in appear here. No real purchases or payments.</p>
 </main>
