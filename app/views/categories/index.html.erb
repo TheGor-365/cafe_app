@@ -4,14 +4,14 @@
     <div>
       <p class="cafe-admin__eyebrow">Restricted · Catalogue administration</p>
       <h1 id="cafe-admin-title">Manage categories</h1>
-      <p>Organize the sample menu. Categories containing products cannot be deleted until their products are reassigned.</p>
+      <p>Organize the menu. Categories containing products cannot be deleted until their products are reassigned.</p>
     </div>
     <%= link_to 'New category', new_category_path, class: 'cafe-admin__button' %>
   </header>
   <nav class="cafe-admin__tabs" aria-label="Catalogue management">
     <%= link_to 'Products', products_path %>
     <%= link_to 'Categories', categories_path, 'aria-current': 'page' %>
-    <%= link_to 'Public demo menu', menu_path %>
+    <%= link_to 'View menu', menu_path %>
   </nav>
   <%= tag.p(alert, class: 'cafe-admin__alert', role: 'alert') if alert.present? %>
   <%= tag.p(notice, class: 'cafe-admin__notice', role: 'status') if notice.present? %>
