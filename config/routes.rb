@@ -1,4 +1,6 @@
 Rails.application.routes.draw do
+  # Railway checks app + database readiness without a separate login gate.
+  get '/__cafe_health', to: 'health#show'
 
   devise_for :users
   get 'account', to: 'account#show', as: :account
