@@ -8,7 +8,7 @@ class CoffeeStaticBrandingTest < ActionDispatch::IntegrationTest
     assert_select 'title', text: /Gor.s Coffee/
     assert_select 'meta[name=viewport][content=?]', 'width=device-width, initial-scale=1', count: 1
     assert_select 'meta[name=description]', count: 1
-    assert_select 'link[rel=icon][type="image/svg+xml"][href="/favicon.svg"]', count: 1
+    assert_select 'link[rel=icon][type="image/svg+xml"][href="/favicon.svg?v=20261109"]', count: 1
     assert_select 'meta[name=theme-color][content="#2c1c14"]', count: 1
   end
 
