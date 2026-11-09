@@ -55,4 +55,30 @@ jobs:
               { echo "FAIL: anonymous admin route improperly exposed: $path $status"; exit 1; }
           done
 
-          echo 'PASS: anonymous storefront, Devise sign-in/up, SVG favicon, PostgreSQL health and protected admin routes. No credentials used.'
+          # Confirm public homepage includes the new compact mobile actions and
+          # the served production stylesheet contains the final mobile-only rules.
+          grep -Fq 'cafe-mobile-account-actions' /tmp/cafe-home-body ||
+            { echo 'FAIL: compact account controls absent from HTML'; exit 1; }
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from urllib.parse import urljoin
+          from urllib.request import urlopen
+          class StylesheetParser(HTMLParser):
+              hrefs = []
+              def handle_starttag(self, tag, attrs):
+                  if tag == "link":
+                      data = dict(attrs)
+                      if "stylesheet" in data.get("rel", ""):
+                          self.hrefs.append(data.get("href", ""))
+          parser = StylesheetParser()
+          parser.feed(open("/tmp/cafe-home-body", encoding="utf-8").read())
+          urls = [urljoin("https://cafe-web-preview.up.railway.app/", p) for p in parser.hrefs if "application" in p and ".css" in p]
+          assert urls, "No compiled application stylesheet found"
+          combined = "\n".join(urlopen(url, timeout=25).read().decode("utf-8") for url in urls)
+          assert "cafe-mobile-account-actions" in combined, "Mobile actions not included in production CSS"
+          assert "nav.cafe-account-widget" in combined and "display: none !important" in combined, "Missing mobile account strip hiding"
+          assert ".home-page" in combined and ".cafe-home__hero-content" in combined, "Missing hero-first mobile rules"
+          print("PASS: compiled production CSS has new mobile hero-first rules")
+          PY
+
+          echo 'PASS: public storefront, Devise auth, favicon, health, admin isolation and mobile CSS. No credentials used.'
