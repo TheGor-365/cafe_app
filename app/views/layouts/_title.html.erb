@@ -4,8 +4,6 @@
     <span class="cafe-brandbar__name">Gor's Coffee</span>
   <% end %>
   <span class="cafe-brandbar__descriptor">Coffee &amp; good moments</span>
-  <%# On phones, the homepage starts with its hero; other pages keep a compact header. %>
-  <% unless @page == 'home' %>
-    <%= render 'layouts/mobile_account_actions' %>
-  <% end %>
+  <%# Consistent compact account shortcuts on every mobile page, including Home. %>
+  <%= render 'layouts/mobile_account_actions' %>
 </div>
