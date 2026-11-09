@@ -76,7 +76,8 @@ jobs:
           assert urls, "No compiled application stylesheet found"
           combined = "\n".join(urlopen(url, timeout=25).read().decode("utf-8") for url in urls)
           assert "cafe-mobile-account-actions" in combined, "Mobile actions not included in production CSS"
-          assert "nav.cafe-account-widget" in combined and "display: none !important" in combined, "Missing mobile account strip hiding"
+          import re
+          assert "nav.cafe-account-widget" in combined and re.search(r"display\s*:\s*none\s*!important", combined), "Missing mobile account strip hiding"
           assert ".home-page" in combined and ".cafe-home__hero-content" in combined, "Missing hero-first mobile rules"
           print("PASS: compiled production CSS has new mobile hero-first rules")
           PY
