@@ -1,0 +1,157 @@
+/*
+ * Compact mobile account actions. The original desktop account card is
+ * intentionally untouched; mobile uses accessible inline SVG icon controls.
+ * This file sorts after the historical mobile dock and sticky-header styles.
+ */
+@media (min-width: 761px) {
+  html body .cafe-mobile-account-actions { display: none !important; }
+}
+
+@media (max-width: 760px) {
+  /* Remove the redundant 60px account strip entirely on phones. */
+  html body .page-container.row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "main";
+  }
+  html body .page-container.row > nav.cafe-account-widget {
+    display: none !important;
+  }
+  html body .page-container.row > .col-8#cafe-main-content {
+    grid-area: main;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding-top: 0;
+  }
+
+  /* The coffee hero, not an account/header strip, starts the mobile home. */
+  html body .home-page .page-container.row > .col-8#cafe-main-content > .cafe-brandbar.title-card {
+    display: none !important;
+  }
+  html body .home-page #cafe-main-content > .cafe-home {
+    margin-top: 0;
+    padding-top: .55rem;
+  }
+
+  /* Secondary pages keep one compact brand bar with actions at the right. */
+  html body .page-container.row > .col-8#cafe-main-content > .cafe-brandbar.title-card {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    box-sizing: border-box;
+    min-height: 58px;
+    padding: .4rem .7rem;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: .5rem;
+  }
+  html body .cafe-brandbar__brand {
+    flex: 0 1 auto;
+    min-width: 0;
+    gap: .5rem;
+    font-size: 1.13rem;
+  }
+  html body .cafe-brandbar__mark {
+    width: 2.15rem;
+    height: 2.15rem;
+  }
+  html body .cafe-brandbar__descriptor { display: none; }
+
+  /* One pair of 44px touch targets; never a full-width profile bar. */
+  html body .cafe-mobile-account-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .35rem;
+    width: max-content;
+    margin-left: auto;
+  }
+  html body .cafe-mobile-account-actions__form {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  html body .cafe-mobile-account-actions__control {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0;
+    padding: 9px;
+    border: 1px solid rgba(234, 193, 137, .57);
+    border-radius: 11px;
+    background: rgba(42, 28, 20, .90);
+    color: #fbe7c9;
+    font: inherit;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    appearance: none;
+  }
+  html body .cafe-mobile-account-actions__signout {
+    color: #ffe2af;
+    background: rgba(108, 65, 32, .96);
+  }
+  html body .cafe-mobile-account-actions__control svg {
+    display: block;
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+  }
+  html body .cafe-mobile-account-actions__control:hover {
+    background: #7d4c2e;
+    color: #fff9ef;
+    text-decoration: none;
+    border-color: #ffda9b;
+  }
+  html body .cafe-mobile-account-actions__control:focus-visible {
+    outline: 3px solid #f6cb86;
+    outline-offset: 2px;
+  }
+
+  /* The home hero has its own mobile shortcuts; no duplicate header. */
+  html body .cafe-home__hero-content {
+    position: relative;
+  }
+  html body .cafe-home__hero-content > .cafe-mobile-account-actions {
+    position: absolute;
+    top: .65rem;
+    right: .65rem;
+    z-index: 2;
+    margin: 0;
+  }
+  html body .cafe-home__hero-content > .cafe-home__eyebrow {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding-right: 102px;
+    margin-top: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 360px) {
+  html body .page-container.row > .col-8#cafe-main-content > .cafe-brandbar.title-card {
+    padding: .35rem .5rem;
+  }
+  html body .cafe-brandbar__brand {
+    font-size: 1.02rem;
+    gap: .35rem;
+  }
+  html body .cafe-mobile-account-actions {
+    gap: .2rem;
+  }
+  html body .cafe-home__hero-content > .cafe-home__eyebrow {
+    padding-right: 98px;
+  }
+}
