@@ -1,4 +1,4 @@
-name: Cafe external protected-preview HTTP smoke
+name: Cafe external open-showcase HTTP smoke
 on:
   push:
     branches:
@@ -8,31 +8,51 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
-      - name: Verify anonymous browser flow and HTTPS health
+      - name: Verify public routes, favicon, health, and admin isolation without secrets
         shell: bash
         run: |
           set -euo pipefail
-          url="https://cafe-web-preview.up.railway.app"
-          for attempt in $(seq 1 30); do
-            status="$(curl --silent --show-error --max-time 12 -D /tmp/preview-headers -o /tmp/preview-body -w '%{http_code}' "$url/" || true)"
-            echo "attempt=$attempt status=$status"
-            if [[ "$status" == "200" ]] && grep -q "Private portfolio preview" /tmp/preview-body && grep -q "Create a demo account" /tmp/preview-body && grep -q "Sign in to my account" /tmp/preview-body && grep -q "Browse as a guest" /tmp/preview-body && grep -qi '^set-cookie: __Host-cafe_preview_csrf=' /tmp/preview-headers && ! grep -qi '^www-authenticate:' /tmp/preview-headers; then
+          url='https://cafe-web-preview.up.railway.app'
+          success=0
+          for attempt in $(seq 1 45); do
+            status="$(curl -sS --max-time 15 -D /tmp/cafe-home-headers -o /tmp/cafe-home-body -w '%{http_code}' "$url/" || true)"
+            echo "public storefront attempt=$attempt status=$status"
+            if [[ "$status" == '200' ]] &&
+               grep -Fq 'href="/users/sign_in"' /tmp/cafe-home-body &&
+               grep -Fq 'href="/users/sign_up"' /tmp/cafe-home-body &&
+               ! grep -Fq 'Preview access password' /tmp/cafe-home-body; then
+              success=1
               break
             fi
-            if [[ "$attempt" == 30 ]]; then
-              echo "FAIL: public browser login not returned without HTTP Basic retry"
-              sed -n '1,20p' /tmp/preview-headers || true
-              exit 1
-            fi
-            sleep 7
+            sleep 8
           done
-          grep -qi 'secure' /tmp/preview-headers
-          grep -qi 'httponly' /tmp/preview-headers
-          grep -qi 'samesite=strict' /tmp/preview-headers
-          health="$(curl --silent --show-error --max-time 15 "$url/__cafe_health")"
-          [[ "$health" == 'ok' ]] || { echo "FAIL health probe"; exit 1; }
-          bad_post="$(curl --silent --show-error --max-time 15 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data 'csrf=invalid' "$url/__cafe_access")"
-          [[ "$bad_post" == '403' ]] || { echo "FAIL: forged form accepted or incorrect status $bad_post"; exit 1; }
-          echo "PASS: HTTPS health, English registration/sign-in/guest entry, signed CSRF cookie and forged login denied. No credentials used."
+          [[ "$success" == '1' ]] || { echo 'FAIL: public storefront still gated'; exit 1; }
+
+          signin="$(curl -sS --max-time 20 -o /tmp/cafe-signin -w '%{http_code}' "$url/users/sign_in")"
+          [[ "$signin" == '200' ]] && grep -Fq 'Sign in' /tmp/cafe-signin ||
+            { echo 'FAIL: sign-in form not available'; exit 1; }
+
+          signup="$(curl -sS --max-time 20 -o /tmp/cafe-signup -w '%{http_code}' "$url/users/sign_up")"
+          [[ "$signup" == '200' ]] && grep -Fq 'Create an account' /tmp/cafe-signup ||
+            { echo 'FAIL: sign-up form not available'; exit 1; }
+
+          favstatus="$(curl -sS --max-time 20 -D /tmp/cafe-favicon-headers -o /tmp/cafe-favicon -w '%{http_code}' "$url/favicon.svg?v=20261109")"
+          [[ "$favstatus" == '200' ]] &&
+            grep -qi '^content-type: image/svg+xml' /tmp/cafe-favicon-headers &&
+            grep -Fq '<svg' /tmp/cafe-favicon ||
+            { echo 'FAIL: first-party favicon missing or returning HTML'; cat /tmp/cafe-favicon-headers; exit 1; }
+
+          healthstatus="$(curl -sS --max-time 20 -o /tmp/cafe-health -w '%{http_code}' "$url/__cafe_health")"
+          [[ "$healthstatus" == '200' ]] && [[ "$(cat /tmp/cafe-health)" == 'ok' ]] ||
+            { echo 'FAIL: database healthcheck'; exit 1; }
+
+          for path in /products /categories /admin/demo_orders; do
+            status="$(curl -sS --max-time 20 -D /tmp/cafe-protected-headers -o /tmp/cafe-protected-body -w '%{http_code}' "$url$path")"
+            [[ "$status" == '302' || "$status" == '303' ]] &&
+              grep -qi '^location: .*\/users\/sign_in' /tmp/cafe-protected-headers ||
+              { echo "FAIL: anonymous admin route improperly exposed: $path $status"; exit 1; }
+          done
+
+          echo 'PASS: anonymous storefront, Devise sign-in/up, SVG favicon, PostgreSQL health and protected admin routes. No credentials used.'
