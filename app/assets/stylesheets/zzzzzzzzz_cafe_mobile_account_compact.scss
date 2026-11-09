@@ -24,16 +24,7 @@
     padding-top: 0;
   }
 
-  /* The coffee hero, not an account/header strip, starts the mobile home. */
-  html body .home-page .page-container.row > .col-8#cafe-main-content > .cafe-brandbar.title-card {
-    display: none !important;
-  }
-  html body .home-page #cafe-main-content > .cafe-home {
-    margin-top: 0;
-    padding-top: .55rem;
-  }
-
-  /* Secondary pages keep one compact brand bar with actions at the right. */
+  /* Every page, including Home, keeps one compact brand bar. */
   html body .page-container.row > .col-8#cafe-main-content > .cafe-brandbar.title-card {
     position: sticky;
     top: 0;
@@ -119,25 +110,6 @@
     outline-offset: 2px;
   }
 
-  /* The home hero has its own mobile shortcuts; no duplicate header. */
-  html body .cafe-home__hero-content {
-    position: relative;
-  }
-  html body .cafe-home__hero-content > .cafe-mobile-account-actions {
-    position: absolute;
-    top: .65rem;
-    right: .65rem;
-    z-index: 2;
-    margin: 0;
-  }
-  html body .cafe-home__hero-content > .cafe-home__eyebrow {
-    display: flex;
-    align-items: center;
-    min-height: 44px;
-    padding-right: 102px;
-    margin-top: 0;
-    overflow-wrap: anywhere;
-  }
 }
 
 @media (max-width: 360px) {
@@ -150,8 +122,5 @@
   }
   html body .cafe-mobile-account-actions {
     gap: .2rem;
-  }
-  html body .cafe-home__hero-content > .cafe-home__eyebrow {
-    padding-right: 98px;
   }
 }
