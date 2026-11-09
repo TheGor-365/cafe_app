@@ -60,7 +60,7 @@ class CafeCompactMobileAccountTest < ActionDispatch::IntegrationTest
     assert_includes css, 'display: none !important'
     assert_includes css, 'grid-template-areas: "main"'
     assert_includes css, '.cafe-brandbar.title-card'
-    refute_includes css, 'display: none !important;\n  }\n  html body .home-page'
+    refute_includes css, '.home-page .page-container.row > .col-8#cafe-main-content > .cafe-brandbar.title-card'
     refute_includes css, '.cafe-home__hero-content > .cafe-mobile-account-actions'
     assert_includes css, 'min-height: 44px'
     assert_includes css, ':focus-visible'
