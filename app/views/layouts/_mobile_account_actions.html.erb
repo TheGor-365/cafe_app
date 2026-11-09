@@ -1,0 +1,42 @@
+<%# Compact first-party, Bootstrap-style outline icons for mobile only.
+    Keep Rails button_to DELETE semantics; no third-party icon font or JS. %>
+<div class="cafe-mobile-account-actions" role="group" aria-label="Account shortcuts">
+  <% if user_signed_in? %>
+    <%= link_to account_path, class: 'cafe-mobile-account-actions__control',
+          title: 'My account', 'aria-label': 'My account' do %>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="9"/>
+        <circle cx="12" cy="9" r="3"/>
+        <path d="M5.6 18.3c1.3-2.7 3.4-4.1 6.4-4.1s5.1 1.4 6.4 4.1"/>
+      </svg>
+    <% end %>
+    <%= button_to destroy_user_session_path, method: :delete,
+          class: 'cafe-mobile-account-actions__control cafe-mobile-account-actions__signout',
+          form_class: 'cafe-mobile-account-actions__form',
+          title: 'Sign out', 'aria-label': 'Sign out' do %>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5"/>
+        <path d="M14 7l5 5-5 5M9 12h10"/>
+      </svg>
+    <% end %>
+  <% else %>
+    <%= link_to new_user_session_path, class: 'cafe-mobile-account-actions__control',
+          title: 'Sign in', 'aria-label': 'Sign in' do %>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5"/>
+        <path d="M14 7l5 5-5 5M9 12h10"/>
+      </svg>
+    <% end %>
+    <%= link_to new_user_registration_path, class: 'cafe-mobile-account-actions__control',
+          title: 'Sign up', 'aria-label': 'Sign up' do %>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="9" cy="9" r="3"/>
+        <path d="M3.5 19c.4-3.3 2.3-5 5.5-5 1.4 0 2.7.4 3.7 1.2M18 8v8M14 12h8"/>
+      </svg>
+    <% end %>
+  <% end %>
+</div>
