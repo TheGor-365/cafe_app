@@ -60,6 +60,14 @@ jobs:
           grep -Fq 'cafe-mobile-account-actions' /tmp/cafe-home-body ||
             { echo 'FAIL: compact account controls absent from HTML'; exit 1; }
           python3 - <<'PY'
+          html = open('/tmp/cafe-home-body', encoding='utf-8').read()
+          brand = html.find('class="title-card cafe-brandbar"')
+          hero = html.find('class="cafe-home"')
+          assert brand >= 0 and hero > brand, "Mobile Home title header absent or after hero"
+          assert html.count('class="cafe-mobile-account-actions"') == 1, "Mobile account controls duplicated or missing"
+          print("PASS: homepage shared brandbar before hero with one account control group")
+          PY
+          python3 - <<'PY'
           from html.parser import HTMLParser
           from urllib.parse import urljoin
           from urllib.request import urlopen
